@@ -431,18 +431,6 @@ function checkValue(
 ): DroppedBy | undefined {
   const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
-  if (rule.undelimited && items.some((item) => DELIMITER_START.test(item))) {
-    if (field === 'correct') return 'undelimited';
-    throw new UnrecordableError(
-      `it is text ${startingWith(i, DELIMITERS)}, which this export standard reads as a delimiter`,
-    );
-  }
-  if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
-    if (field === 'correct') return 'untagged';
-    throw new UnrecordableError(
-      `it is text ${startingWith(i, '{lang=')}, which this export standard reads as a language tag or rejects`,
-    );
-  }
   if (rule.steps && i.type === 'performance') {
     checkSteps(i[field] ?? [], rule.steps, fmt);
   }
@@ -455,6 +443,18 @@ function checkValue(
   if (items.length > maxItems) {
     throw new UnrecordableError(
       `it has ${items.length} items, more than the ${maxItems} this export standard records`,
+    );
+  }
+  if (rule.undelimited && items.some((item) => DELIMITER_START.test(item))) {
+    if (field === 'correct') return 'undelimited';
+    throw new UnrecordableError(
+      `it is text ${startingWith(i, DELIMITERS)}, which this export standard reads as a delimiter`,
+    );
+  }
+  if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
+    if (field === 'correct') return 'untagged';
+    throw new UnrecordableError(
+      `it is text ${startingWith(i, '{lang=')}, which this export standard reads as a language tag or rejects`,
     );
   }
   if (rule.trimmed && items.some((item) => item.trim() !== item)) {
@@ -568,22 +568,25 @@ export function fitPatterns(
   const answers = correctItems(i, fmt);
   if (!answers) return { kept: null, warnings: [] };
   const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
+  const rejects = `which ${recorder} rejects`;
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
       case 'undelimited':
-        return startingWith(i, DELIMITERS);
+        return `${startingWith(i, DELIMITERS)}, which ${recorder} reads as a delimiter or rejects`;
       case 'untagged':
-        return startingWith(i, '{lang=');
+        return `${startingWith(i, '{lang=')}, ${rejects}`;
       case 'trimmed':
-        return isList(i)
-          ? 'with an item starting or ending in whitespace'
-          : i.type === 'fill-in'
-            ? 'starting or ending in whitespace, or with whitespace beside [,]'
-            : 'starting or ending in whitespace';
+        return `${
+          isList(i)
+            ? 'with an item starting or ending in whitespace'
+            : i.type === 'fill-in'
+              ? 'starting or ending in whitespace, or with whitespace beside [,]'
+              : 'starting or ending in whitespace'
+        }, ${rejects}`;
       case 'unique':
-        return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`;
+        return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}, ${rejects}`;
       case 'maxParts':
-        return `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts`;
+        return `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts, ${rejects}`;
     }
   };
   const warnings: string[] = [];
@@ -591,7 +594,7 @@ export function fitPatterns(
     const dropped = broken.filter((b) => b === rule).length;
     if (dropped) {
       warnings.push(
-        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} ${rule === 'undelimited' ? 'reads as a delimiter or rejects' : 'rejects'}; they are ${lost}`,
+        `has ${dropped} correct answer(s) ${reason(rule)}; they are ${lost}`,
       );
     }
   }

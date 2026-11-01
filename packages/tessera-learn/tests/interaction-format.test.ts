@@ -274,6 +274,21 @@ describe('SCORM 2004 ids inside a response', () => {
 });
 
 describe('fitPatterns', () => {
+  it('leaves out the whole field when a dropped answer also breaks a field rule', () => {
+    const fmt = {
+      ...SCORM2004_INTERACTION_FORMAT,
+      rules: {
+        'long-fill-in': { correct: { undelimited: true, maxItems: 0 } },
+      },
+    };
+    expect(() =>
+      fitPatterns(
+        { type: 'long-fill-in', response: '', correct: ['{lang=en}x'] },
+        fmt,
+      ),
+    ).toThrow('more than the 0');
+  });
+
   it.each([
     ['fill-in', 250],
     ['long-fill-in', 4000],
