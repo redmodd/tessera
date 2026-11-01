@@ -1,5 +1,12 @@
 # create-tessera
 
+## 0.12.1
+
+### Patch Changes
+
+- b709fc0: - `tsdown` 0.23.1 → 0.23.2
+- be4a88f: Type-check tests against one shared ES2024 config. No user-facing change.
+
 ## 0.12.0
 
 ### Patch Changes

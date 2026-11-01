@@ -2219,33 +2219,19 @@ let a = {}; let b = {};</script>
     ).toEqual([]);
   });
 
-  it.each([
-    ['scorm2004', 'caseSensitive', 1],
-    ['scorm2004', 'caseSensitive="true"', 1],
-    ['scorm2004', 'caseSensitive={false}', 0],
-    ['scorm2004', 'caseSensitive={undefined}', 0],
-    ['scorm2004', '{weight}', 0],
-    ['scorm2004', 'caseSensitive={strict}', 1],
-    ['scorm2004', '{...cfg}', 1],
-    ['scorm2004', 'caseSensitive={false} {...cfg}', 1],
-    ['scorm2004', '{...cfg} caseSensitive={false}', 0],
-    ['scorm12', 'caseSensitive', 0],
-  ])(
-    'counts the case-sensitive prefix toward the fill-in cap under %s with %s',
-    (standard, attr, warnings) => {
-      createValidProject(testRoot);
-      writeStandardConfig(standard);
-      writePage(
-        `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank ${attr} id="q1" question="Q" answers={["${'x'.repeat(232)}", "${'y'.repeat(231)}"]} />`,
-      );
-      expect(
-        validateProject(testRoot).warnings.filter((w) =>
-          w.includes('<FillInTheBlank> "q1" has 1 correct answer(s) over'),
-        ),
-      ).toHaveLength(warnings);
-    },
-  );
+  it('does not count the case-sensitive prefix toward the fill-in cap', () => {
+    createValidProject(testRoot);
+    writeStandardConfig('scorm2004');
+    writePage(
+      `<script>import { FillInTheBlank } from 'tessera-learn';</script>
+<FillInTheBlank caseSensitive id="q1" question="Q" answers={["${'x'.repeat(250)}"]} />`,
+    );
+    expect(
+      validateProject(testRoot).warnings.filter((w) =>
+        w.includes('<FillInTheBlank> "q1" has'),
+      ),
+    ).toEqual([]);
+  });
 
   it.each([
     ['web', null],

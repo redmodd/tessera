@@ -1,5 +1,18 @@
 # tessera-learn
 
+## 0.12.1
+
+### Patch Changes
+
+- be00f77: Under SCORM 2004, a case-sensitive fill-in answer can use the full 250 characters: the `{case_matters=true}` prefix no longer counts toward the cap. The prefix also no longer hides leading or trailing whitespace or a repeated `[,]`-separated part, so such an answer is left out of the LMS record with a warning, as it is without `caseSensitive`.
+- b709fc0: - `scorm-again` 3.4.6 → 3.4.7
+  - `tsdown` 0.23.1 → 0.23.2
+- b68feb4: - `vite` 8.3.4 → 8.3.5
+- 1edcb41: Course builds now target Chrome/Edge 111, Firefox 133 and Safari 16.4, pinned so a Vite update can't change the supported browsers. The export guide lists them.
+- ec7d403: Internal dependency change only; no user-facing change.
+- be4a88f: Type-check tests against one shared ES2024 config. No user-facing change.
+- dd4a70d: Internal test fix; no user-facing change.
+
 ## 0.12.0
 
 ### Minor Changes
