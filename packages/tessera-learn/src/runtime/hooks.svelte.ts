@@ -307,6 +307,9 @@ export function useProgress() {
     quizScore(pageIndex: number) {
       return progress.quizScore(pageIndex);
     },
+    quizUnscored(pageIndex: number) {
+      return progress.quizUnscored(pageIndex);
+    },
     pageScore(pageIndex = pageCtx?.index) {
       return pageIndex === undefined
         ? undefined

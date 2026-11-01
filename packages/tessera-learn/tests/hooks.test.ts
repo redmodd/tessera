@@ -629,6 +629,18 @@ describe('useProgress', () => {
     expect(h.successStatus).toBe('unknown');
   });
 
+  it('flags a submitted quiz with nothing to score as unscored', () => {
+    const { progress } = provideNavCtx();
+    progress.quizCompleted(1, 80);
+    progress.quizCompleted(2, 100, [], false);
+
+    const h = useProgress();
+    expect(h.quizUnscored(0)).toBe(false);
+    expect(h.quizUnscored(1)).toBe(false);
+    expect(h.quizScore(2)).toBe(100);
+    expect(h.quizUnscored(2)).toBe(true);
+  });
+
   it('exposes the course-wide graded score and pass threshold', () => {
     const manifest = createManifest(4, {
       1: { graded: true },
