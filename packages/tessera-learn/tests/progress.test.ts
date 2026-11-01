@@ -80,6 +80,16 @@ describe('ProgressState', () => {
       expect(restored.quizUnscored(2)).toBe(true);
     });
 
+    it('keeps a scored best attempt over an unscored tie', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 100, [['q1', 'a']]);
+      progress.quizCompleted(2, 100, [], false);
+      expect(progress.quizUnscored(2)).toBe(false);
+      expect(progress.toSaved().g).toMatchObject({ 2: { s: 100, a: 2 } });
+      progress.quizCompleted(2, 100, [['q1', 'b']]);
+      expect(progress.quizResponses(2)?.get('q1')).toBe('b');
+    });
+
     it('counts attempts per page', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.quizCompleted(2, 50);
