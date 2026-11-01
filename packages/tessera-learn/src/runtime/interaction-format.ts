@@ -16,11 +16,10 @@ export interface InteractionFormat {
    */
   supportsRange: boolean;
   /**
-   * SCORM 2004 4E RTE §4.2.7 fill-in patterns take `{case_matters=}`,
-   * `{order_matters=}` and `{lang=}` delimiters, so a correct answer starting
-   * with one is left out; SCORM 1.2 has no such syntax.
+   * SCORM 2004 4E RTE §4.2.7 allows fill-in patterns to carry a
+   * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
    */
-  fillInDelimiters: boolean;
+  supportsCasePrefix: boolean;
   encodesOptionIndex: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
@@ -64,6 +63,13 @@ interface ItemRule {
    */
   steps?: 'text' | 'range';
   /**
+   * No item can start with a closed `{lang=}`, `{case_matters=}` or
+   * `{order_matters=}`: the LMS strips it from the start of each fill-in
+   * part, or rejects the pattern when one can't go there. No escape keeps one
+   * as answer text. An unclosed one is plain text.
+   */
+  undelimited?: boolean;
+  /**
    * No item can start with `{lang=`, closed or not: the LMS reads a valid tag
    * as the item's language and rejects any other.
    */
@@ -71,8 +77,9 @@ interface ItemRule {
 }
 
 /**
- * In a correct answer, breaking `maxParts`, `trimmed`, `unique` or `untagged`
- * drops only that answer; breaking any other rule leaves out the whole field.
+ * In a correct answer, breaking `maxParts`, `trimmed`, `unique`,
+ * `undelimited` or `untagged` drops only that answer; breaking any other rule
+ * leaves out the whole field.
  */
 interface AnswerRule extends ItemRule {
   trimmed?: boolean;
@@ -101,13 +108,25 @@ const SCORM2004_RULES: ValueRules = {
   },
   'fill-in': {
     response: { maxParts: 10, untagged: true },
-    correct: { maxParts: 10, trimmed: true, unique: true },
+    correct: { maxParts: 10, trimmed: true, unique: true, undelimited: true },
   },
   'long-fill-in': {
     response: { untagged: true },
-    correct: { trimmed: true, untagged: true },
+    correct: { trimmed: true, untagged: true, undelimited: true },
   },
   other: { correct: { trimmed: true } },
+};
+
+/** xAPI reads a response in the correct pattern's format. */
+const XAPI_RULES: ValueRules = {
+  'fill-in': {
+    response: { undelimited: true },
+    correct: { undelimited: true },
+  },
+  'long-fill-in': {
+    response: { undelimited: true },
+    correct: { undelimited: true },
+  },
 };
 
 export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
@@ -115,7 +134,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '.',
   rangeDelim: ':',
   supportsRange: false,
-  fillInDelimiters: false,
+  supportsCasePrefix: false,
   encodesOptionIndex: true,
   fillInLimit: 10,
   longFillInLimit: 10,
@@ -136,7 +155,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '[.]',
   rangeDelim: '[:]',
   supportsRange: true,
-  fillInDelimiters: true,
+  supportsCasePrefix: true,
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
@@ -165,7 +184,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
-  rules: undefined,
+  rules: XAPI_RULES,
   responseId: (v) => v,
 };
 
@@ -347,58 +366,19 @@ function correctItems(
   }
 }
 
-function delimitedFillIn(
-  i: Interaction,
-  fmt: InteractionFormat,
-): Extract<Interaction, { type: 'fill-in' | 'long-fill-in' }> | undefined {
-  return fmt.fillInDelimiters &&
-    (i.type === 'fill-in' || i.type === 'long-fill-in')
-    ? i
-    : undefined;
-}
-
 /**
  * A delimiter, not part of the answer: the format's rules and length cap
  * apply to the answer alone.
  */
 function casePrefix(i: Interaction, fmt: InteractionFormat): string {
-  return delimitedFillIn(i, fmt)?.caseMatters ? CASE_PREFIX : '';
+  return fmt.supportsCasePrefix &&
+    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
+    i.caseMatters
+    ? CASE_PREFIX
+    : '';
 }
 
-/**
- * xAPI reads a response in the correct pattern's format, so one starting with
- * a fill-in delimiter is left out. Throws when the format cannot encode a value.
- */
-export function formatResponse(
-  questionId: string,
-  i: Interaction,
-  fmt: InteractionFormat,
-): string | null {
-  const items = responseItems(i, fmt);
-  if (!readsAsDelimiter(i, items, fmt)) return items.join(fmt.itemDelim);
-  console.warn(
-    `Tessera: the response of interaction "${questionId}" is left out of the LMS record: it starts with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a delimiter.`,
-  );
-  return null;
-}
-
-/**
- * The LMS strips these from the start of each fill-in part, or rejects the
- * pattern when one can't go there. No escape keeps one as answer text. An
- * unclosed one is plain text.
- */
 const DELIMITER_START = /^\{(?:lang|case_matters|order_matters)=[^}]*\}/;
-
-function readsAsDelimiter(
-  i: Interaction,
-  items: string[],
-  fmt: InteractionFormat,
-): boolean {
-  return (
-    delimitedFillIn(i, fmt) !== undefined &&
-    items.some((item) => DELIMITER_START.test(item))
-  );
-}
 
 const STEP_DELIM = /\[[,.:]\]/;
 
@@ -443,11 +423,14 @@ function checkValue(
   items: string[],
   fmt: InteractionFormat,
 ): DroppedBy | undefined {
-  if (field === 'correct' && readsAsDelimiter(i, items, fmt)) {
-    return 'delimiter';
-  }
   const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
+  if (rule.undelimited && items.some((item) => DELIMITER_START.test(item))) {
+    if (field === 'correct') return 'delimiter';
+    throw new UnrecordableError(
+      `it starts with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a delimiter`,
+    );
+  }
   if (rule.steps && i.type === 'performance') {
     checkSteps(i[field] ?? [], rule.steps, fmt);
   }
@@ -709,6 +692,48 @@ function fitResponse(
   return cut || null;
 }
 
+function recordable<T>(
+  questionId: string,
+  field: string,
+  format: () => T,
+): T | null {
+  try {
+    return format();
+  } catch (err) {
+    if (!(err instanceof UnrecordableError)) throw err;
+    console.warn(
+      `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
+    );
+    return null;
+  }
+}
+
+/** The response as the LMS records it, or null when it can't, with a warning. */
+export function formatResponse(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): string | null {
+  return recordable(questionId, 'response', () =>
+    fitResponse(questionId, i, fmt),
+  );
+}
+
+/** The correct patterns the LMS records, or null when none, with warnings. */
+export function formatPatterns(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): string[] | null {
+  return recordable(questionId, 'correct answer', () => {
+    const { kept, warnings } = fitPatterns(i, fmt);
+    for (const warning of warnings) {
+      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
+    }
+    return kept;
+  });
+}
+
 function warnResponseIds(
   questionId: string,
   i: Interaction,
@@ -761,27 +786,8 @@ export function buildScormInteractionFields(
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
   warnResponseIds(questionId, interaction, spec.format);
-  const recordable = <T>(field: string, format: () => T): T | null => {
-    try {
-      return format();
-    } catch (err) {
-      if (!(err instanceof UnrecordableError)) throw err;
-      console.warn(
-        `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
-      );
-      return null;
-    }
-  };
-  const patterns = recordable('correct answer', () => {
-    const { kept, warnings } = fitPatterns(interaction, spec.format);
-    for (const warning of warnings) {
-      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
-    }
-    return kept;
-  });
-  const response = recordable('response', () =>
-    fitResponse(questionId, interaction, spec.format),
-  );
+  const patterns = formatPatterns(questionId, interaction, spec.format);
+  const response = formatResponse(questionId, interaction, spec.format);
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });

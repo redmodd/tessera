@@ -5,7 +5,7 @@ import type {
 } from '../persistence.js';
 import type { Verdict } from '../types.js';
 import type { Interaction } from '../interaction.js';
-import { formatResponse, fitPatterns } from '../interaction-format.js';
+import { formatResponse, formatPatterns } from '../interaction-format.js';
 import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
 import { formatISO8601Duration, toScaled } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
@@ -370,15 +370,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (!this.publisher) return;
     const { interactionFormat } = this.profile;
     const response = formatResponse(questionId, interaction, interactionFormat);
-    const { kept, warnings } = fitPatterns(interaction, interactionFormat);
-    for (const warning of warnings) {
-      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
-    }
+    const patterns = formatPatterns(questionId, interaction, interactionFormat);
     const definition: Record<string, unknown> = {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
-    if (kept) definition.correctResponsesPattern = kept;
+    if (patterns) definition.correctResponsesPattern = patterns;
     const result: Record<string, unknown> = {};
     if (response !== null) result.response = response;
     if (correct !== null) {
