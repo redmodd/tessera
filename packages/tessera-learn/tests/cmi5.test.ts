@@ -1079,6 +1079,25 @@ describe('CMI5Adapter', () => {
       );
     });
 
+    it('leaves out a response read as a delimiter, with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'fill-in',
+          response: '{case_matters=true}Paris',
+          correct: ['Paris'],
+        },
+        false,
+      );
+      expect(body.result).toEqual({ success: false });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'the response of interaction "q1" is left out of the LMS record',
+        ),
+      );
+    });
+
     it('sends an empty correctResponsesPattern for an empty fill-in correct list', async () => {
       const body = await initAndReport(
         'q1',

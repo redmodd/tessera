@@ -32,17 +32,19 @@ function recordedResponse(i: Interaction, format: InteractionFormat) {
 
 describe('encodesOptionIndex', () => {
   it('encodes SCORM 1.2 choices as option indexes', () => {
-    expect(formatResponse(choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
+    expect(formatResponse('q1', choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
     expect(fitPatterns(choice, SCORM12_INTERACTION_FORMAT).kept).toEqual(['1']);
   });
 
   it('keeps encoding indexes on a copy of the SCORM 1.2 format', () => {
     const copy = { ...SCORM12_INTERACTION_FORMAT };
-    expect(formatResponse(choice, copy)).toBe('2');
+    expect(formatResponse('q1', choice, copy)).toBe('2');
   });
 
   it('encodes identifiers when the flag is off', () => {
-    expect(formatResponse(choice, SCORM2004_INTERACTION_FORMAT)).toBe('Blue');
+    expect(formatResponse('q1', choice, SCORM2004_INTERACTION_FORMAT)).toBe(
+      'Blue',
+    );
   });
 });
 
@@ -56,7 +58,7 @@ describe('performance steps', () => {
       ],
       correct: [['Step 1', 'done!']],
     };
-    expect(formatResponse(performance, SCORM12_INTERACTION_FORMAT)).toBe(
+    expect(formatResponse('q1', performance, SCORM12_INTERACTION_FORMAT)).toBe(
       'Step_1.turn left,angle.-3.5',
     );
     expect(fitPatterns(performance, SCORM12_INTERACTION_FORMAT).kept).toEqual([
@@ -72,9 +74,9 @@ describe('performance steps', () => {
         ['angle', -3.5],
       ],
     };
-    expect(formatResponse(performance, SCORM2004_INTERACTION_FORMAT)).toBe(
-      'Step%201[.]turn left[,]angle[.]-3.5',
-    );
+    expect(
+      formatResponse('q1', performance, SCORM2004_INTERACTION_FORMAT),
+    ).toBe('Step%201[.]turn left[,]angle[.]-3.5');
   });
 
   it('keeps performance step names and answers as written on xAPI', () => {
@@ -82,7 +84,7 @@ describe('performance steps', () => {
       type: 'performance',
       response: [['Step 1', 'turn left']],
     };
-    expect(formatResponse(performance, XAPI_INTERACTION_FORMAT)).toBe(
+    expect(formatResponse('q1', performance, XAPI_INTERACTION_FORMAT)).toBe(
       'Step 1[.]turn left',
     );
   });
@@ -92,8 +94,12 @@ describe('performance steps', () => {
       type: 'performance',
       response: [['', 'go']],
     };
-    expect(formatResponse(unnamed, SCORM2004_INTERACTION_FORMAT)).toBe('[.]go');
-    expect(formatResponse(unnamed, SCORM12_INTERACTION_FORMAT)).toBe('_.go');
+    expect(formatResponse('q1', unnamed, SCORM2004_INTERACTION_FORMAT)).toBe(
+      '[.]go',
+    );
+    expect(formatResponse('q1', unnamed, SCORM12_INTERACTION_FORMAT)).toBe(
+      '_.go',
+    );
   });
 
   it('leaves out a correct step range on SCORM 1.2 only', () => {
@@ -164,14 +170,18 @@ describe('SCORM 2004 ids inside a response', () => {
     ['', '_'],
     ['a\uD800', 'a%EF%BF%BD'],
   ])('records %s as %s', (id, recorded) => {
-    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+    expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,
     );
   });
 
   it('records a choice id once', () => {
     expect(
-      formatResponse({ type: 'choice', response: ['', '_', 'a', 'a'] }, fmt),
+      formatResponse(
+        'q1',
+        { type: 'choice', response: ['', '_', 'a', 'a'] },
+        fmt,
+      ),
     ).toBe('_[,]a');
   });
 
@@ -190,8 +200,12 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(() => fitPatterns({ ...i, correct: [['s', 'a[:]b']] }, fmt)).toThrow(
       'holds [,], [.] or [:]',
     );
-    expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe('s[.]a [,] b');
-    expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
+    expect(formatResponse('q1', i, XAPI_INTERACTION_FORMAT)).toBe(
+      's[.]a [,] b',
+    );
+    expect(formatResponse('q1', i, SCORM12_INTERACTION_FORMAT)).toBe(
+      's.a [,] b',
+    );
   });
 
   it('drops a correct sequence or step list that repeats an item', () => {
@@ -208,7 +222,7 @@ describe('SCORM 2004 ids inside a response', () => {
         ['s', 'x'],
       ],
     };
-    expect(formatResponse(seq, fmt)).toBe('a[,]b[,]a');
+    expect(formatResponse('q1', seq, fmt)).toBe('a[,]b[,]a');
     for (const i of [seq, steps]) {
       expect(fitPatterns(i, fmt)).toEqual({
         kept: null,
@@ -243,7 +257,9 @@ describe('SCORM 2004 ids inside a response', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(recordedResponse(i, fmt)).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(error));
-    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
+    expect(() =>
+      formatResponse('q1', i, XAPI_INTERACTION_FORMAT),
+    ).not.toThrow();
     expect(recordedResponse(i, SCORM12_INTERACTION_FORMAT)).toBeDefined();
   });
 
@@ -251,7 +267,7 @@ describe('SCORM 2004 ids inside a response', () => {
     ['an escape', 'a'.repeat(248) + ' b', 'a'.repeat(248)],
     ['a character', 'é'.repeat(42), '%C3%A9'.repeat(41)],
   ])('cuts an id to 250 characters without splitting %s', (_, id, recorded) => {
-    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+    expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,
     );
   });
@@ -400,7 +416,6 @@ describe('fitPatterns', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('reads as a language tag'),
     );
-    expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe(i.response);
   });
 
   it('keeps a SCORM 2004 response starting with {case_matters=}', () => {
@@ -412,6 +427,33 @@ describe('fitPatterns', () => {
       '{case_matters=true}Paris',
     );
   });
+
+  it.each<[Interaction]>([
+    [{ type: 'fill-in', response: '{lang=en}Paris' }],
+    [{ type: 'fill-in', response: '{case_matters=true}Paris' }],
+    [{ type: 'fill-in', response: 'a[,]{order_matters=}b' }],
+    [{ type: 'long-fill-in', response: '{lang=en}Paris' }],
+  ])('leaves out an xAPI response read as a delimiter: %j', (i) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(formatResponse('q1', i, XAPI_INTERACTION_FORMAT)).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'which this export standard reads as a delimiter',
+      ),
+    );
+  });
+
+  it.each([
+    ['fill-in', '{lang=en Paris'],
+    ['long-fill-in', '{case_matters=true Paris'],
+  ] as const)(
+    'keeps an xAPI %s response %j with an unclosed delimiter',
+    (type, response) => {
+      expect(
+        formatResponse('q1', { type, response }, XAPI_INTERACTION_FORMAT),
+      ).toBe(response);
+    },
+  );
 
   it.each<[Interaction]>([
     [{ type: 'numeric', response: 3, correct: { min: 5, max: 1 } }],

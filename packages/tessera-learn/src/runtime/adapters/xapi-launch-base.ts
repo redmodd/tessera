@@ -369,7 +369,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   ): void {
     if (!this.publisher) return;
     const { interactionFormat } = this.profile;
-    const response = formatResponse(interaction, interactionFormat);
+    const response = formatResponse(questionId, interaction, interactionFormat);
     const { kept, warnings } = fitPatterns(interaction, interactionFormat);
     for (const warning of warnings) {
       console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
@@ -379,7 +379,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       interactionType: interaction.type,
     };
     if (kept) definition.correctResponsesPattern = kept;
-    const result: Record<string, unknown> = { response };
+    const result: Record<string, unknown> = {};
+    if (response !== null) result.response = response;
     if (correct !== null) {
       result.success = correct;
     }

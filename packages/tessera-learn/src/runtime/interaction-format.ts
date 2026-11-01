@@ -365,9 +365,21 @@ function casePrefix(i: Interaction, fmt: InteractionFormat): string {
   return delimitedFillIn(i, fmt)?.caseMatters ? CASE_PREFIX : '';
 }
 
-/** Throws when the format cannot encode a value. */
-export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
-  return responseItems(i, fmt).join(fmt.itemDelim);
+/**
+ * xAPI reads a response in the correct pattern's format, so one starting with
+ * a fill-in delimiter is left out. Throws when the format cannot encode a value.
+ */
+export function formatResponse(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): string | null {
+  const items = responseItems(i, fmt);
+  if (!readsAsDelimiter(i, items, fmt)) return items.join(fmt.itemDelim);
+  console.warn(
+    `Tessera: the response of interaction "${questionId}" is left out of the LMS record: it starts with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a delimiter.`,
+  );
+  return null;
 }
 
 /**
