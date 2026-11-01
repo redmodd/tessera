@@ -369,18 +369,16 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   ): void {
     if (!this.publisher) return;
     const { interactionFormat } = this.profile;
-    const response = formatResponse(questionId, interaction, interactionFormat);
     const patterns = formatPatterns(questionId, interaction, interactionFormat);
+    const response = formatResponse(questionId, interaction, interactionFormat);
     const definition: Record<string, unknown> = {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
-    if (patterns) definition.correctResponsesPattern = patterns;
+    if (patterns !== null) definition.correctResponsesPattern = patterns;
     const result: Record<string, unknown> = {};
     if (response !== null) result.response = response;
-    if (correct !== null) {
-      result.success = correct;
-    }
+    if (correct !== null) result.success = correct;
     this.dispatch('Answered', {
       verb: { id: VERBS.answered, display: { 'en-US': 'answered' } },
       object: {

@@ -118,15 +118,14 @@ const SCORM2004_RULES: ValueRules = {
 };
 
 /** xAPI reads a response in the correct pattern's format. */
+const XAPI_TEXT = {
+  response: { undelimited: true },
+  correct: { undelimited: true },
+};
+
 const XAPI_RULES: ValueRules = {
-  'fill-in': {
-    response: { undelimited: true },
-    correct: { undelimited: true },
-  },
-  'long-fill-in': {
-    response: { undelimited: true },
-    correct: { undelimited: true },
-  },
+  'fill-in': XAPI_TEXT,
+  'long-fill-in': XAPI_TEXT,
 };
 
 export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
@@ -403,7 +402,7 @@ function checkSteps(
 }
 
 const DROPS = [
-  'delimiter',
+  'undelimited',
   'untagged',
   'trimmed',
   'unique',
@@ -425,10 +424,18 @@ function checkValue(
 ): DroppedBy | undefined {
   const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
+  const parts =
+    i.type === 'fill-in' ? ', or has a part after [,] that does' : '';
   if (rule.undelimited && items.some((item) => DELIMITER_START.test(item))) {
-    if (field === 'correct') return 'delimiter';
+    if (field === 'correct') return 'undelimited';
     throw new UnrecordableError(
-      `it starts with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a delimiter`,
+      `it starts with {lang=}, {case_matters=} or {order_matters=}${parts}, which this export standard reads as a delimiter`,
+    );
+  }
+  if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
+    if (field === 'correct') return 'untagged';
+    throw new UnrecordableError(
+      `it starts with {lang=${parts}, which this export standard reads as a language tag`,
     );
   }
   if (rule.steps && i.type === 'performance') {
@@ -443,12 +450,6 @@ function checkValue(
   if (items.length > maxItems) {
     throw new UnrecordableError(
       `it has ${items.length} items, more than the ${maxItems} this export standard records`,
-    );
-  }
-  if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
-    if (field === 'correct') return 'untagged';
-    throw new UnrecordableError(
-      `it starts with {lang=${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a language tag`,
     );
   }
   if (rule.trimmed && items.some((item) => item.trim() !== item)) {
@@ -564,7 +565,7 @@ export function fitPatterns(
   const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
-      case 'delimiter':
+      case 'undelimited':
         return `starting with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or with one after [,]' : ''}`;
       case 'untagged':
         return 'starting with {lang=';
@@ -585,7 +586,7 @@ export function fitPatterns(
     const dropped = broken.filter((b) => b === rule).length;
     if (dropped) {
       warnings.push(
-        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} ${rule === 'delimiter' ? 'reads as a delimiter or rejects' : 'rejects'}; they are ${lost}`,
+        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} ${rule === 'undelimited' ? 'reads as a delimiter or rejects' : 'rejects'}; they are ${lost}`,
       );
     }
   }
@@ -610,6 +611,7 @@ export function fitPatterns(
   }
   const prefix = casePrefix(i, fmt);
   const kept = fit.slice(0, limit).map((p) => prefix + p);
+  // An empty list stays: xAPI reads [] as "no answer is correct".
   return { kept: answers.length && !kept.length ? null : kept, warnings };
 }
 
