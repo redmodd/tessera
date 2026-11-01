@@ -1074,6 +1074,9 @@ describe('CMI5Adapter', () => {
         false,
       );
       expect(body.object.definition.correctResponsesPattern).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('reads as a delimiter or rejects'),
+      );
     });
 
     it('sends an empty correctResponsesPattern for an empty fill-in correct list', async () => {

@@ -105,7 +105,7 @@ describe('performance steps', () => {
         ['t', 'x'],
       ],
     };
-    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual([]);
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toBeNull();
     expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual([
       's[.]1[:]5[,]t[.]x',
     ]);
@@ -127,15 +127,15 @@ describe('performance steps', () => {
         ['t', 'a[,]b'],
       ],
     };
-    expect(fitPatterns(i, fmt)).toEqual({ kept: [], warnings: [] });
+    expect(fitPatterns(i, fmt)).toEqual({ kept: null, warnings: [] });
   });
 });
 
 describe('numeric ranges', () => {
-  it.each<[{ min?: number; max?: number }, string[], string[]]>([
-    [{ min: 5 }, ['5[:]'], []],
-    [{ max: 5 }, ['[:]5'], []],
-    [{ min: 1, max: 5 }, ['1[:]5'], []],
+  it.each<[{ min?: number; max?: number }, string[], string[] | null]>([
+    [{ min: 5 }, ['5[:]'], null],
+    [{ max: 5 }, ['[:]5'], null],
+    [{ min: 1, max: 5 }, ['1[:]5'], null],
     [{ min: 5, max: 5 }, ['5'], ['5']],
   ])('records the correct range %j', (correct, scorm2004, scorm12) => {
     const i: Interaction = { type: 'numeric', response: 7, correct };
@@ -211,7 +211,7 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(formatResponse(seq, fmt)).toBe('a[,]b[,]a');
     for (const i of [seq, steps]) {
       expect(fitPatterns(i, fmt)).toEqual({
-        kept: [],
+        kept: null,
         warnings: [
           expect.stringContaining('1 correct answer(s) repeating an item'),
         ],
@@ -288,12 +288,12 @@ describe('fitPatterns', () => {
         { type: 'fill-in', response: '', correct: [answer], caseMatters: true },
         SCORM2004_INTERACTION_FORMAT,
       );
-      expect(kept).toEqual([]);
+      expect(kept).toBeNull();
       expect(warnings).toEqual([expect.stringContaining(reason)]);
     },
   );
 
-  it.each<[string, Interaction, string[], string]>([
+  it.each<[string, Interaction, string[] | null, string]>([
     [
       'fill-in',
       {
@@ -314,7 +314,7 @@ describe('fitPatterns', () => {
           ['t', 'x'],
         ],
       },
-      [],
+      null,
       '1 correct answer(s) with an item starting or ending in whitespace',
     ],
   ])(
@@ -328,12 +328,12 @@ describe('fitPatterns', () => {
   );
 
   it.each([
-    ['{lang=en}Paris'],
-    ['{case_matters=true}Paris'],
-    ['{order_matters=false}a[,]b'],
-    ['{case_matters=yes}Paris'],
-    ['a[,]{lang=en}b'],
-    ['a[,]{case_matters=true}b'],
+    '{lang=en}Paris',
+    '{case_matters=true}Paris',
+    '{order_matters=false}a[,]b',
+    '{case_matters=yes}Paris',
+    'a[,]{lang=en}b',
+    'a[,]{case_matters=true}b',
   ])('drops an answer %j the LMS reads as a delimiter', (answer) => {
     const i: Interaction = {
       type: 'fill-in',
@@ -418,7 +418,7 @@ describe('fitPatterns', () => {
     [{ type: 'performance', response: [], correct: [['s', '5[:]1']] }],
   ])('drops a reversed correct range on SCORM 2004: %j', (i) => {
     expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
-      kept: [],
+      kept: null,
       warnings: [expect.stringContaining('minimum above its maximum')],
     });
   });
@@ -438,7 +438,7 @@ describe('fitPatterns', () => {
       correct: [['s', 'x'.repeat(260)]],
     };
     const { kept, warnings } = fitPatterns(i, SCORM12_INTERACTION_FORMAT);
-    expect(kept).toEqual([]);
+    expect(kept).toBeNull();
     expect(warnings).toEqual([
       expect.stringContaining('1 correct answer(s) over the 255 characters'),
     ]);

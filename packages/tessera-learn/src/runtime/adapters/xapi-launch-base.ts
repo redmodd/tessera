@@ -378,14 +378,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
-    // An empty list says no response is correct, so send one only when no
-    // answer was left out (every warning reports one).
-    if (
-      kept.length ||
-      (interaction.correct !== undefined && !warnings.length)
-    ) {
-      definition.correctResponsesPattern = kept;
-    }
+    if (kept) definition.correctResponsesPattern = kept;
     const result: Record<string, unknown> = { response };
     if (correct !== null) {
       result.success = correct;

@@ -347,16 +347,22 @@ function correctItems(
   }
 }
 
+function delimitedFillIn(
+  i: Interaction,
+  fmt: InteractionFormat,
+): Extract<Interaction, { type: 'fill-in' | 'long-fill-in' }> | undefined {
+  return fmt.fillInDelimiters &&
+    (i.type === 'fill-in' || i.type === 'long-fill-in')
+    ? i
+    : undefined;
+}
+
 /**
  * A delimiter, not part of the answer: the format's rules and length cap
  * apply to the answer alone.
  */
 function casePrefix(i: Interaction, fmt: InteractionFormat): string {
-  return fmt.fillInDelimiters &&
-    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
-    i.caseMatters
-    ? CASE_PREFIX
-    : '';
+  return delimitedFillIn(i, fmt)?.caseMatters ? CASE_PREFIX : '';
 }
 
 /** Throws when the format cannot encode a value. */
@@ -377,8 +383,7 @@ function readsAsDelimiter(
   fmt: InteractionFormat,
 ): boolean {
   return (
-    fmt.fillInDelimiters &&
-    (i.type === 'fill-in' || i.type === 'long-fill-in') &&
+    delimitedFillIn(i, fmt) !== undefined &&
     items.some((item) => DELIMITER_START.test(item))
   );
 }
@@ -529,13 +534,15 @@ function mergedIds(
  * Formats the correct patterns, drops those over the format's length cap,
  * since a shortened pattern matches nothing, then keeps the first ones up to
  * its count cap. Each warning completes a sentence whose subject is the
- * question. Throws when the format cannot record a value.
+ * question. `kept` is null when there is no pattern to send: none was given,
+ * the format can't write it, or every answer was dropped. Throws when the
+ * format cannot record a value.
  */
 export function fitPatterns(
   i: Interaction,
   fmt: InteractionFormat,
   recorder = 'this export standard',
-): { kept: string[]; warnings: string[] } {
+): { kept: string[] | null; warnings: string[] } {
   const lost = 'graded but left out of the LMS record';
   if (
     i.type === 'performance' &&
@@ -543,7 +550,7 @@ export function fitPatterns(
     hasLongStep(i.correct, fmt.maxStepAnswerLength)
   ) {
     return {
-      kept: [],
+      kept: null,
       warnings: [
         `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
       ],
@@ -551,13 +558,14 @@ export function fitPatterns(
   }
   if (fmt.supportsRange && reversedRange(i)) {
     return {
-      kept: [],
+      kept: null,
       warnings: [
         `has a correct range with its minimum above its maximum, which no answer can match; the correct answer is ${lost}`,
       ],
     };
   }
-  const answers = correctItems(i, fmt) ?? [];
+  const answers = correctItems(i, fmt);
+  if (!answers) return { kept: null, warnings: [] };
   const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
@@ -606,7 +614,8 @@ export function fitPatterns(
     );
   }
   const prefix = casePrefix(i, fmt);
-  return { kept: fit.slice(0, limit).map((p) => prefix + p), warnings };
+  const kept = fit.slice(0, limit).map((p) => prefix + p);
+  return { kept: answers.length && !kept.length ? null : kept, warnings };
 }
 
 function hasLongStep(

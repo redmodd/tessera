@@ -429,7 +429,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
         },
         'Paris',
         '',
-        'which this export standard reads as a delimiter',
+        'which this export standard reads as a delimiter or rejects',
       ],
       [
         'a case-sensitive fill-in answer starting with {case_matters=}',
@@ -441,14 +441,14 @@ describe('SCORM2004Adapter against scorm-again', () => {
         },
         'Paris',
         '',
-        'which this export standard reads as a delimiter',
+        'which this export standard reads as a delimiter or rejects',
       ],
       [
         'a fill-in answer with a part starting with {lang=}',
         { type: 'fill-in', response: 'a', correct: ['a[,]{lang=en}b'] },
         'a',
         '',
-        'which this export standard reads as a delimiter',
+        'which this export standard reads as a delimiter or rejects',
       ],
       [
         'a long-fill-in answer starting with {lang=}',
@@ -459,7 +459,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
         },
         'a',
         '',
-        'which this export standard reads as a delimiter',
+        'which this export standard reads as a delimiter or rejects',
       ],
       [
         'a fill-in answer starting with an unclosed {case_matters=',
