@@ -4,8 +4,8 @@
  *
  * Locks down two contracts produced by `useQuiz.submit()`:
  *
- *  1. `tessera-quiz-complete` event detail — `{ score, scored }`. Score rollup is the
- *     LMS-facing signal that drives Pass/Fail.
+ *  1. `tessera-quiz-complete` event detail: `{ score, scored }`. Score rollup
+ *     is the LMS-facing signal that drives Pass/Fail.
  *  2. The exact sequence of `adapter.reportInteraction(id, interaction, correct)`
  *     calls produced as widgets `q.commit()` and as `submit()` flushes any
  *     uncommitted questions. Per-question writes to SCORM `cmi.interactions.*`

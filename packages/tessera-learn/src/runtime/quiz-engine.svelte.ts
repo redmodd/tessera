@@ -286,13 +286,10 @@ export class QuizEngine implements UseQuizHandle {
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
     const computed = this.#computeScore();
+    const scored = computed !== null;
     // A quiz of only survey or reflection questions has nothing to fail.
     const score = computed ?? 100;
-    if (
-      computed === null &&
-      import.meta.env?.DEV &&
-      this.#deps.quizConfig.graded
-    ) {
+    if (!scored && import.meta.env?.DEV && this.#deps.quizConfig.graded) {
       console.warn(
         '[tessera] useQuiz: this quiz is graded, but no question has a `correct` answer, ' +
           'so every learner scores 100 toward the course score. ' +
@@ -300,7 +297,7 @@ export class QuizEngine implements UseQuizHandle {
       );
     }
     this.#score = score;
-    this.#scored = computed !== null;
+    this.#scored = scored;
     this.#bestScore = Math.max(this.#bestScore, score);
     this.#submitted = true;
     this.#fromSave = false;
@@ -319,11 +316,8 @@ export class QuizEngine implements UseQuizHandle {
         if (response !== undefined) responses.set(q.id, response);
       }
     }
-    this.#deps.onComplete(score, responses, this.#scored);
-    this.#deps.notify?.('tessera-quiz-complete', {
-      score,
-      scored: this.#scored,
-    });
+    this.#deps.onComplete(score, responses, scored);
+    this.#deps.notify?.('tessera-quiz-complete', { score, scored });
   }
 
   startReview(): void {

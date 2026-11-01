@@ -567,6 +567,11 @@ describe('custom widget in a quiz', () => {
     expect(document.activeElement!.getAttribute('role')).toBe('group');
   });
 
+  const textIn = (target: HTMLElement, selector: string) =>
+    [...target.querySelectorAll(selector)].map((el) =>
+      (el.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+
   function submitBoth(correct: (number | undefined)[]) {
     const { target, button, click } = mountWidget(
       CustomChoiceQuiz,
@@ -584,25 +589,21 @@ describe('custom widget in a quiz', () => {
     click(button('Next'));
     pickFirst();
     click(button('Submit'));
-    const text = (selector: string) =>
-      [...target.querySelectorAll(selector)].map((el) =>
-        (el.textContent ?? '').replace(/\s+/g, ' ').trim(),
-      );
-    return { text };
+    return target;
   }
 
   it('counts only questions with a correct answer in the results', () => {
-    const { text } = submitBoth([1, undefined]);
-    expect(text('.tessera-quiz-score-value')).toEqual(['0%']);
-    expect(text('.tessera-quiz-results-detail')).toEqual([
+    const target = submitBoth([1, undefined]);
+    expect(textIn(target, '.tessera-quiz-score-value')).toEqual(['0%']);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
       'You answered 0 of 1 question correctly.',
     ]);
   });
 
   it('shows no score when no question has a correct answer', () => {
-    const { text } = submitBoth([undefined, undefined]);
-    expect(text('.tessera-quiz-score')).toEqual([]);
-    expect(text('.tessera-quiz-results-detail')).toEqual([
+    const target = submitBoth([undefined, undefined]);
+    expect(textIn(target, '.tessera-quiz-score')).toEqual([]);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
       'Your answers have been submitted.',
     ]);
   });
@@ -615,11 +616,10 @@ describe('custom widget in a quiz', () => {
       { attempts: 1, score: 100, unscored: true },
     );
     flushSync();
-    expect(target.querySelector('.tessera-quiz-score')).toBeNull();
-    expect(
-      [...target.querySelectorAll('.tessera-quiz-results-detail')].map((el) =>
-        el.textContent?.trim(),
-      ),
-    ).toEqual(['Your answers have been submitted.', 'Your previous result.']);
+    expect(textIn(target, '.tessera-quiz-score')).toEqual([]);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'Your answers have been submitted.',
+      'Your previous result.',
+    ]);
   });
 });

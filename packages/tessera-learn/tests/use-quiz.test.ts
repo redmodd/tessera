@@ -73,6 +73,15 @@ function completes(events: EngineProbe['events']) {
   return events.filter((e) => e.name === 'tessera-quiz-complete');
 }
 
+/** A survey question: no `correct`, so it has nothing to score. */
+function surveyQuestion(id: string) {
+  return {
+    id,
+    checkAnswer: () => null,
+    interaction: (): Interaction => ({ type: 'long-fill-in', response: 'x' }),
+  };
+}
+
 function tfQuestion(id: string, response: boolean, correct: boolean) {
   return {
     id,
@@ -826,14 +835,9 @@ describe('QuizEngine', () => {
   it('leaves a question with no correct answer out of the score and the result', () => {
     const { engine, events, reports } = makeEngine();
     const a = engine.registerQuestion(tfQuestion('a', true, true));
-    const b = engine.registerQuestion({
-      id: 'b',
-      weight: 3,
-      checkAnswer: () => null,
-      interaction: () => ({ type: 'long-fill-in', response: 'anything' }),
-    });
+    const b = engine.registerQuestion({ ...surveyQuestion('b'), weight: 3 });
     engine.setAnswer(0, true);
-    engine.setAnswer(1, 'anything');
+    engine.setAnswer(1, 'x');
     engine.submit();
 
     expect(completeScore(events)).toBe(100);
@@ -849,11 +853,7 @@ describe('QuizEngine', () => {
   it('scores 100 when no question has a correct answer, warning when graded', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine, events } = makeEngine({ graded: true });
-    engine.registerQuestion({
-      id: 'a',
-      checkAnswer: () => null,
-      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
-    });
+    engine.registerQuestion(surveyQuestion('a'));
     engine.setAnswer(0, 'x');
     engine.submit();
     expect(completes(events)[0].detail).toEqual({ score: 100, scored: false });
@@ -874,11 +874,7 @@ describe('QuizEngine', () => {
   it('does not warn about an ungraded quiz with no correct answer', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine({ graded: false });
-    engine.registerQuestion({
-      id: 'a',
-      checkAnswer: () => null,
-      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
-    });
+    engine.registerQuestion(surveyQuestion('a'));
     engine.setAnswer(0, 'x');
     engine.submit();
     expect(warn).not.toHaveBeenCalled();
@@ -892,10 +888,8 @@ describe('QuizEngine', () => {
     const keptReset = vi.fn();
     const wrongReset = vi.fn();
     const kept = engine.registerQuestion({
-      id: 'a',
-      checkAnswer: () => null,
+      ...surveyQuestion('a'),
       reset: keptReset,
-      interaction: () => ({ type: 'long-fill-in', response: 'x' }),
     });
     engine.registerQuestion({
       ...tfQuestion('b', false, true),
