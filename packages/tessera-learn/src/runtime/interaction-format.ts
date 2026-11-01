@@ -62,15 +62,33 @@ interface ItemRule {
    * `[,]`, `[.]` or `[:]` unless `range` lets it be a `min[:]max` range.
    */
   steps?: 'text' | 'range';
+  /**
+   * No item can start with a closed `{lang=}`, `{case_matters=}` or
+   * `{order_matters=}`: the LMS strips it from the start of each fill-in
+   * part, or rejects the pattern when one can't go there. No escape keeps one
+   * as answer text. An unclosed one is plain text.
+   */
+  undelimited?: boolean;
+  /**
+   * No item can start with `{lang=`, closed or not: the LMS reads a valid tag
+   * as the item's language and rejects any other.
+   */
+  untagged?: boolean;
 }
 
 /**
- * In a correct answer, breaking `maxParts`, `trimmed` or `unique` drops only
- * that answer; breaking any other rule leaves out the whole field.
+ * In a correct answer, breaking `maxParts`, `trimmed`, `unique`,
+ * `undelimited`, `untagged` or `unopened` drops only that answer; breaking any
+ * other rule leaves out the whole field.
  */
 interface AnswerRule extends ItemRule {
   trimmed?: boolean;
   unique?: boolean;
+  /**
+   * The answer can't start with any of these, closed or not: SCORM Cloud
+   * reads one as the pattern's opening delimiter and rejects it unclosed.
+   */
+  unopened?: readonly string[];
 }
 
 type ValueRules = Partial<
@@ -81,8 +99,8 @@ const LIST: ItemRule = { maxItems: 36, nonEmpty: true };
 const STEPS: ItemRule = { maxItems: 250, nonEmpty: true, steps: 'text' };
 
 /**
- * scorm-again's SCORM 2004 grammar. Encoded ids hold no whitespace, and choice
- * and matching items are already deduplicated.
+ * The SCORM 2004 grammar scorm-again and SCORM Cloud accept. Encoded ids hold
+ * no whitespace, and choice and matching items are already deduplicated.
  */
 const SCORM2004_RULES: ValueRules = {
   // An empty choice pattern means "no choice is correct".
@@ -94,11 +112,36 @@ const SCORM2004_RULES: ValueRules = {
     correct: { ...STEPS, steps: 'range', trimmed: true, unique: true },
   },
   'fill-in': {
-    response: { maxParts: 10 },
-    correct: { maxParts: 10, trimmed: true, unique: true },
+    response: { maxParts: 10, untagged: true },
+    correct: {
+      maxParts: 10,
+      trimmed: true,
+      unique: true,
+      undelimited: true,
+      unopened: ['{case_matters=', '{order_matters='],
+    },
   },
-  'long-fill-in': { correct: { trimmed: true } },
+  'long-fill-in': {
+    response: { untagged: true },
+    correct: {
+      trimmed: true,
+      untagged: true,
+      undelimited: true,
+      unopened: ['{case_matters='],
+    },
+  },
   other: { correct: { trimmed: true } },
+};
+
+/** xAPI reads a response in the correct pattern's format. */
+const XAPI_TEXT = {
+  response: { undelimited: true },
+  correct: { undelimited: true },
+};
+
+const XAPI_RULES: ValueRules = {
+  'fill-in': XAPI_TEXT,
+  'long-fill-in': XAPI_TEXT,
 };
 
 export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
@@ -156,7 +199,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
   maxStepAnswerLength: Infinity,
-  rules: undefined,
+  rules: XAPI_RULES,
   responseId: (v) => v,
 };
 
@@ -350,24 +393,13 @@ function casePrefix(i: Interaction, fmt: InteractionFormat): string {
     : '';
 }
 
-/** Throws when the format cannot encode a value. */
-export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
-  return responseItems(i, fmt).join(fmt.itemDelim);
-}
+const DELIMITER_START = /^\{(?:lang|case_matters|order_matters)=[^}]*\}/;
+const DELIMITERS = '{lang=}, {case_matters=} or {order_matters=}';
 
-/**
- * Returns null when no correct pattern was provided. Throws when the format
- * cannot encode a value.
- */
-export function formatCorrectPattern(
-  i: Interaction,
-  fmt: InteractionFormat,
-): string[] | null {
-  const prefix = casePrefix(i, fmt);
-  return (
-    correctItems(i, fmt)?.map((items) => prefix + items.join(fmt.itemDelim)) ??
-    null
-  );
+/** The LMS reads a delimiter at the start of each fill-in `[,]` part too. */
+function startingWith(i: Interaction, start: string): string {
+  const parts = i.type === 'fill-in' ? ', or with one after [,]' : '';
+  return `starting with ${start}${parts}`;
 }
 
 const STEP_DELIM = /\[[,.:]\]/;
@@ -392,7 +424,14 @@ function checkSteps(
   }
 }
 
-const DROPS = ['trimmed', 'unique', 'maxParts'] as const;
+const DROPS = [
+  'undelimited',
+  'untagged',
+  'unopened',
+  'trimmed',
+  'unique',
+  'maxParts',
+] as const;
 type DroppedBy = (typeof DROPS)[number];
 
 /**
@@ -422,6 +461,21 @@ function checkValue(
     throw new UnrecordableError(
       `it has ${items.length} items, more than the ${maxItems} this export standard records`,
     );
+  }
+  if (rule.undelimited && items.some((item) => DELIMITER_START.test(item))) {
+    if (field === 'correct') return 'undelimited';
+    throw new UnrecordableError(
+      `it is text ${startingWith(i, DELIMITERS)}, which this export standard reads as a delimiter`,
+    );
+  }
+  if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
+    if (field === 'correct') return 'untagged';
+    throw new UnrecordableError(
+      `it is text ${startingWith(i, '{lang=')}, which this export standard reads as a language tag or rejects`,
+    );
+  }
+  if (rule.unopened?.some((start) => items[0]?.startsWith(start))) {
+    return 'unopened';
   }
   if (rule.trimmed && items.some((item) => item.trim() !== item)) {
     return 'trimmed';
@@ -501,13 +555,15 @@ function mergedIds(
  * Formats the correct patterns, drops those over the format's length cap,
  * since a shortened pattern matches nothing, then keeps the first ones up to
  * its count cap. Each warning completes a sentence whose subject is the
- * question. Throws when the format cannot record a value.
+ * question. `kept` is null when there is no pattern to send: none was given,
+ * the format can't write it, or every answer was dropped. Throws when the
+ * format cannot record a value.
  */
 export function fitPatterns(
   i: Interaction,
   fmt: InteractionFormat,
   recorder = 'this export standard',
-): { kept: string[]; warnings: string[] } {
+): { kept: string[] | null; warnings: string[] } {
   const lost = 'graded but left out of the LMS record';
   if (
     i.type === 'performance' &&
@@ -515,7 +571,7 @@ export function fitPatterns(
     hasLongStep(i.correct, fmt.maxStepAnswerLength)
   ) {
     return {
-      kept: [],
+      kept: null,
       warnings: [
         `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
       ],
@@ -523,26 +579,36 @@ export function fitPatterns(
   }
   if (fmt.supportsRange && reversedRange(i)) {
     return {
-      kept: [],
+      kept: null,
       warnings: [
         `has a correct range with its minimum above its maximum, which no answer can match; the correct answer is ${lost}`,
       ],
     };
   }
-  const answers = correctItems(i, fmt) ?? [];
+  const answers = correctItems(i, fmt);
+  if (!answers) return { kept: null, warnings: [] };
   const broken = answers.map((it) => checkValue(i, 'correct', it, fmt));
+  const rejects = `which ${recorder} rejects`;
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
+      case 'undelimited':
+        return `${startingWith(i, DELIMITERS)}, which ${recorder} reads as a delimiter or rejects`;
+      case 'untagged':
+        return `${startingWith(i, '{lang=')}, ${rejects}`;
+      case 'unopened':
+        return `starting with ${fmt.rules?.[i.type]?.correct?.unopened?.join(' or ')}, ${rejects}`;
       case 'trimmed':
-        return isList(i)
-          ? 'with an item starting or ending in whitespace'
-          : i.type === 'fill-in'
-            ? 'starting or ending in whitespace, or with whitespace beside [,]'
-            : 'starting or ending in whitespace';
+        return `${
+          isList(i)
+            ? 'with an item starting or ending in whitespace'
+            : i.type === 'fill-in'
+              ? 'starting or ending in whitespace, or with whitespace beside [,]'
+              : 'starting or ending in whitespace'
+        }, ${rejects}`;
       case 'unique':
-        return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}`;
+        return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}, ${rejects}`;
       case 'maxParts':
-        return `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts`;
+        return `with more than ${fmt.rules?.[i.type]?.correct?.maxParts} [,]-separated parts, ${rejects}`;
     }
   };
   const warnings: string[] = [];
@@ -550,7 +616,7 @@ export function fitPatterns(
     const dropped = broken.filter((b) => b === rule).length;
     if (dropped) {
       warnings.push(
-        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} rejects; they are ${lost}`,
+        `has ${dropped} correct answer(s) ${reason(rule)}; they are ${lost}`,
       );
     }
   }
@@ -574,7 +640,9 @@ export function fitPatterns(
     );
   }
   const prefix = casePrefix(i, fmt);
-  return { kept: fit.slice(0, limit).map((p) => prefix + p), warnings };
+  const kept = fit.slice(0, limit).map((p) => prefix + p);
+  // An empty list stays: xAPI reads [] as "no answer is correct".
+  return { kept: answers.length && !kept.length ? null : kept, warnings };
 }
 
 function hasLongStep(
@@ -656,6 +724,48 @@ function fitResponse(
   return cut || null;
 }
 
+function recordable<T>(
+  questionId: string,
+  field: string,
+  format: () => T,
+): T | null {
+  try {
+    return format();
+  } catch (err) {
+    if (!(err instanceof UnrecordableError)) throw err;
+    console.warn(
+      `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
+    );
+    return null;
+  }
+}
+
+/** The response as the LMS records it, or null when it can't, with a warning. */
+export function formatResponse(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): string | null {
+  return recordable(questionId, 'response', () =>
+    fitResponse(questionId, i, fmt),
+  );
+}
+
+/** The correct patterns the LMS records, or null when none, with warnings. */
+export function formatPatterns(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+): string[] | null {
+  return recordable(questionId, 'correct answer', () => {
+    const { kept, warnings } = fitPatterns(i, fmt);
+    for (const warning of warnings) {
+      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
+    }
+    return kept;
+  });
+}
+
 function warnResponseIds(
   questionId: string,
   i: Interaction,
@@ -708,27 +818,8 @@ export function buildScormInteractionFields(
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
   warnResponseIds(questionId, interaction, spec.format);
-  const recordable = <T>(field: string, format: () => T): T | null => {
-    try {
-      return format();
-    } catch (err) {
-      if (!(err instanceof UnrecordableError)) throw err;
-      console.warn(
-        `Tessera: the ${field} of interaction "${questionId}" is left out of the LMS record: ${err.message}.`,
-      );
-      return null;
-    }
-  };
-  const patterns = recordable('correct answer', () => {
-    const { kept, warnings } = fitPatterns(interaction, spec.format);
-    for (const warning of warnings) {
-      console.warn(`Tessera: interaction "${questionId}" ${warning}.`);
-    }
-    return kept;
-  });
-  const response = recordable('response', () =>
-    fitResponse(questionId, interaction, spec.format),
-  );
+  const patterns = formatPatterns(questionId, interaction, spec.format);
+  const response = formatResponse(questionId, interaction, spec.format);
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });

@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import {
   formatResponse,
-  formatCorrectPattern,
   fitPatterns,
   buildScormInteractionFields,
   type InteractionFormat,
@@ -33,19 +32,19 @@ function recordedResponse(i: Interaction, format: InteractionFormat) {
 
 describe('encodesOptionIndex', () => {
   it('encodes SCORM 1.2 choices as option indexes', () => {
-    expect(formatResponse(choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
-    expect(formatCorrectPattern(choice, SCORM12_INTERACTION_FORMAT)).toEqual([
-      '1',
-    ]);
+    expect(formatResponse('q1', choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
+    expect(fitPatterns(choice, SCORM12_INTERACTION_FORMAT).kept).toEqual(['1']);
   });
 
   it('keeps encoding indexes on a copy of the SCORM 1.2 format', () => {
     const copy = { ...SCORM12_INTERACTION_FORMAT };
-    expect(formatResponse(choice, copy)).toBe('2');
+    expect(formatResponse('q1', choice, copy)).toBe('2');
   });
 
   it('encodes identifiers when the flag is off', () => {
-    expect(formatResponse(choice, SCORM2004_INTERACTION_FORMAT)).toBe('Blue');
+    expect(formatResponse('q1', choice, SCORM2004_INTERACTION_FORMAT)).toBe(
+      'Blue',
+    );
   });
 });
 
@@ -59,12 +58,12 @@ describe('performance steps', () => {
       ],
       correct: [['Step 1', 'done!']],
     };
-    expect(formatResponse(performance, SCORM12_INTERACTION_FORMAT)).toBe(
+    expect(formatResponse('q1', performance, SCORM12_INTERACTION_FORMAT)).toBe(
       'Step_1.turn left,angle.-3.5',
     );
-    expect(
-      formatCorrectPattern(performance, SCORM12_INTERACTION_FORMAT),
-    ).toEqual(['Step_1.done!']);
+    expect(fitPatterns(performance, SCORM12_INTERACTION_FORMAT).kept).toEqual([
+      'Step_1.done!',
+    ]);
   });
 
   it('percent-encodes performance step names but keeps answers as written on SCORM 2004', () => {
@@ -75,9 +74,9 @@ describe('performance steps', () => {
         ['angle', -3.5],
       ],
     };
-    expect(formatResponse(performance, SCORM2004_INTERACTION_FORMAT)).toBe(
-      'Step%201[.]turn left[,]angle[.]-3.5',
-    );
+    expect(
+      formatResponse('q1', performance, SCORM2004_INTERACTION_FORMAT),
+    ).toBe('Step%201[.]turn left[,]angle[.]-3.5');
   });
 
   it('keeps performance step names and answers as written on xAPI', () => {
@@ -85,7 +84,7 @@ describe('performance steps', () => {
       type: 'performance',
       response: [['Step 1', 'turn left']],
     };
-    expect(formatResponse(performance, XAPI_INTERACTION_FORMAT)).toBe(
+    expect(formatResponse('q1', performance, XAPI_INTERACTION_FORMAT)).toBe(
       'Step 1[.]turn left',
     );
   });
@@ -95,8 +94,12 @@ describe('performance steps', () => {
       type: 'performance',
       response: [['', 'go']],
     };
-    expect(formatResponse(unnamed, SCORM2004_INTERACTION_FORMAT)).toBe('[.]go');
-    expect(formatResponse(unnamed, SCORM12_INTERACTION_FORMAT)).toBe('_.go');
+    expect(formatResponse('q1', unnamed, SCORM2004_INTERACTION_FORMAT)).toBe(
+      '[.]go',
+    );
+    expect(formatResponse('q1', unnamed, SCORM12_INTERACTION_FORMAT)).toBe(
+      '_.go',
+    );
   });
 
   it('leaves out a correct step range on SCORM 1.2 only', () => {
@@ -108,15 +111,15 @@ describe('performance steps', () => {
         ['t', 'x'],
       ],
     };
-    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toBeNull();
-    expect(formatCorrectPattern(i, XAPI_INTERACTION_FORMAT)).toEqual([
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toBeNull();
+    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual([
       's[.]1[:]5[,]t[.]x',
     ]);
     expect(
-      formatCorrectPattern(
+      fitPatterns(
         { ...i, correct: [['s', 'a[:]b']] },
         SCORM12_INTERACTION_FORMAT,
-      ),
+      ).kept,
     ).toEqual(['s.a[:]b']);
   });
 
@@ -130,7 +133,7 @@ describe('performance steps', () => {
         ['t', 'a[,]b'],
       ],
     };
-    expect(fitPatterns(i, fmt)).toEqual({ kept: [], warnings: [] });
+    expect(fitPatterns(i, fmt)).toEqual({ kept: null, warnings: [] });
   });
 });
 
@@ -142,12 +145,10 @@ describe('numeric ranges', () => {
     [{ min: 5, max: 5 }, ['5'], ['5']],
   ])('records the correct range %j', (correct, scorm2004, scorm12) => {
     const i: Interaction = { type: 'numeric', response: 7, correct };
-    expect(formatCorrectPattern(i, SCORM2004_INTERACTION_FORMAT)).toEqual(
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT).kept).toEqual(
       scorm2004,
     );
-    expect(formatCorrectPattern(i, SCORM12_INTERACTION_FORMAT)).toEqual(
-      scorm12,
-    );
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual(scorm12);
   });
 });
 
@@ -169,14 +170,18 @@ describe('SCORM 2004 ids inside a response', () => {
     ['', '_'],
     ['a\uD800', 'a%EF%BF%BD'],
   ])('records %s as %s', (id, recorded) => {
-    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+    expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,
     );
   });
 
   it('records a choice id once', () => {
     expect(
-      formatResponse({ type: 'choice', response: ['', '_', 'a', 'a'] }, fmt),
+      formatResponse(
+        'q1',
+        { type: 'choice', response: ['', '_', 'a', 'a'] },
+        fmt,
+      ),
     ).toBe('_[,]a');
   });
 
@@ -195,8 +200,12 @@ describe('SCORM 2004 ids inside a response', () => {
     expect(() => fitPatterns({ ...i, correct: [['s', 'a[:]b']] }, fmt)).toThrow(
       'holds [,], [.] or [:]',
     );
-    expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe('s[.]a [,] b');
-    expect(formatResponse(i, SCORM12_INTERACTION_FORMAT)).toBe('s.a [,] b');
+    expect(formatResponse('q1', i, XAPI_INTERACTION_FORMAT)).toBe(
+      's[.]a [,] b',
+    );
+    expect(formatResponse('q1', i, SCORM12_INTERACTION_FORMAT)).toBe(
+      's.a [,] b',
+    );
   });
 
   it('drops a correct sequence or step list that repeats an item', () => {
@@ -213,10 +222,10 @@ describe('SCORM 2004 ids inside a response', () => {
         ['s', 'x'],
       ],
     };
-    expect(formatResponse(seq, fmt)).toBe('a[,]b[,]a');
+    expect(formatResponse('q1', seq, fmt)).toBe('a[,]b[,]a');
     for (const i of [seq, steps]) {
       expect(fitPatterns(i, fmt)).toEqual({
-        kept: [],
+        kept: null,
         warnings: [
           expect.stringContaining('1 correct answer(s) repeating an item'),
         ],
@@ -248,7 +257,9 @@ describe('SCORM 2004 ids inside a response', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(recordedResponse(i, fmt)).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(error));
-    expect(() => formatResponse(i, XAPI_INTERACTION_FORMAT)).not.toThrow();
+    expect(() =>
+      formatResponse('q1', i, XAPI_INTERACTION_FORMAT),
+    ).not.toThrow();
     expect(recordedResponse(i, SCORM12_INTERACTION_FORMAT)).toBeDefined();
   });
 
@@ -256,13 +267,28 @@ describe('SCORM 2004 ids inside a response', () => {
     ['an escape', 'a'.repeat(248) + ' b', 'a'.repeat(248)],
     ['a character', 'é'.repeat(42), '%C3%A9'.repeat(41)],
   ])('cuts an id to 250 characters without splitting %s', (_, id, recorded) => {
-    expect(formatResponse({ type: 'likert', response: id }, fmt)).toBe(
+    expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,
     );
   });
 });
 
 describe('fitPatterns', () => {
+  it('leaves out the whole field when a dropped answer also breaks a field rule', () => {
+    const fmt = {
+      ...SCORM2004_INTERACTION_FORMAT,
+      rules: {
+        'long-fill-in': { correct: { undelimited: true, maxItems: 0 } },
+      },
+    };
+    expect(() =>
+      fitPatterns(
+        { type: 'long-fill-in', response: '', correct: ['{lang=en}x'] },
+        fmt,
+      ),
+    ).toThrow('more than the 0');
+  });
+
   it.each([
     ['fill-in', 250],
     ['long-fill-in', 4000],
@@ -293,12 +319,12 @@ describe('fitPatterns', () => {
         { type: 'fill-in', response: '', correct: [answer], caseMatters: true },
         SCORM2004_INTERACTION_FORMAT,
       );
-      expect(kept).toEqual([]);
+      expect(kept).toBeNull();
       expect(warnings).toEqual([expect.stringContaining(reason)]);
     },
   );
 
-  it.each<[string, Interaction, string[], string]>([
+  it.each<[string, Interaction, string[] | null, string]>([
     [
       'fill-in',
       {
@@ -319,7 +345,7 @@ describe('fitPatterns', () => {
           ['t', 'x'],
         ],
       },
-      [],
+      null,
       '1 correct answer(s) with an item starting or ending in whitespace',
     ],
   ])(
@@ -332,12 +358,152 @@ describe('fitPatterns', () => {
     },
   );
 
+  it.each([
+    '{lang=en}Paris',
+    '{case_matters=true}Paris',
+    '{order_matters=false}a[,]b',
+    '{case_matters=yes}Paris',
+    'a[,]{lang=en}b',
+    'a[,]{case_matters=true}b',
+  ])('drops an answer %j the LMS reads as a delimiter', (answer) => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '',
+      correct: [answer, 'Oslo'],
+    };
+    const warning = expect.stringContaining(
+      '1 correct answer(s) starting with {lang=}, {case_matters=} or {order_matters=}',
+    );
+    for (const fmt of [SCORM2004_INTERACTION_FORMAT, XAPI_INTERACTION_FORMAT]) {
+      expect(fitPatterns(i, fmt)).toEqual({
+        kept: ['Oslo'],
+        warnings: [warning],
+      });
+    }
+    expect(fitPatterns(i, SCORM12_INTERACTION_FORMAT).kept).toEqual([
+      answer,
+      'Oslo',
+    ]);
+  });
+
+  it.each([
+    [
+      'fill-in',
+      '{case_matters=true Paris',
+      '{case_matters= or {order_matters=',
+    ],
+    [
+      'fill-in',
+      '{order_matters=true Paris',
+      '{case_matters= or {order_matters=',
+    ],
+    ['long-fill-in', '{case_matters=true Paris', '{case_matters='],
+  ] as const)(
+    'drops a %s answer %j opening with an unclosed delimiter only under SCORM 2004',
+    (type, answer, starts) => {
+      const i: Interaction = { type, response: '', correct: [answer, 'Oslo'] };
+      expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+        kept: ['Oslo'],
+        warnings: [
+          expect.stringContaining(
+            `1 correct answer(s) starting with ${starts}, which this export standard rejects`,
+          ),
+        ],
+      });
+      expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual(i.correct);
+    },
+  );
+
+  it.each([
+    ['fill-in', '{lang=en Paris'],
+    ['fill-in', 'a[,]{case_matters=true b'],
+    ['fill-in', '{case_matters Paris'],
+    ['long-fill-in', '{order_matters=true Paris'],
+  ] as const)(
+    'keeps a %s answer %j with an unclosed delimiter',
+    (type, answer) => {
+      const i: Interaction = { type, response: '', correct: [answer] };
+      for (const fmt of [
+        SCORM2004_INTERACTION_FORMAT,
+        XAPI_INTERACTION_FORMAT,
+      ]) {
+        expect(fitPatterns(i, fmt)).toEqual({ kept: [answer], warnings: [] });
+      }
+    },
+  );
+
+  it('drops a long-fill-in answer starting with an unclosed {lang= only under SCORM 2004', () => {
+    const i: Interaction = {
+      type: 'long-fill-in',
+      response: '',
+      correct: ['{lang=en Paris', 'Oslo'],
+    };
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: ['Oslo'],
+      warnings: [
+        expect.stringContaining(
+          '1 correct answer(s) starting with {lang=, which this export standard rejects',
+        ),
+      ],
+    });
+    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual(i.correct);
+  });
+
+  it.each<[Interaction]>([
+    [{ type: 'fill-in', response: '{lang=en}Paris' }],
+    [{ type: 'fill-in', response: 'a[,]{lang=}x' }],
+    [{ type: 'long-fill-in', response: '{lang=en Paris' }],
+  ])('leaves out a SCORM 2004 response read as a language tag: %j', (i) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(recordedResponse(i, SCORM2004_INTERACTION_FORMAT)).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('reads as a language tag or rejects'),
+    );
+  });
+
+  it('keeps a SCORM 2004 response starting with {case_matters=}', () => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '{case_matters=true}Paris',
+    };
+    expect(recordedResponse(i, SCORM2004_INTERACTION_FORMAT)).toBe(
+      '{case_matters=true}Paris',
+    );
+  });
+
+  it.each<[Interaction]>([
+    [{ type: 'fill-in', response: '{lang=en}Paris' }],
+    [{ type: 'fill-in', response: '{case_matters=true}Paris' }],
+    [{ type: 'fill-in', response: 'a[,]{order_matters=}b' }],
+    [{ type: 'long-fill-in', response: '{lang=en}Paris' }],
+  ])('leaves out an xAPI response read as a delimiter: %j', (i) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(formatResponse('q1', i, XAPI_INTERACTION_FORMAT)).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'which this export standard reads as a delimiter',
+      ),
+    );
+  });
+
+  it.each([
+    ['fill-in', '{lang=en Paris'],
+    ['long-fill-in', '{case_matters=true Paris'],
+  ] as const)(
+    'keeps an xAPI %s response %j with an unclosed delimiter',
+    (type, response) => {
+      expect(
+        formatResponse('q1', { type, response }, XAPI_INTERACTION_FORMAT),
+      ).toBe(response);
+    },
+  );
+
   it.each<[Interaction]>([
     [{ type: 'numeric', response: 3, correct: { min: 5, max: 1 } }],
     [{ type: 'performance', response: [], correct: [['s', '5[:]1']] }],
   ])('drops a reversed correct range on SCORM 2004: %j', (i) => {
     expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
-      kept: [],
+      kept: null,
       warnings: [expect.stringContaining('minimum above its maximum')],
     });
   });
@@ -357,7 +523,7 @@ describe('fitPatterns', () => {
       correct: [['s', 'x'.repeat(260)]],
     };
     const { kept, warnings } = fitPatterns(i, SCORM12_INTERACTION_FORMAT);
-    expect(kept).toEqual([]);
+    expect(kept).toBeNull();
     expect(warnings).toEqual([
       expect.stringContaining('1 correct answer(s) over the 255 characters'),
     ]);

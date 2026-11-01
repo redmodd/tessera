@@ -1047,6 +1047,89 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
+    it('drops a fill-in answer read as a delimiter, with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'fill-in',
+          response: 'Oslo',
+          correct: ['{lang=en}Paris', 'Oslo'],
+        },
+        true,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual(['Oslo']);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'which this export standard reads as a delimiter',
+        ),
+      );
+    });
+
+    it('omits correctResponsesPattern when every answer reads as a delimiter', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        { type: 'long-fill-in', response: 'a', correct: ['{lang=en}Paris'] },
+        false,
+      );
+      expect(body.object.definition.correctResponsesPattern).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('reads as a delimiter or rejects'),
+      );
+    });
+
+    it('leaves out a response read as a delimiter, with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        {
+          type: 'fill-in',
+          response: '{case_matters=true}Paris',
+          correct: ['Paris'],
+        },
+        false,
+      );
+      expect(body.result).toEqual({ success: false });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'the response of interaction "q1" is left out of the LMS record',
+        ),
+      );
+    });
+
+    it('omits result when an ungraded response is left out', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        { type: 'long-fill-in', response: '{lang=en}x' },
+        null,
+      );
+      expect(body).not.toHaveProperty('result');
+    });
+
+    it('sends an empty correctResponsesPattern for an empty fill-in correct list', async () => {
+      const body = await initAndReport(
+        'q1',
+        { type: 'fill-in', response: 'a', correct: [] },
+        false,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual([]);
+    });
+
+    it('omits a reversed correct range, with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        { type: 'numeric', response: 3, correct: { min: 5, max: 1 } },
+        false,
+      );
+      expect(body.object.definition.correctResponsesPattern).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('minimum above its maximum'),
+      );
+    });
+
     it('omits correctResponsesPattern when no correct provided', async () => {
       const body = await initAndReport(
         'q1',
