@@ -52,6 +52,8 @@ export interface GradedUnitState {
    * response saved, else a {@link SavedQuestion}.
    */
   q?: Record<string, number | SavedQuestion>;
+  /** 1 when the best quiz attempt had no question with a `correct` to score */
+  u?: 1;
   /** Quiz responses from the best attempt, questionId → response, omitted when they don't fit */
   r?: Record<string, unknown>;
   /** Graded standalone questions on the page not yet answered, omitted when none */

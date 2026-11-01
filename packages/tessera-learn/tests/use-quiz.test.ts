@@ -35,6 +35,7 @@ function makeEngine(
     restore?: {
       attempts: number;
       score: number;
+      unscored?: boolean;
       responses?: Record<string, unknown>;
     };
   } = {},
@@ -70,6 +71,15 @@ function completeScore(events: EngineProbe['events']): number | undefined {
 
 function completes(events: EngineProbe['events']) {
   return events.filter((e) => e.name === 'tessera-quiz-complete');
+}
+
+/** A survey question: no `correct`, so it has nothing to score. */
+function surveyQuestion(id: string) {
+  return {
+    id,
+    checkAnswer: () => null,
+    interaction: (): Interaction => ({ type: 'long-fill-in', response: 'x' }),
+  };
 }
 
 function tfQuestion(id: string, response: boolean, correct: boolean) {
@@ -822,6 +832,113 @@ describe('QuizEngine', () => {
     expect(completeScore(events)).toBe(75);
   });
 
+  it('leaves a question with no correct answer out of the score and the result', () => {
+    const { engine, events, reports } = makeEngine();
+    const a = engine.registerQuestion(tfQuestion('a', true, true));
+    const b = engine.registerQuestion({ ...surveyQuestion('b'), weight: 3 });
+    engine.setAnswer(0, true);
+    engine.setAnswer(1, 'x');
+    engine.submit();
+
+    expect(completeScore(events)).toBe(100);
+    expect(engine.scored).toBe(true);
+    expect(reports.map((r) => [r.id, r.correct])).toEqual([
+      ['a', true],
+      ['b', null],
+    ]);
+    expect(a.correct).toBe(true);
+    expect(b.correct).toBeNull();
+  });
+
+  it('scores 100 when no question has a correct answer, warning when graded', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine, events } = makeEngine({ graded: true });
+    engine.registerQuestion(surveyQuestion('a'));
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(completes(events)[0].detail).toEqual({ score: 100, scored: false });
+    expect(engine.scored).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/graded, but no question has a `correct`/),
+    );
+  });
+
+  it('keeps a scored best over a later unscored attempt', () => {
+    let result: boolean | null = false;
+    const { engine } = makeEngine({ graded: true, maxAttempts: 3 });
+    engine.registerQuestion({
+      ...surveyQuestion('a'),
+      checkAnswer: () => result,
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(engine.bestScore).toBe(0);
+
+    result = null;
+    engine.retry();
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(engine.score).toBe(100);
+    expect(engine.bestScore).toBe(0);
+  });
+
+  it('replaces a restored unscored best with a scored attempt', () => {
+    const { engine } = makeEngine(
+      { graded: true, maxAttempts: 3 },
+      { restore: { attempts: 1, score: 100, unscored: true } },
+    );
+    engine.registerQuestion(tfQuestion('a', true, false));
+    engine.retry();
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(engine.bestScore).toBe(0);
+  });
+
+  it('restores a result with nothing to score as unscored', () => {
+    const { engine } = makeEngine(
+      { graded: false },
+      { restore: { attempts: 1, score: 100, unscored: true } },
+    );
+    expect(engine.scored).toBe(false);
+  });
+
+  it('does not warn about an ungraded quiz with no correct answer', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: false });
+    engine.registerQuestion(surveyQuestion('a'));
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('incorrect-only retry keeps a no-correct answer unlocked and resets a wrong one', () => {
+    const { engine } = makeEngine({
+      graded: true,
+      retryMode: 'incorrect-only',
+    });
+    const keptReset = vi.fn();
+    const wrongReset = vi.fn();
+    const kept = engine.registerQuestion({
+      ...surveyQuestion('a'),
+      reset: keptReset,
+    });
+    engine.registerQuestion({
+      ...tfQuestion('b', false, true),
+      reset: wrongReset,
+    });
+    engine.setAnswer(0, 'x');
+    engine.setAnswer(1, false);
+    engine.submit();
+
+    engine.retry();
+    expect(engine.getAnswer(0)).toBe('x');
+    expect(kept.locked).toBe(false);
+    expect(kept.isLockedCorrect).toBe(false);
+    expect(keptReset).not.toHaveBeenCalled();
+    expect(engine.getAnswer(1)).toBeUndefined();
+    expect(wrongReset).toHaveBeenCalledTimes(1);
+  });
+
   it('weight=1 (default) scores the unweighted mean to 2 decimal places', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true)); // correct
@@ -1033,7 +1150,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
     q.submit();
-    expect(m.ref.events).toEqual([{ score: 100 }]);
+    expect(m.ref.events).toEqual([{ score: 100, scored: true }]);
   });
 
   it('warns in dev when a second useQuiz registers on the same page', () => {

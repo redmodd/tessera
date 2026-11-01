@@ -71,6 +71,41 @@ describe('ProgressState', () => {
       expect(progress.quizScore(2)).toBe(90);
     });
 
+    it('saves and restores a best attempt with nothing to score', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 100, [], false);
+      expect(progress.toSaved().g).toEqual({ 2: { s: 100, u: 1 } });
+      const restored = new ProgressState(createManifest(3), createConfig());
+      restored.restoreFrom(progress.toSaved());
+      expect(restored.quizUnscored(2)).toBe(true);
+    });
+
+    it('keeps a scored best attempt over an unscored tie', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 100, [['q1', 'a']]);
+      progress.quizCompleted(2, 100, [], false);
+      expect(progress.quizUnscored(2)).toBe(false);
+      expect(progress.toSaved().g).toMatchObject({ 2: { s: 100, a: 2 } });
+      progress.quizCompleted(2, 100, [['q1', 'b']]);
+      expect(progress.quizResponses(2)?.get('q1')).toBe('b');
+    });
+
+    it('keeps a lower scored attempt over a later unscored one', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 60);
+      progress.quizCompleted(2, 100, [], false);
+      expect(progress.quizScore(2)).toBe(60);
+      expect(progress.quizUnscored(2)).toBe(false);
+    });
+
+    it('replaces an unscored best with a lower scored attempt', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 100, [], false);
+      progress.quizCompleted(2, 80);
+      expect(progress.quizScore(2)).toBe(80);
+      expect(progress.quizUnscored(2)).toBe(false);
+    });
+
     it('counts attempts per page', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.quizCompleted(2, 50);

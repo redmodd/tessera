@@ -9,14 +9,19 @@ import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
 import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
 import type { QuizConfig } from '../src/runtime/types.js';
+import type { QuizPageState } from '../src/runtime/contexts.js';
 import { mountQuestion } from './helpers/mount.js';
 
 function mountWidget(
   widget: Component<any>,
   props: Record<string, unknown>,
   quiz?: QuizConfig,
+  quizState?: QuizPageState,
 ) {
-  const { target, unmount } = mountQuestion(widget, props, { quiz });
+  const { target, unmount } = mountQuestion(widget, props, {
+    quiz,
+    quizState,
+  });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -605,5 +610,61 @@ describe('custom widget in a quiz', () => {
     expect(document.activeElement!.textContent).toContain(
       'The right answer was 4.',
     );
+  });
+
+  const textIn = (target: HTMLElement, selector: string) =>
+    [...target.querySelectorAll(selector)].map((el) =>
+      (el.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+
+  function submitBoth(correct: (number | undefined)[]) {
+    const { target, button, click } = mountWidget(
+      CustomChoiceQuiz,
+      { correct },
+      {},
+    );
+    flushSync();
+    const pickFirst = () =>
+      click(
+        target.querySelector(
+          '.tessera-quiz-question-wrapper.active input',
+        ) as HTMLElement,
+      );
+    pickFirst();
+    click(button('Next'));
+    pickFirst();
+    click(button('Submit'));
+    return target;
+  }
+
+  it('counts only questions with a correct answer in the results', () => {
+    const target = submitBoth([1, undefined]);
+    expect(textIn(target, '.tessera-quiz-score-value')).toEqual(['0%']);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'You answered 0 of 1 question correctly.',
+    ]);
+  });
+
+  it('shows no score when no question has a correct answer', () => {
+    const target = submitBoth([undefined, undefined]);
+    expect(textIn(target, '.tessera-quiz-score')).toEqual([]);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'Your answers have been submitted.',
+    ]);
+  });
+
+  it('shows no score for a restored result with nothing to score', () => {
+    const { target } = mountWidget(
+      CustomChoiceQuiz,
+      { correct: [undefined, undefined] },
+      {},
+      { attempts: 1, score: 100, unscored: true },
+    );
+    flushSync();
+    expect(textIn(target, '.tessera-quiz-score')).toEqual([]);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'Your answers have been submitted.',
+      'Your previous result.',
+    ]);
   });
 });
