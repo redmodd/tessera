@@ -414,7 +414,7 @@ describe('fitPatterns', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(recordedResponse(i, SCORM2004_INTERACTION_FORMAT)).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('reads as a language tag'),
+      expect.stringContaining('reads as a language tag or rejects'),
     );
   });
 

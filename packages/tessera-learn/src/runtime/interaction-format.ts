@@ -378,6 +378,13 @@ function casePrefix(i: Interaction, fmt: InteractionFormat): string {
 }
 
 const DELIMITER_START = /^\{(?:lang|case_matters|order_matters)=[^}]*\}/;
+const DELIMITERS = '{lang=}, {case_matters=} or {order_matters=}';
+
+/** The LMS reads a delimiter at the start of each fill-in `[,]` part too. */
+function startingWith(i: Interaction, start: string): string {
+  const parts = i.type === 'fill-in' ? ', or with one after [,]' : '';
+  return `starting with ${start}${parts}`;
+}
 
 const STEP_DELIM = /\[[,.:]\]/;
 
@@ -424,18 +431,16 @@ function checkValue(
 ): DroppedBy | undefined {
   const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
-  const parts =
-    i.type === 'fill-in' ? ', or has a part after [,] that does' : '';
   if (rule.undelimited && items.some((item) => DELIMITER_START.test(item))) {
     if (field === 'correct') return 'undelimited';
     throw new UnrecordableError(
-      `it starts with {lang=}, {case_matters=} or {order_matters=}${parts}, which this export standard reads as a delimiter`,
+      `it is text ${startingWith(i, DELIMITERS)}, which this export standard reads as a delimiter`,
     );
   }
   if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
     if (field === 'correct') return 'untagged';
     throw new UnrecordableError(
-      `it starts with {lang=${parts}, which this export standard reads as a language tag`,
+      `it is text ${startingWith(i, '{lang=')}, which this export standard reads as a language tag or rejects`,
     );
   }
   if (rule.steps && i.type === 'performance') {
@@ -566,9 +571,9 @@ export function fitPatterns(
   const reason = (rule: DroppedBy): string => {
     switch (rule) {
       case 'undelimited':
-        return `starting with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or with one after [,]' : ''}`;
+        return startingWith(i, DELIMITERS);
       case 'untagged':
-        return 'starting with {lang=';
+        return startingWith(i, '{lang=');
       case 'trimmed':
         return isList(i)
           ? 'with an item starting or ending in whitespace'
