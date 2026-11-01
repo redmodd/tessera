@@ -114,7 +114,7 @@ test.describe('Custom quiz.svelte — public useQuiz() data contract', () => {
       () => (window as any).__tesseraQuizEvents,
     );
     expect(events).toHaveLength(1);
-    expect(events[0]).toEqual({ score: 100 });
+    expect(events[0]).toEqual({ score: 100, scored: true });
     // Per-question reporting to the LMS is covered by custom-quiz-lms-roundtrip.spec.ts.
   });
 

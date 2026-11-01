@@ -856,7 +856,7 @@ describe('QuizEngine', () => {
     });
     engine.setAnswer(0, 'x');
     engine.submit();
-    expect(completeScore(events)).toBe(100);
+    expect(completes(events)[0].detail).toEqual({ score: 100, scored: false });
     expect(engine.scored).toBe(false);
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/graded, but no question has a `correct`/),
@@ -1125,7 +1125,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     q.registerQuestion(tfQuestion('a', true, true));
     q.setAnswer(0, true);
     q.submit();
-    expect(m.ref.events).toEqual([{ score: 100 }]);
+    expect(m.ref.events).toEqual([{ score: 100, scored: true }]);
   });
 
   it('warns in dev when a second useQuiz registers on the same page', () => {

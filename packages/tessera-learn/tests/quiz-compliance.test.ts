@@ -4,7 +4,7 @@
  *
  * Locks down two contracts produced by `useQuiz.submit()`:
  *
- *  1. `tessera-quiz-complete` event detail — `{ score }`. Score rollup is the
+ *  1. `tessera-quiz-complete` event detail — `{ score, scored }`. Score rollup is the
  *     LMS-facing signal that drives Pass/Fail.
  *  2. The exact sequence of `adapter.reportInteraction(id, interaction, correct)`
  *     calls produced as widgets `q.commit()` and as `submit()` flushes any
@@ -55,10 +55,10 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     return m;
   }
 
-  it('event detail carries only the rolled-up score', () => {
+  it('event detail carries only the rolled-up score and whether it scored', () => {
     const adapter = recordingAdapter();
     const m = answerEveryFixture(adapter);
-    expect(m.ref.events[0]).toEqual({ score: 90 });
+    expect(m.ref.events[0]).toEqual({ score: 90, scored: true });
   });
 
   it('adapter reportInteraction calls are stable across all 10 interaction types', () => {

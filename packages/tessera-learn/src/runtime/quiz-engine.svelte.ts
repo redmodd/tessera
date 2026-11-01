@@ -320,7 +320,10 @@ export class QuizEngine implements UseQuizHandle {
       }
     }
     this.#deps.onComplete(score, responses, this.#scored);
-    this.#deps.notify?.('tessera-quiz-complete', { score });
+    this.#deps.notify?.('tessera-quiz-complete', {
+      score,
+      scored: this.#scored,
+    });
   }
 
   startReview(): void {
