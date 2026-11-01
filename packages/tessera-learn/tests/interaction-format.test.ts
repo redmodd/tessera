@@ -331,7 +331,9 @@ describe('fitPatterns', () => {
     ['{lang=en}Paris'],
     ['{case_matters=true}Paris'],
     ['{order_matters=false}a[,]b'],
+    ['{case_matters=yes}Paris'],
     ['a[,]{lang=en}b'],
+    ['a[,]{case_matters=true}b'],
   ])('drops an answer %j the LMS reads as a delimiter', (answer) => {
     const i: Interaction = {
       type: 'fill-in',
@@ -354,23 +356,39 @@ describe('fitPatterns', () => {
   });
 
   it.each([
-    ['fill-in', '{case_matters=true Paris', true],
-    ['fill-in', '{order_matters=true Paris', true],
-    ['fill-in', '{lang=en Paris', false],
-    ['long-fill-in', '{case_matters=true Paris', true],
-    ['long-fill-in', '{lang=en Paris', false],
+    ['fill-in', '{case_matters=true Paris'],
+    ['fill-in', '{order_matters=true Paris'],
+    ['fill-in', '{lang=en Paris'],
+    ['long-fill-in', '{case_matters=true Paris'],
   ] as const)(
-    'keeps a %s answer %j only when it is plain text',
-    (type, answer, kept) => {
+    'keeps a %s answer %j with an unclosed delimiter',
+    (type, answer) => {
       const i: Interaction = { type, response: '', correct: [answer] };
       for (const fmt of [
         SCORM2004_INTERACTION_FORMAT,
         XAPI_INTERACTION_FORMAT,
       ]) {
-        expect(fitPatterns(i, fmt).kept).toEqual(kept ? [answer] : []);
+        expect(fitPatterns(i, fmt)).toEqual({ kept: [answer], warnings: [] });
       }
     },
   );
+
+  it('drops a long-fill-in answer starting with an unclosed {lang= only under SCORM 2004', () => {
+    const i: Interaction = {
+      type: 'long-fill-in',
+      response: '',
+      correct: ['{lang=en Paris', 'Oslo'],
+    };
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: ['Oslo'],
+      warnings: [
+        expect.stringContaining(
+          '1 correct answer(s) starting with {lang=, which this export standard rejects',
+        ),
+      ],
+    });
+    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual(i.correct);
+  });
 
   it.each<[Interaction]>([
     [{ type: 'fill-in', response: '{lang=en}Paris' }],
@@ -383,7 +401,6 @@ describe('fitPatterns', () => {
       expect.stringContaining('reads as a language tag'),
     );
     expect(formatResponse(i, XAPI_INTERACTION_FORMAT)).toBe(i.response);
-    warn.mockRestore();
   });
 
   it('keeps a SCORM 2004 response starting with {case_matters=}', () => {

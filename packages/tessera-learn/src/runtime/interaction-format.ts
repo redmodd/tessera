@@ -20,7 +20,7 @@ export interface InteractionFormat {
    * `{order_matters=}` and `{lang=}` delimiters, so a correct answer starting
    * with one is left out; SCORM 1.2 has no such syntax.
    */
-  supportsCasePrefix: boolean;
+  fillInDelimiters: boolean;
   encodesOptionIndex: boolean;
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
@@ -64,15 +64,15 @@ interface ItemRule {
    */
   steps?: 'text' | 'range';
   /**
-   * No item can start with `{lang=`: the LMS reads a valid tag as the item's
-   * language and rejects any other.
+   * No item can start with `{lang=`, closed or not: the LMS reads a valid tag
+   * as the item's language and rejects any other.
    */
   untagged?: boolean;
 }
 
 /**
- * In a correct answer, breaking `maxParts`, `trimmed` or `unique` drops only
- * that answer; breaking any other rule leaves out the whole field.
+ * In a correct answer, breaking `maxParts`, `trimmed`, `unique` or `untagged`
+ * drops only that answer; breaking any other rule leaves out the whole field.
  */
 interface AnswerRule extends ItemRule {
   trimmed?: boolean;
@@ -103,7 +103,10 @@ const SCORM2004_RULES: ValueRules = {
     response: { maxParts: 10, untagged: true },
     correct: { maxParts: 10, trimmed: true, unique: true },
   },
-  'long-fill-in': { response: { untagged: true }, correct: { trimmed: true } },
+  'long-fill-in': {
+    response: { untagged: true },
+    correct: { trimmed: true, untagged: true },
+  },
   other: { correct: { trimmed: true } },
 };
 
@@ -112,7 +115,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '.',
   rangeDelim: ':',
   supportsRange: false,
-  supportsCasePrefix: false,
+  fillInDelimiters: false,
   encodesOptionIndex: true,
   fillInLimit: 10,
   longFillInLimit: 10,
@@ -133,7 +136,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   pairDelim: '[.]',
   rangeDelim: '[:]',
   supportsRange: true,
-  supportsCasePrefix: true,
+  fillInDelimiters: true,
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
@@ -349,7 +352,7 @@ function correctItems(
  * apply to the answer alone.
  */
 function casePrefix(i: Interaction, fmt: InteractionFormat): string {
-  return fmt.supportsCasePrefix &&
+  return fmt.fillInDelimiters &&
     (i.type === 'fill-in' || i.type === 'long-fill-in') &&
     i.caseMatters
     ? CASE_PREFIX
@@ -364,10 +367,9 @@ export function formatResponse(i: Interaction, fmt: InteractionFormat): string {
 /**
  * The LMS strips these from the start of each fill-in part, or rejects the
  * pattern when one can't go there. No escape keeps one as answer text. An
- * unclosed `{case_matters=` or `{order_matters=` is plain text; an unclosed
- * `{lang=` still counts, since a long-fill-in pattern rejects it.
+ * unclosed one is plain text.
  */
-const DELIMITER_START = /^\{(?:lang=|(?:case_matters|order_matters)=[^}]*\})/;
+const DELIMITER_START = /^\{(?:lang|case_matters|order_matters)=[^}]*\}/;
 
 function readsAsDelimiter(
   i: Interaction,
@@ -375,7 +377,7 @@ function readsAsDelimiter(
   fmt: InteractionFormat,
 ): boolean {
   return (
-    fmt.supportsCasePrefix &&
+    fmt.fillInDelimiters &&
     (i.type === 'fill-in' || i.type === 'long-fill-in') &&
     items.some((item) => DELIMITER_START.test(item))
   );
@@ -403,7 +405,13 @@ function checkSteps(
   }
 }
 
-const DROPS = ['delimiter', 'trimmed', 'unique', 'maxParts'] as const;
+const DROPS = [
+  'delimiter',
+  'untagged',
+  'trimmed',
+  'unique',
+  'maxParts',
+] as const;
 type DroppedBy = (typeof DROPS)[number];
 
 /**
@@ -438,6 +446,7 @@ function checkValue(
     );
   }
   if (rule.untagged && items.some((item) => item.startsWith('{lang='))) {
+    if (field === 'correct') return 'untagged';
     throw new UnrecordableError(
       `it starts with {lang=${i.type === 'fill-in' ? ', or has a part after [,] that does' : ''}, which this export standard reads as a language tag`,
     );
@@ -554,6 +563,8 @@ export function fitPatterns(
     switch (rule) {
       case 'delimiter':
         return `starting with {lang=}, {case_matters=} or {order_matters=}${i.type === 'fill-in' ? ', or with one after [,]' : ''}`;
+      case 'untagged':
+        return 'starting with {lang=';
       case 'trimmed':
         return isList(i)
           ? 'with an item starting or ending in whitespace'
@@ -571,7 +582,7 @@ export function fitPatterns(
     const dropped = broken.filter((b) => b === rule).length;
     if (dropped) {
       warnings.push(
-        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} ${rule === 'delimiter' ? 'reads as a delimiter' : 'rejects'}; they are ${lost}`,
+        `has ${dropped} correct answer(s) ${reason(rule)}, which ${recorder} ${rule === 'delimiter' ? 'reads as a delimiter or rejects' : 'rejects'}; they are ${lost}`,
       );
     }
   }

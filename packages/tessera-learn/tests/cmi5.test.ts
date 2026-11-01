@@ -1064,7 +1064,6 @@ describe('CMI5Adapter', () => {
           'which this export standard reads as a delimiter',
         ),
       );
-      warn.mockRestore();
     });
 
     it('omits correctResponsesPattern when every answer reads as a delimiter', async () => {
@@ -1075,7 +1074,15 @@ describe('CMI5Adapter', () => {
         false,
       );
       expect(body.object.definition.correctResponsesPattern).toBeUndefined();
-      warn.mockRestore();
+    });
+
+    it('sends an empty correctResponsesPattern for an empty fill-in correct list', async () => {
+      const body = await initAndReport(
+        'q1',
+        { type: 'fill-in', response: 'a', correct: [] },
+        false,
+      );
+      expect(body.object.definition.correctResponsesPattern).toEqual([]);
     });
 
     it('omits a reversed correct range, with a warning', async () => {
@@ -1089,7 +1096,6 @@ describe('CMI5Adapter', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('minimum above its maximum'),
       );
-      warn.mockRestore();
     });
 
     it('omits correctResponsesPattern when no correct provided', async () => {

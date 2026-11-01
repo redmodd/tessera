@@ -2242,7 +2242,7 @@ let a = {}; let b = {};</script>
         warns
           ? [
               expect.stringMatching(
-                /"q1" has 1 correct answer\(s\) starting with \{lang=\}.* reads as a delimiter; they are graded but left out/,
+                /"q1" has 1 correct answer\(s\) starting with \{lang=\}.* reads as a delimiter or rejects; they are graded but left out/,
               ),
             ]
           : [],

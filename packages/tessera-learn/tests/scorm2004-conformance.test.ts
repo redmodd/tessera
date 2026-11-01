@@ -473,11 +473,36 @@ describe('SCORM2004Adapter against scorm-again', () => {
         undefined,
       ],
       [
+        'a fill-in answer with a later part starting with {case_matters=}',
+        {
+          type: 'fill-in',
+          response: 'a',
+          correct: ['a[,]{case_matters=true}b'],
+        },
+        'a',
+        '',
+        'which this export standard reads as a delimiter or rejects',
+      ],
+      [
+        'a fill-in answer starting with {case_matters=} set to neither true nor false',
+        { type: 'fill-in', response: 'a', correct: ['{case_matters=yes}a'] },
+        'a',
+        '',
+        'which this export standard reads as a delimiter or rejects',
+      ],
+      [
+        'a fill-in answer starting with an unclosed {lang=',
+        { type: 'fill-in', response: 'a', correct: ['{lang=en Paris'] },
+        'a',
+        '{lang=en Paris',
+        undefined,
+      ],
+      [
         'a long-fill-in answer starting with an unclosed {lang=',
         { type: 'long-fill-in', response: 'a', correct: ['{lang=en Paris'] },
         'a',
         '',
-        'which this export standard reads as a delimiter',
+        'starting with {lang=, which this export standard rejects',
       ],
       [
         'a fill-in response starting with {lang=}',
