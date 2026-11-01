@@ -9,12 +9,13 @@
     response: () => ({
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
-      correct: [String(correct)],
+      correct: correct === undefined ? undefined : [String(correct)],
       options: options.map((_, i) => String(i)),
     }),
     reset: () => {
       selected = null;
     },
+    restore: ([choice]) => (selected = Number(choice)),
   });
 
   function pick(i) {

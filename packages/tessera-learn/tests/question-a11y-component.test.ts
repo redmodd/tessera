@@ -9,14 +9,19 @@ import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
 import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
 import type { QuizConfig } from '../src/runtime/types.js';
+import type { QuizPageState } from '../src/runtime/contexts.js';
 import { mountQuestion } from './helpers/mount.js';
 
 function mountWidget(
   widget: Component<any>,
   props: Record<string, unknown>,
   quiz?: QuizConfig,
+  quizState?: QuizPageState,
 ) {
-  const { target } = mountQuestion(widget, props, { quiz });
+  const { target, unmount } = mountQuestion(widget, props, {
+    quiz,
+    quizState,
+  });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -37,7 +42,7 @@ function mountWidget(
     el.click();
     flushSync();
   };
-  return { target, button, name, click };
+  return { target, button, name, click, unmount };
 }
 
 describe('Sorting accessible names', () => {
@@ -504,6 +509,48 @@ describe('standalone feedback', () => {
       .toBe(mounted.target.querySelector('fieldset input'));
   });
 
+  it.each(['Submit', 'Try again'])(
+    'keeps focus the learner moves before %s focuses',
+    async (pressed) => {
+      const mounted = mountWidget(CustomChoice, {
+        prompt: '2 + 2?',
+        options: ['3', '4'],
+        correct: 1,
+      });
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      submitOption(mounted, 0);
+      if (pressed === 'Try again') {
+        await expect.poll(focusedText).toContain('Try again');
+        mounted.click(mounted.button('Try again'));
+      }
+      elsewhere.focus();
+
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => setTimeout(() => setTimeout(resolve))),
+      );
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    },
+  );
+
+  it('does not warn when the question unmounts before Try again moves focus', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mounted = mountWidget(CustomChoice, {
+      prompt: '2 + 2?',
+      options: ['3', '4'],
+      correct: 1,
+    });
+    submitOption(mounted, 0);
+    mounted.click(mounted.button('Try again'));
+    mounted.unmount();
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => setTimeout(() => setTimeout(resolve))),
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       name: 'is the page',
@@ -558,10 +605,66 @@ describe('custom widget in a quiz', () => {
     click(active.querySelector('input')!);
     click(button('Submit'));
 
-    await expect
-      .poll(() => document.activeElement?.textContent ?? '')
-      .toContain('The right answer was 4.');
-    expect(active.contains(document.activeElement)).toBe(true);
+    await expect.poll(() => active.contains(document.activeElement)).toBe(true);
     expect(document.activeElement!.getAttribute('role')).toBe('group');
+    expect(document.activeElement!.textContent).toContain(
+      'The right answer was 4.',
+    );
+  });
+
+  const textIn = (target: HTMLElement, selector: string) =>
+    [...target.querySelectorAll(selector)].map((el) =>
+      (el.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+
+  function submitBoth(correct: (number | undefined)[]) {
+    const { target, button, click } = mountWidget(
+      CustomChoiceQuiz,
+      { correct },
+      {},
+    );
+    flushSync();
+    const pickFirst = () =>
+      click(
+        target.querySelector(
+          '.tessera-quiz-question-wrapper.active input',
+        ) as HTMLElement,
+      );
+    pickFirst();
+    click(button('Next'));
+    pickFirst();
+    click(button('Submit'));
+    return target;
+  }
+
+  it('counts only questions with a correct answer in the results', () => {
+    const target = submitBoth([1, undefined]);
+    expect(textIn(target, '.tessera-quiz-score-value')).toEqual(['0%']);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'You answered 0 of 1 question correctly.',
+    ]);
+  });
+
+  it('shows no score when no question has a correct answer', () => {
+    const target = submitBoth([undefined, undefined]);
+    expect(textIn(target, '.tessera-quiz-score')).toEqual([]);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'Your answers have been submitted.',
+    ]);
+  });
+
+  it('shows no score for a restored result with nothing to score', () => {
+    const { target } = mountWidget(
+      CustomChoiceQuiz,
+      { correct: [undefined, undefined] },
+      {},
+      { attempts: 1, score: 100, unscored: true },
+    );
+    flushSync();
+    expect(textIn(target, '.tessera-quiz-score')).toEqual([]);
+    expect(textIn(target, '.tessera-quiz-results-detail')).toEqual([
+      'Your answers have been submitted.',
+      'Your previous result.',
+    ]);
   });
 });

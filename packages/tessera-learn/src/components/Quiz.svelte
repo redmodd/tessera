@@ -31,9 +31,9 @@
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
-  let correctCount = $derived(
-    handle.questions.reduce((sum, q) => sum + (q.correct ? 1 : 0), 0),
-  );
+  let results = $derived(handle.questions.map((q) => q.correct));
+  let correctCount = $derived(results.filter((c) => c).length);
+  let scoredCount = $derived(results.filter((c) => c !== null).length);
   let attemptPassed = $derived(handle.score >= handle.passingScore);
   let passed = $derived(handle.bestScore >= handle.passingScore);
   let bestBeaten = $derived(handle.bestScore > handle.score);
@@ -251,7 +251,11 @@
       >
         <div id={resultsId}>
           <h2 class="tessera-quiz-results-title">Quiz Results</h2>
-          {#if bestBeaten}
+          {#if !handle.scored}
+            <p class="tessera-quiz-results-detail">
+              Your answers have been submitted.
+            </p>
+          {:else if bestBeaten}
             <div
               class="tessera-quiz-score paired"
               data-testid="quiz-attempt-score"
@@ -294,9 +298,10 @@
           {/if}
           {#if handle.restored}
             <p class="tessera-quiz-results-detail">Your previous result.</p>
-          {:else}
+          {:else if handle.scored}
             <p class="tessera-quiz-results-detail">
-              You answered {correctCount} of {totalQuestions} questions correctly.
+              You answered {correctCount} of {scoredCount}
+              {scoredCount === 1 ? 'question' : 'questions'} correctly.
             </p>
           {/if}
         </div>

@@ -116,8 +116,14 @@ Drop `quiz.svelte` at the course root. It replaces the quiz UI on every quiz pag
       >Submit</button
     >
   {:else if quiz.state === 'submitted'}
-    <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
-    {#if quiz.bestScore > quiz.score}<p>Best attempt: {quiz.bestScore}%</p>{/if}
+    {#if quiz.scored}
+      <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
+      {#if quiz.bestScore > quiz.score}
+        <p>Best attempt: {quiz.bestScore}%</p>
+      {/if}
+    {:else}
+      <p>Your answers have been submitted.</p>
+    {/if}
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
     {#if !quiz.restored}<button onclick={() => quiz.startReview()}
         >Review</button
@@ -160,7 +166,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
     response: () => ({
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
-      correct: [String(correct)],
+      correct: correct === undefined ? undefined : [String(correct)],
       options: options.map((_, i) => String(i)),
     }),
     reset: () => {
@@ -207,7 +213,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
 {#if q.mode === 'standalone'}{@render view()}{/if}
 ```
 
-`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown in place of the other two, with no feedback, when a standalone question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
+`QuestionReview` props: `q` (required), `correctLabel` / `incorrectLabel` (default `'Correct'` / `'Incorrect'`), `submittedLabel` (default `'Submitted'`, shown in place of the other two, with no feedback, when the question has no `correct`), `correctFeedback` / `incorrectFeedback`. Its children render under the result.
 
 Feedback timing: `feedbackMode: 'immediate'` → shell calls `quiz.revealFeedback(q)`, flipping `feedbackVisible` (and `locked`). `'review'` → after `submit()` + `startReview()`. `'never'` → `feedbackVisible` stays false but `locked` still flips on submit.
 

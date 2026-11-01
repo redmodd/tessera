@@ -8,6 +8,7 @@ import {
 import type { CourseConfig, QuizConfig } from '../../src/runtime/types.js';
 import type { Manifest } from '../../src/plugin/manifest.js';
 import {
+  type QuizPageState,
   setInPage,
   setNavContext,
   setPageContext,
@@ -54,6 +55,7 @@ export function mountOnPage(
   props: Record<string, unknown>,
   course: { manifest: Manifest; progress: ProgressState; config: CourseConfig },
   quiz: QuizConfig | null = null,
+  quizState: QuizPageState | null = null,
 ) {
   return mountInBody(component, {
     props,
@@ -61,7 +63,7 @@ export function mountOnPage(
       setNavContext({ nav: { currentPageIndex: 0 }, ...course } as any);
       setPageContext({
         quiz,
-        quizState: null,
+        quizState,
         passingScore: 70,
         index: 0,
       });
@@ -79,7 +81,11 @@ export type SavedAnswer = StandaloneSubmit & { score: number };
 export function mountQuestion(
   widget: Component<any>,
   props: Record<string, unknown>,
-  { saved, quiz }: { saved?: SavedAnswer; quiz?: QuizConfig } = {},
+  {
+    saved,
+    quiz,
+    quizState,
+  }: { saved?: SavedAnswer; quiz?: QuizConfig; quizState?: QuizPageState } = {},
 ) {
   const manifest = createManifest(1);
   const config = createConfig();
@@ -92,6 +98,7 @@ export function mountQuestion(
     { id: 'q1', question: 'Question', ...props },
     { manifest, progress, config },
     quiz,
+    quizState,
   );
 }
 

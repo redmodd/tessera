@@ -206,6 +206,7 @@
         pageContext.quizState = {
           attempts: progress.quizAttempts(index),
           score: progress.quizScore(index) ?? 0,
+          unscored: progress.quizUnscored(index),
           responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;

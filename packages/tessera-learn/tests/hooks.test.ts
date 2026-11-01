@@ -486,7 +486,7 @@ describe('useQuestion — inside a <Quiz>', () => {
     });
   });
 
-  it('checkAnswer() returns the boolean from isCorrect(response())', () => {
+  it('checkAnswer() returns isCorrect(response()), false while unanswered', () => {
     const quiz = provideQuizCtx();
     provideNavCtx();
 
@@ -501,6 +501,8 @@ describe('useQuestion — inside a <Quiz>', () => {
     expect(arg.checkAnswer()).toBe(true);
     current = { type: 'true-false', response: false, correct: true };
     expect(arg.checkAnswer()).toBe(false);
+    current = { type: 'true-false', response: true };
+    expect(arg.checkAnswer()).toBeNull();
     current = undefined;
     expect(arg.checkAnswer()).toBe(false);
   });
@@ -625,6 +627,18 @@ describe('useProgress', () => {
     expect(h.quizScore(2)).toBe(80);
     expect(h.completionStatus).toBe('incomplete');
     expect(h.successStatus).toBe('unknown');
+  });
+
+  it('flags a submitted quiz with nothing to score as unscored', () => {
+    const { progress } = provideNavCtx();
+    progress.quizCompleted(1, 80);
+    progress.quizCompleted(2, 100, [], false);
+
+    const h = useProgress();
+    expect(h.quizUnscored(0)).toBe(false);
+    expect(h.quizUnscored(1)).toBe(false);
+    expect(h.quizScore(2)).toBe(100);
+    expect(h.quizUnscored(2)).toBe(true);
   });
 
   it('exposes the course-wide graded score and pass threshold', () => {

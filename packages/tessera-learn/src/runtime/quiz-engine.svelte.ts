@@ -30,7 +30,11 @@ export interface QuizEngineDeps {
     correct: boolean | null,
   ) => void;
   /** Records the submitted score and responses against the current page's progress. */
-  onComplete: (score: number, responses: Map<string, unknown>) => void;
+  onComplete: (
+    score: number,
+    responses: Map<string, unknown>,
+    scored: boolean,
+  ) => void;
   /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
   notify?: (name: string, detail?: unknown) => void;
   /**
@@ -45,7 +49,7 @@ export interface QuizEngineDeps {
 interface InternalQuestion {
   id: string;
   weight: number;
-  checkAnswer: () => boolean;
+  checkAnswer: () => boolean | null;
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
@@ -71,6 +75,8 @@ export class QuizEngine implements UseQuizHandle {
   #reviewing = $state(false);
   #score = $state(0);
   #bestScore = $state(0);
+  #scored = $state(true);
+  #bestScored = true;
   #attemptCount = $state(0);
   #fromSave = $state(false);
   #answerMissing = $state(false);
@@ -89,6 +95,8 @@ export class QuizEngine implements UseQuizHandle {
       this.#attemptCount = deps.restore.attempts;
       this.#score = deps.restore.score;
       this.#bestScore = deps.restore.score;
+      this.#scored = !deps.restore.unscored;
+      this.#bestScored = this.#scored;
       this.#submitted = true;
       this.#fromSave = true;
       this.#submitCalled = true;
@@ -141,6 +149,10 @@ export class QuizEngine implements UseQuizHandle {
 
   get bestScore(): number {
     return this.#bestScore;
+  }
+
+  get scored(): boolean {
+    return this.#scored;
   }
 
   get passingScore(): number {
@@ -275,9 +287,27 @@ export class QuizEngine implements UseQuizHandle {
 
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
-    const score = this.#computeScore();
+    const computed = this.#computeScore();
+    const scored = computed !== null;
+    // A quiz of only survey or reflection questions has nothing to fail.
+    const score = computed ?? 100;
+    if (!scored && import.meta.env?.DEV && this.#deps.quizConfig.graded) {
+      console.warn(
+        '[tessera] useQuiz: this quiz is graded, but no question has a `correct` answer, ' +
+          'so every learner scores 100 toward the course score. ' +
+          'Leave `graded` off for a survey or reflection quiz.',
+      );
+    }
     this.#score = score;
-    this.#bestScore = Math.max(this.#bestScore, score);
+    this.#scored = scored;
+    // Same rule as ProgressState.quizCompleted: a scored attempt beats a placeholder.
+    const best =
+      this.#attemptCount === 0 ||
+      (scored === this.#bestScored ? score >= this.#bestScore : scored);
+    if (best) {
+      this.#bestScore = score;
+      this.#bestScored = scored;
+    }
     this.#submitted = true;
     this.#fromSave = false;
     this.#attemptCount++;
@@ -295,8 +325,8 @@ export class QuizEngine implements UseQuizHandle {
         if (response !== undefined) responses.set(q.id, response);
       }
     }
-    this.#deps.onComplete(score, responses);
-    this.#deps.notify?.('tessera-quiz-complete', { score });
+    this.#deps.onComplete(score, responses, scored);
+    this.#deps.notify?.('tessera-quiz-complete', { score, scored });
   }
 
   startReview(): void {
@@ -318,23 +348,25 @@ export class QuizEngine implements UseQuizHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    const newLocked = new Set<number>();
+    const kept = new Set<number>();
+    this.#lockedCorrect.clear();
     if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
       this.#internalQuestions.forEach((q, i) => {
         // A question restored without its answer can read as correct, and
         // locked it could never be answered.
-        if (this.#answers.has(i) && q.checkAnswer()) newLocked.add(i);
+        if (!this.#answers.has(i)) return;
+        const correct = q.checkAnswer();
+        if (correct) this.#lockedCorrect.add(i);
+        // An answer with no `correct` can't be wrong: it stays, still editable.
+        if (correct !== false) kept.add(i);
       });
     }
-    this.#lockedCorrect.clear();
-    for (const i of newLocked) this.#lockedCorrect.add(i);
     for (const i of [...this.#answers.keys()]) {
-      if (!newLocked.has(i)) this.#answers.delete(i);
+      if (!kept.has(i)) this.#answers.delete(i);
     }
     this.#reportedAnswers.clear();
     for (let i = 0; i < this.#internalQuestions.length; i++) {
-      if (!newLocked.has(i) && this.#internalQuestions[i].reset)
-        this.#internalQuestions[i].reset!();
+      if (!kept.has(i)) this.#internalQuestions[i].reset?.();
     }
     this.#feedbackShown.clear();
     this.#submitted = false;
@@ -354,13 +386,15 @@ export class QuizEngine implements UseQuizHandle {
     this.#reportedAnswers.set(index, fingerprint);
   }
 
-  #computeScore(): number {
-    return weightedScore(
-      this.#internalQuestions.map((q) => ({
-        score: q.checkAnswer() ? 100 : 0,
-        weight: q.weight,
-      })),
-    );
+  /** Null when no question has a `correct` to score. */
+  #computeScore(): number | null {
+    const scored = this.#internalQuestions.flatMap((q) => {
+      const correct = q.checkAnswer();
+      return correct === null
+        ? []
+        : [{ score: correct ? 100 : 0, weight: q.weight }];
+    });
+    return scored.length ? weightedScore(scored) : null;
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

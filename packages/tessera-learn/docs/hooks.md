@@ -27,7 +27,7 @@ import type { Interaction } from 'tessera-learn';
 interface Question {
   readonly id: string;
   readonly submitted: boolean;
-  readonly correct: boolean | null; // null while answering, and null on a quiz restored without its answers (see `useQuiz().restored`)
+  readonly correct: boolean | null; // null while answering, for a question with no `correct`, and on a quiz restored without its answers (see `useQuiz().restored`)
   readonly answer: unknown;
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
@@ -43,7 +43,11 @@ Gate input on `q.locked`. In a quiz, branch on `q.isLockedCorrect` only to rende
 
 A widget that builds its answer incrementally (matching, ordering, multi-select) must pass `complete` to `useQuestion()`. Without it the shell treats the first `setAnswer()` as a finished answer and offers to submit half of one. Read reactive state inside it (`matches.size === pairs.length` over a `SvelteMap`), or the shell's button gating never updates.
 
-`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging (`useQuestion` reports `null` correctness). Standalone, `QuestionReview` shows a neutral `Submitted` result; inside a quiz the question still counts as wrong. A standalone question with no `correct` scores 0 unless you pass `score()`, so it offers Try again and pulls a graded page down: pass `score: () => 100` to accept any answer.
+`Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging: `useQuestion` reports `null` correctness, the LMS records no result, `q.correct` stays `null` and `QuestionReview` shows a neutral `Submitted` result.
+
+- **In a quiz:** the question is left out of the score and the built-in `<Quiz>`'s correct count. An `incorrect-only` retry keeps its answer, still editable.
+- **A quiz with no `correct` on any question** scores 100, reports `useQuiz().scored` as `false`, and the built-in `<Quiz>` shows no score. Leave its `graded` off (the default), or every learner adds a 100 to the course score and a dev warning fires.
+- **Standalone:** the question scores 0 unless you pass `score()`, so it offers Try again and pulls a graded page down. Pass `score: () => 100` to accept any answer.
 
 ```ts
 type Interaction =
@@ -191,7 +195,7 @@ Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Throws on 
 
 - **A custom shell must render `children`**, visibly or hidden. Questions register only when they mount, so a shell that drops `children` has nothing to score.
 - **Only `submit()` scores the quiz.** It reports every question to the LMS, records the page score and marks the quiz Completed/Passed/Failed.
-- **`tessera-quiz-complete` is a notification, not the scoring path.** A shell that passes `element` gets it dispatched there after `submit()`. Dispatching it yourself is a build error.
+- **`tessera-quiz-complete` is a notification, not the scoring path.** A shell that passes `element` gets it dispatched there after `submit()`, with `detail: { score, scored }` from that attempt. Dispatching it yourself is a build error.
 - **Widgets call `setAnswer()` only; the shell decides when an answer is final.** Call `q.commit()` to report one question before the end (the built-in `<Quiz>` does when `feedbackMode: 'immediate'` reveals it), and still call `submit()` at the end.
 
 ```ts
@@ -201,7 +205,8 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
   readonly score: number; // 0–100, to 2 decimal places; the attempt just submitted, or the restored result
-  readonly bestScore: number; // highest across attempts; this is what the LMS gets
+  readonly bestScore: number; // highest across attempts, a scored one over a placeholder; this is what the LMS gets
+  readonly scored: boolean; // false when no question has a `correct`: `score` is a placeholder 100
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
   readonly restored: boolean; // results came from saved progress without their answers
@@ -217,6 +222,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
 
 - **Show `bestScore` whenever `bestScore > score`.** `score` is the latest attempt; the LMS and the navigation gate use `bestScore`.
 - **Branch on `restored`.** A result restored from saved progress opens in the `submitted` state with the best score, the attempt count and that attempt's answers, ready to review. `restored` is `true` when the answers did not come back (see [Returning to a question](#returning-to-a-question)): every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
+- **Hide the score when `scored` is `false`.** No question has a `correct`, so show only that the answers were submitted, on a restored result too.
 - **Read `passingScore` from this hook**, not from `course.config.js`: an LMS mastery score overrides the config at launch.
 
 ## `useNavigation`
@@ -248,6 +254,7 @@ function useProgress(): {
   readonly visitedPages: Set<number>;
   readonly completedPages: number; // visited pages, minus unsubmitted quiz pages and graded pages still awaiting a score
   quizScore(pageIndex: number): number | undefined; // 0–100, to 2 decimal places; undefined until the quiz is submitted
+  quizUnscored(pageIndex: number): boolean; // true once a quiz with no `correct` on any question is submitted: its quizScore is a placeholder 100, so show no score
   pageScore(pageIndex?: number): number | undefined; // 0–100, to 2 decimal places; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the page on screen
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 2 decimal places; what successStatus is judged on
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
