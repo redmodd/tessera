@@ -78,12 +78,17 @@ interface ItemRule {
 
 /**
  * In a correct answer, breaking `maxParts`, `trimmed`, `unique`,
- * `undelimited` or `untagged` drops only that answer; breaking any other rule
- * leaves out the whole field.
+ * `undelimited`, `untagged` or `unopened` drops only that answer; breaking any
+ * other rule leaves out the whole field.
  */
 interface AnswerRule extends ItemRule {
   trimmed?: boolean;
   unique?: boolean;
+  /**
+   * The answer can't start with any of these, closed or not: SCORM Cloud
+   * reads one as the pattern's opening delimiter and rejects it unclosed.
+   */
+  unopened?: readonly string[];
 }
 
 type ValueRules = Partial<
@@ -94,8 +99,8 @@ const LIST: ItemRule = { maxItems: 36, nonEmpty: true };
 const STEPS: ItemRule = { maxItems: 250, nonEmpty: true, steps: 'text' };
 
 /**
- * scorm-again's SCORM 2004 grammar. Encoded ids hold no whitespace, and choice
- * and matching items are already deduplicated.
+ * The SCORM 2004 grammar scorm-again and SCORM Cloud accept. Encoded ids hold
+ * no whitespace, and choice and matching items are already deduplicated.
  */
 const SCORM2004_RULES: ValueRules = {
   // An empty choice pattern means "no choice is correct".
@@ -108,11 +113,22 @@ const SCORM2004_RULES: ValueRules = {
   },
   'fill-in': {
     response: { maxParts: 10, untagged: true },
-    correct: { maxParts: 10, trimmed: true, unique: true, undelimited: true },
+    correct: {
+      maxParts: 10,
+      trimmed: true,
+      unique: true,
+      undelimited: true,
+      unopened: ['{case_matters=', '{order_matters='],
+    },
   },
   'long-fill-in': {
     response: { untagged: true },
-    correct: { trimmed: true, untagged: true, undelimited: true },
+    correct: {
+      trimmed: true,
+      untagged: true,
+      undelimited: true,
+      unopened: ['{case_matters='],
+    },
   },
   other: { correct: { trimmed: true } },
 };
@@ -411,6 +427,7 @@ function checkSteps(
 const DROPS = [
   'undelimited',
   'untagged',
+  'unopened',
   'trimmed',
   'unique',
   'maxParts',
@@ -456,6 +473,9 @@ function checkValue(
     throw new UnrecordableError(
       `it is text ${startingWith(i, '{lang=')}, which this export standard reads as a language tag or rejects`,
     );
+  }
+  if (rule.unopened?.some((start) => items[0]?.startsWith(start))) {
+    return 'unopened';
   }
   if (rule.trimmed && items.some((item) => item.trim() !== item)) {
     return 'trimmed';
@@ -575,6 +595,8 @@ export function fitPatterns(
         return `${startingWith(i, DELIMITERS)}, which ${recorder} reads as a delimiter or rejects`;
       case 'untagged':
         return `${startingWith(i, '{lang=')}, ${rejects}`;
+      case 'unopened':
+        return `starting with ${fmt.rules?.[i.type]?.correct?.unopened?.join(' or ')}, ${rejects}`;
       case 'trimmed':
         return `${
           isList(i)

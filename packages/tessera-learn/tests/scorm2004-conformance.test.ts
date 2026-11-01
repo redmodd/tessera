@@ -469,7 +469,18 @@ describe('SCORM2004Adapter against scorm-again', () => {
           correct: ['{case_matters=true Paris'],
         },
         'a',
-        '{case_matters=true Paris',
+        '',
+        'starting with {case_matters= or {order_matters=, which this export standard rejects',
+      ],
+      [
+        'a long-fill-in answer starting with an unclosed {order_matters=',
+        {
+          type: 'long-fill-in',
+          response: 'a',
+          correct: ['{order_matters=true Paris'],
+        },
+        'a',
+        '{order_matters=true Paris',
         undefined,
       ],
       [

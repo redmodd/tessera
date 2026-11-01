@@ -387,10 +387,38 @@ describe('fitPatterns', () => {
   });
 
   it.each([
-    ['fill-in', '{case_matters=true Paris'],
-    ['fill-in', '{order_matters=true Paris'],
+    [
+      'fill-in',
+      '{case_matters=true Paris',
+      '{case_matters= or {order_matters=',
+    ],
+    [
+      'fill-in',
+      '{order_matters=true Paris',
+      '{case_matters= or {order_matters=',
+    ],
+    ['long-fill-in', '{case_matters=true Paris', '{case_matters='],
+  ] as const)(
+    'drops a %s answer %j opening with an unclosed delimiter only under SCORM 2004',
+    (type, answer, starts) => {
+      const i: Interaction = { type, response: '', correct: [answer, 'Oslo'] };
+      expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+        kept: ['Oslo'],
+        warnings: [
+          expect.stringContaining(
+            `1 correct answer(s) starting with ${starts}, which this export standard rejects`,
+          ),
+        ],
+      });
+      expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).kept).toEqual(i.correct);
+    },
+  );
+
+  it.each([
     ['fill-in', '{lang=en Paris'],
-    ['long-fill-in', '{case_matters=true Paris'],
+    ['fill-in', 'a[,]{case_matters=true b'],
+    ['fill-in', '{case_matters Paris'],
+    ['long-fill-in', '{order_matters=true Paris'],
   ] as const)(
     'keeps a %s answer %j with an unclosed delimiter',
     (type, answer) => {
