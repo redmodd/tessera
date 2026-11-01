@@ -1098,6 +1098,16 @@ describe('CMI5Adapter', () => {
       );
     });
 
+    it('omits result when an ungraded response is left out', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const body = await initAndReport(
+        'q1',
+        { type: 'long-fill-in', response: '{lang=en}x' },
+        null,
+      );
+      expect(body).not.toHaveProperty('result');
+    });
+
     it('sends an empty correctResponsesPattern for an empty fill-in correct list', async () => {
       const body = await initAndReport(
         'q1',

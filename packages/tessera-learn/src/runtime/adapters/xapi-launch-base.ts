@@ -386,7 +386,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         objectType: 'Activity',
         definition,
       },
-      result,
+      ...(Object.keys(result).length > 0 && { result }),
     });
   }
 
