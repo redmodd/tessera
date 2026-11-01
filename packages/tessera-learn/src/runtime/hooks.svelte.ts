@@ -430,6 +430,11 @@ export interface UseQuizHandle {
    * whenever it exceeds `score`.
    */
   readonly bestScore: number;
+  /**
+   * False when the result had nothing to score, as no question has a
+   * `correct`: `score` is then a placeholder 100, so show no score.
+   */
+  readonly scored: boolean;
   /** Resolved passing threshold (config + LMS mastery override). */
   readonly passingScore: number;
   readonly attemptCount: number;
@@ -500,8 +505,8 @@ export function useQuiz(
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
     report: reporter(),
-    onComplete: (score, responses) =>
-      progress.quizCompleted(pageIndex, score, responses),
+    onComplete: (score, responses, scored) =>
+      progress.quizCompleted(pageIndex, score, responses, scored),
     notify: (name, detail) => {
       opts
         .element?.()

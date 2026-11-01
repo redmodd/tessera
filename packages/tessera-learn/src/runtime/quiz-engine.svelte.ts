@@ -30,7 +30,11 @@ export interface QuizEngineDeps {
     correct: boolean | null,
   ) => void;
   /** Records the submitted score and responses against the current page's progress. */
-  onComplete: (score: number, responses: Map<string, unknown>) => void;
+  onComplete: (
+    score: number,
+    responses: Map<string, unknown>,
+    scored: boolean,
+  ) => void;
   /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
   notify?: (name: string, detail?: unknown) => void;
   /**
@@ -71,6 +75,7 @@ export class QuizEngine implements UseQuizHandle {
   #reviewing = $state(false);
   #score = $state(0);
   #bestScore = $state(0);
+  #scored = $state(true);
   #attemptCount = $state(0);
   #fromSave = $state(false);
   #answerMissing = $state(false);
@@ -89,6 +94,7 @@ export class QuizEngine implements UseQuizHandle {
       this.#attemptCount = deps.restore.attempts;
       this.#score = deps.restore.score;
       this.#bestScore = deps.restore.score;
+      this.#scored = !deps.restore.unscored;
       this.#submitted = true;
       this.#fromSave = true;
       this.#submitCalled = true;
@@ -141,6 +147,10 @@ export class QuizEngine implements UseQuizHandle {
 
   get bestScore(): number {
     return this.#bestScore;
+  }
+
+  get scored(): boolean {
+    return this.#scored;
   }
 
   get passingScore(): number {
@@ -275,8 +285,22 @@ export class QuizEngine implements UseQuizHandle {
 
     for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
 
-    const score = this.#computeScore();
+    const computed = this.#computeScore();
+    // A quiz of only survey or reflection questions has nothing to fail.
+    const score = computed ?? 100;
+    if (
+      computed === null &&
+      import.meta.env?.DEV &&
+      this.#deps.quizConfig.graded
+    ) {
+      console.warn(
+        '[tessera] useQuiz: this quiz is graded, but no question has a `correct` answer, ' +
+          'so every learner scores 100 toward the course score. ' +
+          'Leave `graded` off for a survey or reflection quiz.',
+      );
+    }
     this.#score = score;
+    this.#scored = computed !== null;
     this.#bestScore = Math.max(this.#bestScore, score);
     this.#submitted = true;
     this.#fromSave = false;
@@ -295,7 +319,7 @@ export class QuizEngine implements UseQuizHandle {
         if (response !== undefined) responses.set(q.id, response);
       }
     }
-    this.#deps.onComplete(score, responses);
+    this.#deps.onComplete(score, responses, this.#scored);
     this.#deps.notify?.('tessera-quiz-complete', { score });
   }
 
@@ -356,23 +380,15 @@ export class QuizEngine implements UseQuizHandle {
     this.#reportedAnswers.set(index, fingerprint);
   }
 
-  #computeScore(): number {
+  /** Null when no question has a `correct` to score. */
+  #computeScore(): number | null {
     const scored = this.#internalQuestions.flatMap((q) => {
       const correct = q.checkAnswer();
       return correct === null
         ? []
         : [{ score: correct ? 100 : 0, weight: q.weight }];
     });
-    if (scored.length) return weightedScore(scored);
-    if (import.meta.env?.DEV && this.#deps.quizConfig.graded) {
-      console.warn(
-        '[tessera] useQuiz: this quiz is graded, but no question has a `correct` answer, ' +
-          'so every learner scores 100 toward the course score. ' +
-          'Leave `graded` off for a survey or reflection quiz.',
-      );
-    }
-    // A quiz of only survey or reflection questions has nothing to fail.
-    return 100;
+    return scored.length ? weightedScore(scored) : null;
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {

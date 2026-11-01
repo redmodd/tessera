@@ -35,6 +35,7 @@ function makeEngine(
     restore?: {
       attempts: number;
       score: number;
+      unscored?: boolean;
       responses?: Record<string, unknown>;
     };
   } = {},
@@ -836,6 +837,7 @@ describe('QuizEngine', () => {
     engine.submit();
 
     expect(completeScore(events)).toBe(100);
+    expect(engine.scored).toBe(true);
     expect(reports.map((r) => [r.id, r.correct])).toEqual([
       ['a', true],
       ['b', null],
@@ -855,9 +857,18 @@ describe('QuizEngine', () => {
     engine.setAnswer(0, 'x');
     engine.submit();
     expect(completeScore(events)).toBe(100);
+    expect(engine.scored).toBe(false);
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/graded, but no question has a `correct`/),
     );
+  });
+
+  it('restores a result with nothing to score as unscored', () => {
+    const { engine } = makeEngine(
+      { graded: false },
+      { restore: { attempts: 1, score: 100, unscored: true } },
+    );
+    expect(engine.scored).toBe(false);
   });
 
   it('does not warn about an ungraded quiz with no correct answer', () => {

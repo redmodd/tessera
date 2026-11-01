@@ -9,14 +9,16 @@ import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
 import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
 import type { QuizConfig } from '../src/runtime/types.js';
+import type { QuizPageState } from '../src/runtime/contexts.js';
 import { mountQuestion } from './helpers/mount.js';
 
 function mountWidget(
   widget: Component<any>,
   props: Record<string, unknown>,
   quiz?: QuizConfig,
+  quizState?: QuizPageState,
 ) {
-  const { target } = mountQuestion(widget, props, { quiz });
+  const { target } = mountQuestion(widget, props, { quiz, quizState });
   const buttons = () => [
     ...target.querySelectorAll<HTMLElement>('button, [role="button"]'),
   ];
@@ -593,7 +595,7 @@ describe('custom widget in a quiz', () => {
     const { text } = submitBoth([1, undefined]);
     expect(text('.tessera-quiz-score-value')).toEqual(['0%']);
     expect(text('.tessera-quiz-results-detail')).toEqual([
-      'You answered 0 of 1 questions correctly.',
+      'You answered 0 of 1 question correctly.',
     ]);
   });
 
@@ -603,5 +605,21 @@ describe('custom widget in a quiz', () => {
     expect(text('.tessera-quiz-results-detail')).toEqual([
       'Your answers have been submitted.',
     ]);
+  });
+
+  it('shows no score for a restored result with nothing to score', () => {
+    const { target } = mountWidget(
+      CustomChoiceQuiz,
+      { correct: [undefined, undefined] },
+      {},
+      { attempts: 1, score: 100, unscored: true },
+    );
+    flushSync();
+    expect(target.querySelector('.tessera-quiz-score')).toBeNull();
+    expect(
+      [...target.querySelectorAll('.tessera-quiz-results-detail')].map((el) =>
+        el.textContent?.trim(),
+      ),
+    ).toEqual(['Your answers have been submitted.', 'Your previous result.']);
   });
 });

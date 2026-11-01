@@ -151,6 +151,8 @@ export function weightedScore(
 export interface GradedUnit {
   /** Best score across attempts, or undefined until the quiz is submitted. */
   quizScore?: number;
+  /** The best quiz attempt had no question with a `correct`, so its score is a placeholder. */
+  unscored?: boolean;
   /** Submitted quiz attempts. Persisted so `maxAttempts` survives a resume. */
   attempts: number;
   /** Standalone question results, questionId → score 0-100 + rollup weight. */
@@ -245,6 +247,10 @@ export class ProgressState {
     return this.gradedUnits.get(pageIndex)?.quizScore;
   }
 
+  quizUnscored(pageIndex: number): boolean {
+    return !!this.gradedUnits.get(pageIndex)?.unscored;
+  }
+
   quizAttempts(pageIndex: number): number {
     return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
   }
@@ -267,13 +273,18 @@ export class ProgressState {
     pageIndex: number,
     score: number,
     responses: Iterable<[string, unknown]> = [],
+    scored = true,
   ) {
     const unit = this.gradedUnits.get(pageIndex);
     const best = unit?.quizScore === undefined || score >= unit.quizScore;
     this.#write(pageIndex, {
       attempts: (unit?.attempts ?? 0) + 1,
       ...(best
-        ? { quizScore: score, responses: encodeResponses(responses) }
+        ? {
+            quizScore: score,
+            unscored: !scored,
+            responses: encodeResponses(responses),
+          }
         : {}),
     });
   }
@@ -553,6 +564,7 @@ export class ProgressState {
     for (const [pageIndex, unit] of this.gradedUnits) {
       const entry: GradedUnitState = {};
       if (unit.quizScore !== undefined) entry.s = unit.quizScore;
+      if (unit.unscored) entry.u = 1;
       if (unit.attempts > 1) entry.a = unit.attempts;
       if (unit.questions?.size) {
         entry.q = Object.fromEntries(
@@ -636,6 +648,7 @@ export class ProgressState {
         if (typeof unit.s === 'number') {
           this.#write(pageIndex, {
             quizScore: clampScore(unit.s),
+            unscored: unit.u === 1,
             attempts:
               typeof unit.a === 'number' && Number.isFinite(unit.a)
                 ? Math.max(1, Math.ceil(unit.a))
