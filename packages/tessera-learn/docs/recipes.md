@@ -116,8 +116,14 @@ Drop `quiz.svelte` at the course root. It replaces the quiz UI on every quiz pag
       >Submit</button
     >
   {:else if quiz.state === 'submitted'}
-    <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
-    {#if quiz.bestScore > quiz.score}<p>Best attempt: {quiz.bestScore}%</p>{/if}
+    {#if quiz.scored}
+      <p>You scored {quiz.score}% (pass at {quiz.passingScore}%)</p>
+      {#if quiz.bestScore > quiz.score}
+        <p>Best attempt: {quiz.bestScore}%</p>
+      {/if}
+    {:else}
+      <p>Your answers have been submitted.</p>
+    {/if}
     {#if quiz.canRetry}<button onclick={() => quiz.retry()}>Retry</button>{/if}
     {#if !quiz.restored}<button onclick={() => quiz.startReview()}
         >Review</button
