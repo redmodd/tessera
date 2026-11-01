@@ -205,7 +205,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly canSubmit: boolean;
   readonly canRetry: boolean;
   readonly score: number; // 0–100, to 2 decimal places; the attempt just submitted, or the restored result
-  readonly bestScore: number; // highest across attempts; this is what the LMS gets
+  readonly bestScore: number; // highest across attempts, a scored one over a placeholder; this is what the LMS gets
   readonly scored: boolean; // false when no question has a `correct`: `score` is a placeholder 100
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;

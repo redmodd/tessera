@@ -90,6 +90,22 @@ describe('ProgressState', () => {
       expect(progress.quizResponses(2)?.get('q1')).toBe('b');
     });
 
+    it('keeps a lower scored attempt over a later unscored one', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 60);
+      progress.quizCompleted(2, 100, [], false);
+      expect(progress.quizScore(2)).toBe(60);
+      expect(progress.quizUnscored(2)).toBe(false);
+    });
+
+    it('replaces an unscored best with a lower scored attempt', () => {
+      const progress = new ProgressState(createManifest(3), createConfig());
+      progress.quizCompleted(2, 100, [], false);
+      progress.quizCompleted(2, 80);
+      expect(progress.quizScore(2)).toBe(80);
+      expect(progress.quizUnscored(2)).toBe(false);
+    });
+
     it('counts attempts per page', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.quizCompleted(2, 50);

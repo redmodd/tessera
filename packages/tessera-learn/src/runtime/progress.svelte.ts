@@ -276,11 +276,10 @@ export class ProgressState {
     scored = true,
   ) {
     const unit = this.gradedUnits.get(pageIndex);
-    // On a tie, a placeholder 100 doesn't replace a scored one.
+    // An unscored attempt's 100 is a placeholder, so any scored attempt beats it.
     const best =
       unit?.quizScore === undefined ||
-      score > unit.quizScore ||
-      (score === unit.quizScore && (scored || unit.unscored));
+      (scored === !unit.unscored ? score >= unit.quizScore : scored);
     this.#write(pageIndex, {
       attempts: (unit?.attempts ?? 0) + 1,
       ...(best

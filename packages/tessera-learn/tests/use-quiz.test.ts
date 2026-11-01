@@ -863,6 +863,37 @@ describe('QuizEngine', () => {
     );
   });
 
+  it('keeps a scored best over a later unscored attempt', () => {
+    let result: boolean | null = false;
+    const { engine } = makeEngine({ graded: true, maxAttempts: 3 });
+    engine.registerQuestion({
+      ...surveyQuestion('a'),
+      checkAnswer: () => result,
+    });
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(engine.bestScore).toBe(0);
+
+    result = null;
+    engine.retry();
+    engine.setAnswer(0, 'x');
+    engine.submit();
+    expect(engine.score).toBe(100);
+    expect(engine.bestScore).toBe(0);
+  });
+
+  it('replaces a restored unscored best with a scored attempt', () => {
+    const { engine } = makeEngine(
+      { graded: true, maxAttempts: 3 },
+      { restore: { attempts: 1, score: 100, unscored: true } },
+    );
+    engine.registerQuestion(tfQuestion('a', true, false));
+    engine.retry();
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(engine.bestScore).toBe(0);
+  });
+
   it('restores a result with nothing to score as unscored', () => {
     const { engine } = makeEngine(
       { graded: false },

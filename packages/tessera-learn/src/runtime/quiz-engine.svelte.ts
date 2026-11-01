@@ -76,6 +76,7 @@ export class QuizEngine implements UseQuizHandle {
   #score = $state(0);
   #bestScore = $state(0);
   #scored = $state(true);
+  #bestScored = true;
   #attemptCount = $state(0);
   #fromSave = $state(false);
   #answerMissing = $state(false);
@@ -95,6 +96,7 @@ export class QuizEngine implements UseQuizHandle {
       this.#score = deps.restore.score;
       this.#bestScore = deps.restore.score;
       this.#scored = !deps.restore.unscored;
+      this.#bestScored = this.#scored;
       this.#submitted = true;
       this.#fromSave = true;
       this.#submitCalled = true;
@@ -298,7 +300,14 @@ export class QuizEngine implements UseQuizHandle {
     }
     this.#score = score;
     this.#scored = scored;
-    this.#bestScore = Math.max(this.#bestScore, score);
+    // Same rule as ProgressState.quizCompleted: a scored attempt beats a placeholder.
+    const best =
+      this.#attemptCount === 0 ||
+      (scored === this.#bestScored ? score >= this.#bestScore : scored);
+    if (best) {
+      this.#bestScore = score;
+      this.#bestScored = scored;
+    }
     this.#submitted = true;
     this.#fromSave = false;
     this.#attemptCount++;
