@@ -158,6 +158,17 @@ export function weightedScore(
 }
 
 /**
+ * Weighted mean of the entries that can be scored, or null when none can.
+ * Quiz and standalone share it, so an unscored question counts the same in both.
+ */
+export function scoredMean(
+  entries: { score: number; weight: number; unscored?: boolean }[],
+): number | null {
+  const scored = entries.filter((entry) => !entry.unscored);
+  return scored.length ? weightedScore(scored) : null;
+}
+
+/**
  * Score state for one gradable page. A page can carry both a <Quiz> and
  * standalone `useQuestion` answers; `quizScore` wins when it does.
  */
@@ -474,9 +485,8 @@ export class ProgressState {
   }
 
   pageScore(pageIndex: number): number | undefined {
-    const unit = this.gradedUnits.get(pageIndex);
-    if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
-      return unit.quizScore;
+    const quiz = this.#submittedGradedQuiz(pageIndex);
+    if (quiz) return quiz.quizScore;
     return this.#gradedResults(pageIndex).length
       ? this.getPageStandaloneAverage(pageIndex)
       : undefined;
@@ -484,11 +494,18 @@ export class ProgressState {
 
   /** The page score is a placeholder 100: nothing on the page had a `correct` or `score()` to score it by. */
   pageUnscored(pageIndex: number): boolean {
-    const unit = this.gradedUnits.get(pageIndex);
-    if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
-      return !!unit.unscored;
+    const quiz = this.#submittedGradedQuiz(pageIndex);
+    if (quiz) return !!quiz.unscored;
     const results = this.#gradedResults(pageIndex);
     return results.length > 0 && results.every((result) => result.unscored);
+  }
+
+  /** A submitted graded quiz's score outranks the page's standalone answers. */
+  #submittedGradedQuiz(pageIndex: number): GradedUnit | undefined {
+    const unit = this.gradedUnits.get(pageIndex);
+    return this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined
+      ? unit
+      : undefined;
   }
 
   #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {
@@ -508,9 +525,7 @@ export class ProgressState {
    */
   getPageStandaloneAverage(pageIndex: number): number {
     const results = this.#gradedResults(pageIndex);
-    const scored = results.filter((result) => !result.unscored);
-    if (scored.length) return weightedScore(scored);
-    return results.length ? 100 : 0;
+    return scoredMean(results) ?? (results.length ? 100 : 0);
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it

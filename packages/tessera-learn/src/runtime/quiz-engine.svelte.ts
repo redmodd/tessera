@@ -1,5 +1,5 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { normalizeWeight, weightedScore } from './progress.svelte.js';
+import { normalizeWeight, scoredMean } from './progress.svelte.js';
 import { restoreResponse, type Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type { QuizPageState } from './contexts.js';
@@ -388,13 +388,16 @@ export class QuizEngine implements UseQuizHandle {
 
   /** Null when no question has a `correct` to score. */
   #computeScore(): number | null {
-    const scored = this.#internalQuestions.flatMap((q) => {
-      const correct = q.checkAnswer();
-      return correct === null
-        ? []
-        : [{ score: correct ? 100 : 0, weight: q.weight }];
-    });
-    return scored.length ? weightedScore(scored) : null;
+    return scoredMean(
+      this.#internalQuestions.map((q) => {
+        const correct = q.checkAnswer();
+        return {
+          score: correct ? 100 : 0,
+          weight: q.weight,
+          unscored: correct === null,
+        };
+      }),
+    );
   }
 
   #makeQuestionHandle(i: number): UseQuestionHandle {
