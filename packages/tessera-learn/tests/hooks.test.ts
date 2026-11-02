@@ -675,6 +675,22 @@ describe('useProgress', () => {
     expect(h.pageScore(3)).toBeUndefined();
   });
 
+  it('pageUnscored defaults to the page it renders on', () => {
+    const { nav, progress } = provideNavCtx({ pageIndex: 2 });
+    progress.markStandaloneQuestion(2, 'survey', 100, true, 1, {
+      correct: null,
+      unscored: true,
+    });
+
+    const h = useProgress();
+    expect(h.pageScore()).toBe(100);
+    expect(h.pageUnscored()).toBe(true);
+
+    nav.currentPageIndex = 3;
+    expect(h.pageUnscored()).toBe(true);
+    expect(h.pageUnscored(3)).toBe(false);
+  });
+
   it('markVisited and markChunk delegate to ProgressState', () => {
     const { progress } = provideNavCtx();
 

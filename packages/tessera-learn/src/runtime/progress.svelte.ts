@@ -482,6 +482,15 @@ export class ProgressState {
       : undefined;
   }
 
+  /** The page score is a placeholder 100: nothing on the page had a `correct` or `score()` to score it by. */
+  pageUnscored(pageIndex: number): boolean {
+    const unit = this.gradedUnits.get(pageIndex);
+    if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
+      return !!unit.unscored;
+    const results = this.#gradedResults(pageIndex);
+    return results.length > 0 && results.every((result) => result.unscored);
+  }
+
   #writeQuestions(pageIndex: number, questions: Map<string, StandaloneResult>) {
     this.#write(pageIndex, { questions });
   }

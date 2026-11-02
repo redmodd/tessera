@@ -45,7 +45,7 @@ A widget that builds its answer incrementally (matching, ordering, multi-select)
 
 `Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging: `useQuestion` reports `null` correctness, the LMS records no result, `q.correct` stays `null` and `QuestionReview` shows a neutral `Submitted` result.
 
-- **Score:** the question is left out of the page score, in a quiz and standalone alike. A quiz, or a graded standalone page, with no `correct` on any of its questions scores 100. Leave `graded` off on such a quiz or page (the default), or every learner adds a 100 to the course score. A graded quiz also logs a dev warning.
+- **Score:** the question is left out of the page score, in a quiz and standalone alike. A quiz, or a graded standalone page, with no `correct` on any of its questions scores 100, and `useProgress().pageUnscored()` is `true` for it, so show no score. Leave `graded` off on such a quiz or page (the default), or every learner adds a 100 to the course score. A graded quiz also logs a dev warning.
 - **In a quiz:** the built-in `<Quiz>`'s correct count leaves it out, and an `incorrect-only` retry keeps its answer, still editable. With no `correct` on any question, `useQuiz().scored` is `false` and the built-in `<Quiz>` shows no score.
 - **Standalone:** a submitted answer offers no Try again. Pass `score()` to score it yourself instead.
 
@@ -256,6 +256,7 @@ function useProgress(): {
   quizScore(pageIndex: number): number | undefined; // 0–100, to 2 decimal places; undefined until the quiz is submitted
   quizUnscored(pageIndex: number): boolean; // true once a quiz with no `correct` on any question is submitted: its quizScore is a placeholder 100, so show no score
   pageScore(pageIndex?: number): number | undefined; // 0–100, to 2 decimal places; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the page on screen
+  pageUnscored(pageIndex?: number): boolean; // true when that pageScore is a placeholder 100: a submitted quiz with no `correct`, or graded standalone answers that all have no `correct` and no `score()`, so show no score. Defaults to the page on screen
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 2 decimal places; what successStatus is judged on
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index

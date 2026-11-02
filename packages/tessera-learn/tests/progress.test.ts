@@ -1102,6 +1102,30 @@ describe('ProgressState', () => {
       expect(progress.getPageStandaloneAverage(3)).toBe(0);
     });
 
+    it('flags a page score with nothing to score it by as unscored', () => {
+      const unscored = { correct: null, unscored: true };
+      const manifest = createManifest(4, { 1: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      expect(progress.pageUnscored(1)).toBe(false);
+      expect(progress.pageUnscored(3)).toBe(false);
+
+      progress.quizCompleted(1, 100, [], false);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      progress.markStandaloneQuestion(3, 'practice', 0, false);
+      expect(progress.pageUnscored(1)).toBe(true);
+      expect(progress.pageUnscored(3)).toBe(true);
+
+      const restored = new ProgressState(manifest, createConfig());
+      restored.restoreFrom(JSON.parse(JSON.stringify(progress.toSaved())));
+      expect(restored.pageUnscored(1)).toBe(true);
+      expect(restored.pageUnscored(3)).toBe(true);
+
+      progress.quizCompleted(1, 50);
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+      expect(progress.pageUnscored(1)).toBe(false);
+      expect(progress.pageUnscored(3)).toBe(false);
+    });
+
     it('treats a non-positive or non-finite weight as 1', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 0);

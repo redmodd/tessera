@@ -314,6 +314,9 @@ export function useProgress() {
         ? undefined
         : progress.pageScore(pageIndex);
     },
+    pageUnscored(pageIndex = pageCtx?.index) {
+      return pageIndex !== undefined && progress.pageUnscored(pageIndex);
+    },
     get gradedScore() {
       return progress.gradedScore;
     },
