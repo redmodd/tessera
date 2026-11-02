@@ -29,13 +29,16 @@ export interface InteractionFormat {
   longFillInLimit: number;
   /**
    * Longest response or correct answer the LMS takes for a type. SCORM 1.2
-   * caps every CMIFeedback value at 255 characters; SCORM 2004 caps each
-   * fill-in answer at 250 and long-fill-in and other at 4000. Strict LMSs
-   * reject a longer value (405 / 406).
+   * caps every CMIFeedback value at 255 characters; SCORM 2004 caps
+   * long-fill-in and other at 4000. Strict LMSs reject a longer value
+   * (405 / 406).
    */
   maxValueLength(type: Interaction['type']): number;
-  /** SCORM 2004 caps each performance step answer at 250 characters. */
-  maxStepAnswerLength: number;
+  /**
+   * SCORM 2004 caps each performance step answer and each fill-in `[,]`
+   * part at 250 characters.
+   */
+  maxPartLength: number;
   /** SCORM 2004 keeps an unnamed step as `[.]answer`; SCORM 1.2 names it `_`. */
   namelessSteps: boolean;
   /**
@@ -154,7 +157,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   fillInLimit: 10,
   longFillInLimit: 10,
   maxValueLength: () => 255,
-  maxStepAnswerLength: Infinity,
+  maxPartLength: Infinity,
   namelessSteps: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
@@ -174,18 +177,9 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   encodesOptionIndex: false,
   fillInLimit: 10,
   longFillInLimit: 1,
-  maxValueLength: (type) => {
-    switch (type) {
-      case 'fill-in':
-        return 250;
-      case 'long-fill-in':
-      case 'other':
-        return 4000;
-      default:
-        return Infinity;
-    }
-  },
-  maxStepAnswerLength: 250,
+  maxValueLength: (type) =>
+    type === 'long-fill-in' || type === 'other' ? 4000 : Infinity,
+  maxPartLength: 250,
   namelessSteps: true,
   rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
@@ -198,7 +192,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   fillInLimit: Infinity,
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
-  maxStepAnswerLength: Infinity,
+  maxPartLength: Infinity,
   rules: XAPI_RULES,
   responseId: (v) => v,
 };
@@ -568,12 +562,12 @@ export function fitPatterns(
   if (
     i.type === 'performance' &&
     i.correct &&
-    hasLongStep(i.correct, fmt.maxStepAnswerLength)
+    hasLongStep(i.correct, fmt.maxPartLength)
   ) {
     return {
       kept: null,
       warnings: [
-        `has a correct step answer over the ${fmt.maxStepAnswerLength} characters ${recorder} records; the correct answer is ${lost}`,
+        `has a correct step answer over the ${fmt.maxPartLength} characters ${recorder} records; the correct answer is ${lost}`,
       ],
     };
   }
@@ -620,21 +614,27 @@ export function fitPatterns(
       );
     }
   }
-  const patterns = answers
-    .filter((_, k) => !broken[k])
-    .map((it) => it.join(fmt.itemDelim));
+  const recordable = answers.filter((_, k) => !broken[k]);
   const max = fmt.maxValueLength(i.type);
+  const partMax = i.type === 'fill-in' ? fmt.maxPartLength : Infinity;
   const limit =
     i.type === 'long-fill-in' ? fmt.longFillInLimit : fmt.fillInLimit;
-  const fit = patterns.filter((p) => p.length <= max);
-  if (fit.length < patterns.length) {
+  const fit = recordable
+    .filter((it) => it.every((part) => part.length <= partMax))
+    .map((it) => it.join(fmt.itemDelim))
+    .filter((p) => p.length <= max);
+  if (fit.length < recordable.length) {
+    const cap =
+      partMax < Infinity
+        ? `${partMax} characters ${recorder} records per [,]-separated part`
+        : `${max} characters ${recorder} records`;
     warnings.push(
-      `has ${patterns.length - fit.length} correct answer(s) over the ${max} characters ${recorder} records; they are ${lost}`,
+      `has ${recordable.length - fit.length} correct answer(s) over the ${cap}; they are ${lost}`,
     );
   }
   if (fit.length > limit) {
     const counted =
-      fit.length < patterns.length ? ' short enough to record,' : '';
+      fit.length < recordable.length ? ' short enough to record,' : '';
     warnings.push(
       `has ${fit.length} correct answers${counted} but ${recorder} records at most ${limit}; the rest are ${lost}`,
     );
@@ -666,49 +666,53 @@ function wholeItems(items: string[], delim: string, max: number): string {
   return kept;
 }
 
-/** Cuts on a character boundary, so an emoji or accented letter stays whole. */
+/**
+ * Cuts on a character boundary, so an emoji or accented letter stays whole,
+ * unless one character runs past max (a letter with hundreds of accents).
+ */
 function cutText(value: string, max: number): string {
-  // Firefox before 125 has no Intl.Segmenter; there, only keep surrogate pairs whole.
-  if (typeof Intl.Segmenter !== 'function') {
+  for (const { index, segment } of new Intl.Segmenter().segment(value)) {
+    if (index + segment.length <= max) continue;
+    if (segment.length <= max) return value.slice(0, index);
     const cut = value.slice(0, max);
     return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
   }
-  let end = 0;
-  for (const { index, segment } of new Intl.Segmenter().segment(value)) {
-    if (index + segment.length > max) break;
-    end = index + segment.length;
-  }
-  return value.slice(0, end);
+  return value;
 }
 
 /**
- * Cuts a response to the format's length caps. A list keeps only whole items,
- * since a half-written id or pair is wrong data, but a performance response
- * whose first step doesn't fit keeps that step with its answer cut. Null when
- * nothing fits.
+ * Cuts a response to the format's length caps. Each SCORM 2004 fill-in part
+ * and performance step answer is cut on its own first. A list keeps only
+ * whole items, since a half-written id or pair is wrong data, but a
+ * performance response whose first step doesn't fit keeps that step with its
+ * answer cut. Null when nothing fits.
  */
 function fitResponse(
   questionId: string,
   i: Interaction,
   fmt: InteractionFormat,
 ): string | null {
-  const stepMax = fmt.maxStepAnswerLength;
-  let longStep = false;
-  if (i.type === 'performance' && hasLongStep(i.response, stepMax)) {
-    longStep = true;
+  const partMax = fmt.maxPartLength;
+  let longPart = '';
+  if (i.type === 'performance' && hasLongStep(i.response, partMax)) {
+    longPart = 'a step answer';
     i = {
       ...i,
       response: i.response.map(([step, a]): [string, string | number] => [
         step,
-        typeof a === 'string' ? cutText(a, stepMax) : a,
+        typeof a === 'string' ? cutText(a, partMax) : a,
       ]),
     };
   }
-  const items = responseItems(i, fmt);
+  let items = responseItems(i, fmt);
+  if (i.type === 'fill-in' && items.some((part) => part.length > partMax)) {
+    longPart = 'a response part';
+    items = items.map((part) => cutText(part, partMax));
+  }
   checkValue(i, 'response', items, fmt);
-  if (longStep) {
+  if (longPart) {
     console.warn(
-      `Tessera: interaction "${questionId}" has a step answer over the ${stepMax} characters this export standard records; the LMS gets its first ${stepMax} characters.`,
+      `Tessera: interaction "${questionId}" has ${longPart} over the ${partMax} characters this export standard records; the LMS gets at most its first ${partMax} characters.`,
     );
   }
   const value = items.join(fmt.itemDelim);

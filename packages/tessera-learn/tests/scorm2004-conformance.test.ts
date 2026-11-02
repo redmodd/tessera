@@ -181,6 +181,40 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
+    it('caps each fill-in [,] part at 250 characters, not the whole value', async () => {
+      await start();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const fits = `${'x'.repeat(250)}[,]${'y'.repeat(250)}`;
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'fill-in',
+          response: `${'a'.repeat(251)}[,]${'b'.repeat(200)}`,
+          correct: [fits, `${'z'.repeat(251)}[,]b`],
+        },
+        true,
+      );
+      await flush();
+      expect(lms.errors).toEqual([]);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+        `${'a'.repeat(250)}[,]${'b'.repeat(200)}`,
+      );
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses._count'),
+      ).toBe('1');
+      expect(
+        lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
+      ).toBe(fits);
+      expect(warn.mock.calls.map(([w]) => w)).toEqual([
+        expect.stringContaining(
+          '"q1" has 1 correct answer(s) over the 250 characters this export standard records per [,]-separated part',
+        ),
+        expect.stringContaining(
+          '"q1" has a response part over the 250 characters this export standard records; the LMS gets at most its first 250 characters',
+        ),
+      ]);
+    });
+
     it.each([
       ['an id', 'a'.repeat(300), 'a'.repeat(250)],
       ['an id with no letter or digit', '-'.repeat(100), '%2D'.repeat(83)],
@@ -225,7 +259,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       ).toBe('0');
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets its first 250 characters',
+          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets at most its first 250 characters',
         ),
       );
       expect(warn).toHaveBeenCalledWith(
