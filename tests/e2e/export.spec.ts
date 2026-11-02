@@ -141,7 +141,10 @@ test.describe('Export — SCORM 2004', () => {
     expect(xml).toContain('adlcp_v1p3');
     expect(xml).toContain('<schemaversion>2004 4th Edition</schemaversion>');
     expect(xml).toContain('adlcp:scormType="sco"'); // capital T for 2004
-    expect(xml).not.toContain('imsss:sequencing');
+    expect(xml).not.toContain('imsss:objectives');
+    expect(xml).toContain(
+      '<imsss:deliveryControls completionSetByContent="true" objectiveSetByContent="true"/>',
+    );
   });
 
   test('a quiz-mode course declares the pass mark the LMS judges against', async () => {

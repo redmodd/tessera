@@ -112,8 +112,6 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   }
 
   setSuccessStatus(status: SuccessStatus): void {
-    // Setting "unknown" explicitly prevents SCORM Cloud from rolling up
-    // a null status to "passed".
     this.set('cmi.success_status', status);
   }
 
