@@ -55,6 +55,7 @@ describe('StandaloneQuestion', () => {
       retries: 0,
       response: undefined,
       correct: true,
+      unscored: false,
       final: false,
     });
 
@@ -64,6 +65,7 @@ describe('StandaloneQuestion', () => {
       retries: 0,
       response: true,
       correct: true,
+      unscored: false,
       final: false,
     });
   });
@@ -87,8 +89,8 @@ describe('StandaloneQuestion', () => {
 
     expect(report).toHaveBeenCalledWith('q1', likert, null);
     expect(markScore).toHaveBeenCalledWith(
-      0,
-      expect.objectContaining({ correct: null }),
+      100,
+      expect.objectContaining({ correct: null, unscored: true }),
     );
     expect(q.correct).toBe(null);
   });
@@ -239,15 +241,30 @@ describe('StandaloneQuestion', () => {
     expect(throwing.isLockedCorrect).toBe(false);
   });
 
-  it('can retry an answer with no correct response', () => {
+  it('offers no retry on an answer with no correct response', () => {
     const { q } = make({
       response: () => ({ type: 'likert', response: 'agree' }),
     });
     q.submit();
-    expect(q.canRetry).toBe(true);
+    expect(q.canRetry).toBe(false);
+    expect(q.isLockedCorrect).toBe(false);
 
     q.retry();
-    expect(q.submitted).toBe(false);
+    expect(q.submitted).toBe(true);
+  });
+
+  it('scores an answer with no correct response by score()', () => {
+    const { q, markScore } = make({
+      response: () => ({ type: 'likert', response: 'agree' }),
+      score: () => 40,
+    });
+    q.submit();
+
+    expect(markScore).toHaveBeenCalledWith(
+      40,
+      expect.objectContaining({ correct: null, unscored: false }),
+    );
+    expect(q.canRetry).toBe(true);
   });
 
   it('maxRetries: 0 means canRetry is false from the start', () => {
@@ -369,6 +386,7 @@ describe('StandaloneQuestion', () => {
         retries: 2,
         response: false,
         correct: false,
+        unscored: false,
         final: true,
       });
       expect(q.canRetry).toBe(false);
@@ -398,11 +416,12 @@ describe('StandaloneQuestion', () => {
     });
 
     it('has no verdict when the submit had no correct answer to judge by', () => {
-      const { q } = make({}, { score: 0, retries: 0, correct: null });
+      const { q } = make({}, { score: 100, retries: 0, correct: null });
 
       expect(q.submitted).toBe(true);
       expect(q.correct).toBe(null);
-      expect(q.canRetry).toBe(true);
+      expect(q.canRetry).toBe(false);
+      expect(q.isLockedCorrect).toBe(false);
     });
 
     it('shows no answer when the widget has no restore()', () => {

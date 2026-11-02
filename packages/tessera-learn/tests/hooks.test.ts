@@ -345,6 +345,7 @@ describe('useQuestion — standalone mode', () => {
       graded: true,
       retries: 0,
       correct: true,
+      unscored: false,
       final: true,
     });
   });

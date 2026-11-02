@@ -297,7 +297,7 @@ test.describe.serial('weighted standalone questions', () => {
   test.afterAll(() => preview?.kill('SIGTERM'));
   test.beforeEach(async ({ page }) => installScorm12Mock(page));
 
-  test('weight pulls the page score — one right of three counts for 75, not 50', async ({
+  test('weight pulls the page score and a survey is left out: 75, not 50 or 60', async ({
     page,
   }) => {
     await page.goto(BASE);
@@ -310,6 +310,10 @@ test.describe.serial('weighted standalone questions', () => {
     await page
       .locator('[data-question-id="q-light"] input[type="radio"]')
       .nth(0)
+      .check();
+    await page
+      .locator('[data-question-id="q-survey"] input[type="radio"]')
+      .nth(2)
       .check();
 
     await expect

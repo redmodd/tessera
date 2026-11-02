@@ -72,11 +72,18 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get isLockedCorrect(): boolean {
-    return this.#submitted && this.#score >= 100;
+    return (
+      this.#submitted && this.#score >= 100 && !this.#unscored(this.#correct)
+    );
   }
 
   get canRetry(): boolean {
-    return this.#submitted && !this.isLockedCorrect && this.#retriesLeft;
+    return this.#submitted && this.#score < 100 && this.#retriesLeft;
+  }
+
+  /** No `correct` and no `score()`: left out of the page score, like in a quiz. */
+  #unscored(correct: boolean | null): boolean {
+    return correct === null && !this.#opts.score;
   }
 
   get #retriesLeft(): boolean {
@@ -103,12 +110,17 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const response = this.#opts.response();
     if (!response) return;
     const correct = isCorrect(response);
-    const score = clampScore(this.#opts.score?.() ?? (correct ? 100 : 0));
+    const unscored = this.#unscored(correct);
+    // An unscored answer's 100 is a placeholder the page score leaves out.
+    const score = unscored
+      ? 100
+      : clampScore(this.#opts.score?.() ?? (correct ? 100 : 0));
 
     this.#deps.markScore(score, {
       retries: this.#retryCount,
       response: this.#opts.restore ? response.response : undefined,
       correct,
+      unscored,
       final: !this.#retriesLeft,
     });
     this.#report(response, correct);

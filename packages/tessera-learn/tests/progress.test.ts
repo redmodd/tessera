@@ -525,6 +525,30 @@ describe('ProgressState', () => {
       expect(restored.pageScore(0)).toBe(0);
     });
 
+    it('saves that a standalone submit had nothing to score it by', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'survey', 100, true, 1, {
+        correct: null,
+        unscored: true,
+      });
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(saved.g[0].q).toEqual({ survey: [100, 1, 19] });
+      expect(restored.gradedUnits.get(0)?.questions?.get('survey')).toEqual(
+        expect.objectContaining({ correct: null, unscored: true, final: true }),
+      );
+    });
+
+    it('drops an unscored flag saved without its missing verdict', () => {
+      const restored = new ProgressState(createManifest(6), createConfig());
+      restored.restoreFrom({ v: [], g: { 0: { q: { a: [100, 1, 17] } } } });
+
+      expect(restored.gradedUnits.get(0)?.questions?.get('a')).toEqual(
+        expect.objectContaining({ graded: false, unscored: false }),
+      );
+    });
+
     it('saves a verdict that the score does not give', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.markStandaloneQuestion(0, 'partial', 80, true, 1, {
@@ -1068,6 +1092,16 @@ describe('ProgressState', () => {
       expect(progress.getPageStandaloneAverage(3)).toBe(0);
     });
 
+    it('leaves out unscored answers, and scores a page of only those 100', () => {
+      const unscored = { correct: null, unscored: true };
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      expect(progress.getPageStandaloneAverage(3)).toBe(100);
+
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+      expect(progress.getPageStandaloneAverage(3)).toBe(0);
+    });
+
     it('treats a non-positive or non-finite weight as 1', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 0);
@@ -1158,6 +1192,7 @@ describe('ProgressState', () => {
         graded: true,
         retries: 0,
         correct: true,
+        unscored: false,
         final: true,
       });
       expect(progress.getPageStandaloneAverage(3)).toBe(50);

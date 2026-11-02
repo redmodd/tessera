@@ -7,7 +7,10 @@
 </script>
 
 <h1>Weighted Questions</h1>
-<p>Two graded questions, no quiz shell. The first counts for three.</p>
+<p>
+  Three graded questions, no quiz shell. The first counts for three; the survey
+  has no correct answer, so it is left out of the score.
+</p>
 
 <WeightedChoice
   id="q-heavy"
@@ -23,4 +26,10 @@
   options={['Atlantic', 'Indian', 'Pacific']}
   correct={2}
   weight={1}
+/>
+
+<WeightedChoice
+  id="q-survey"
+  prompt="How confident do you feel?"
+  options={['Not yet', 'Somewhat', 'Very']}
 />

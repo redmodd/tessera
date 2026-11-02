@@ -30,6 +30,8 @@ export interface StandaloneResult {
   retries: number;
   /** The submit's verdict, or null when its response had no `correct` to judge it by. */
   correct: boolean | null;
+  /** No `correct` and no `score()`: `score` is a placeholder 100 the page score leaves out. */
+  unscored: boolean;
   /** The submitted response, as JSON. */
   response?: string;
   /** Graded, with no retry left to change the score. */
@@ -43,6 +45,8 @@ export interface StandaloneSubmit {
   response?: unknown;
   /** The verdict, or null when the response had no `correct` to judge it by. Default: what the score gives. */
   correct?: boolean | null;
+  /** No `correct` and no `score()` to judge the response by. */
+  unscored?: boolean;
   /** No retries are left. A score of 100 is final either way. */
   final?: boolean;
 }
@@ -322,7 +326,7 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
-    { retries, response, correct, final }: StandaloneSubmit = {},
+    { retries, response, correct, unscored, final }: StandaloneSubmit = {},
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
@@ -334,6 +338,7 @@ export class ProgressState {
       graded,
       retries: normalizeRetries(retries),
       correct: correct === undefined ? clamped >= 100 : correct,
+      unscored: !!unscored,
       response: encodeResponse(response),
       final: graded && (clamped >= 100 || final === true),
     });
@@ -465,9 +470,14 @@ export class ProgressState {
       : [];
   }
 
-  /** Weighted mean of graded standalone scores on a page, or 0 if none. */
+  /**
+   * Weighted mean of graded standalone scores on a page, or 0 if none. As in
+   * a quiz, unscored answers are left out, and a page of only those scores 100.
+   */
   getPageStandaloneAverage(pageIndex: number): number {
-    return weightedScore(this.#gradedResults(pageIndex));
+    const results = this.#gradedResults(pageIndex);
+    const scored = results.filter((result) => !result.unscored);
+    return weightedScore(scored.length ? scored : results);
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it
@@ -576,7 +586,8 @@ export class ProgressState {
             const verdict =
               correct === null ? 2 : correct === score >= 100 ? 0 : 4;
             const final = result.final && score < 100 ? 8 : 0;
-            const flags = (result.graded ? 1 : 0) + verdict + final;
+            const unscored = result.unscored ? 16 : 0;
+            const flags = (result.graded ? 1 : 0) + verdict + final + unscored;
             const bare: number | SavedQuestion =
               retries > 0
                 ? [score, weight, flags, retries]
@@ -677,12 +688,13 @@ export class ProgressState {
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
-          // Flags 1, 2, 4 and 8, never 2 with 4.
+          // Flags 1, 2, 4, 8 and 16, never 2 with 4, and 16 only with 2.
           const bits =
             Number.isInteger(flags) &&
             flags >= 0 &&
-            flags < 16 &&
-            (flags & 6) !== 6
+            flags < 32 &&
+            (flags & 6) !== 6 &&
+            (flags & 18) !== 16
               ? flags
               : 0;
           this.markStandaloneQuestion(
@@ -695,6 +707,7 @@ export class ProgressState {
               retries,
               response: swapIds(response),
               correct: bits & 2 ? null : score >= 100 !== !!(bits & 4),
+              unscored: !!(bits & 16),
               final: !!(bits & 8),
             },
           );
