@@ -125,7 +125,8 @@ interface ScormManifestDialect {
   scormTypeAttr: 'scormtype' | 'scormType';
   /** Whitespace-separated namespace+XSD pairs for xsi:schemaLocation. */
   schemaLocation: string;
-  passMark(passingScore: number): string;
+  /** Markup after the item's title; `passingScore` is null when the package declares no pass mark. */
+  itemData(passingScore: number | null): string;
 }
 
 function generateScormManifest(
@@ -141,9 +142,9 @@ function generateScormManifest(
   const xmlns = Object.entries(dialect.xmlns)
     .map(([prefix, uri]) => `\n  xmlns:${prefix}="${uri}"`)
     .join('');
-  const passMark = declaresPassMark(config)
-    ? `\n        ${dialect.passMark(config.scoring.passingScore)}`
-    : '';
+  const itemData = dialect.itemData(
+    declaresPassMark(config) ? config.scoring.passingScore : null,
+  );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="tessera-course" version="1.0"
@@ -158,7 +159,7 @@ function generateScormManifest(
     <organization identifier="org-1">
       <title>${title}</title>
       <item identifier="item-1" identifierref="res-1">
-        <title>${title}</title>${passMark}
+        <title>${title}</title>${itemData && `\n        ${itemData}`}
       </item>
     </organization>
   </organizations>
@@ -297,8 +298,10 @@ export const LMS_BUILD: Record<
         'http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd ' +
         'http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd ' +
         'http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd',
-      passMark: (score) =>
-        `<adlcp:masteryscore>${formatReal107(score)}</adlcp:masteryscore>`,
+      itemData: (score) =>
+        score === null
+          ? ''
+          : `<adlcp:masteryscore>${formatReal107(score)}</adlcp:masteryscore>`,
     }),
     adapter: 'SCORM12Adapter',
   },
@@ -316,12 +319,19 @@ export const LMS_BUILD: Record<
         'http://www.imsglobal.org/xsd/imscp_v1p1 imscp_v1p1.xsd ' +
         'http://www.adlnet.org/xsd/adlcp_v1p3 adlcp_v1p3.xsd ' +
         'http://www.imsglobal.org/xsd/imsss imsss_v1p0.xsd',
-      passMark: (score) => `<imsss:sequencing>
+      // Without deliveryControls an LMS marks an attempt that ends with no
+      // reported completion or success as completed and passed.
+      itemData: (score) => `<imsss:sequencing>${
+        score === null
+          ? ''
+          : `
           <imsss:objectives>
             <imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">
               <imsss:minNormalizedMeasure>${formatReal107(toScaled(score))}</imsss:minNormalizedMeasure>
             </imsss:primaryObjective>
-          </imsss:objectives>
+          </imsss:objectives>`
+      }
+          <imsss:deliveryControls completionSetByContent="true" objectiveSetByContent="true"/>
         </imsss:sequencing>`,
     }),
     adapter: 'SCORM2004Adapter',

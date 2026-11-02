@@ -172,6 +172,17 @@ describe('SCORM 2004 manifest', () => {
     expect(xml).toContain(
       '<imsss:minNormalizedMeasure>0.725</imsss:minNormalizedMeasure>',
     );
+    // imsss:sequencing is an xs:sequence: deliveryControls follows objectives.
+    expect(xml).toMatch(
+      /<\/imsss:objectives>\s*<imsss:deliveryControls [^>]*\/>\s*<\/imsss:sequencing>/,
+    );
+  });
+
+  it('leaves completion and success to the content, so the LMS never fills in its own', () => {
+    const xml = scormXml('scorm2004', { title: 'Test' });
+    expect(xml).toMatch(
+      /<item [^>]*>\s*<title>Test<\/title>\s*<imsss:sequencing>\s*<imsss:deliveryControls completionSetByContent="true" objectiveSetByContent="true"\/>\s*<\/imsss:sequencing>\s*<\/item>/,
+    );
   });
 
   it('defaults minNormalizedMeasure to 0.7', () => {
@@ -184,13 +195,14 @@ describe('SCORM 2004 manifest', () => {
     );
   });
 
-  it('omits sequencing in manual mode, even with a passingScore', () => {
+  it('omits the objective in manual mode, even with a passingScore', () => {
     const xml = scormXml('scorm2004', {
       title: 'Test',
       completion: { mode: 'manual' },
       scoring: { passingScore: 80 },
     });
-    expect(xml).not.toContain('imsss:sequencing');
+    expect(xml).not.toContain('imsss:objectives');
+    expect(xml).toContain('objectiveSetByContent="true"');
   });
 
   it('lists all files', () => {
