@@ -273,6 +273,27 @@ describe('SCORM 2004 ids inside a response', () => {
   });
 });
 
+describe('cutting a response', () => {
+  const zalgo = 'a' + '́'.repeat(300);
+
+  it.each([
+    [SCORM12_INTERACTION_FORMAT, zalgo, zalgo.slice(0, 255)],
+    [
+      SCORM2004_INTERACTION_FORMAT,
+      `ok[,]${zalgo}`,
+      `ok[,]${zalgo.slice(0, 250)}`,
+    ],
+  ])(
+    'cuts a character longer than the cap rather than dropping it (%#)',
+    (fmt, response, recorded) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(formatResponse('q1', { type: 'fill-in', response }, fmt)).toBe(
+        recorded,
+      );
+    },
+  );
+});
+
 describe('fitPatterns', () => {
   it('leaves out the whole field when a dropped answer also breaks a field rule', () => {
     const fmt = {

@@ -668,17 +668,18 @@ function wholeItems(items: string[], delim: string, max: number): string {
 
 /** Cuts on a character boundary, so an emoji or accented letter stays whole. */
 function cutText(value: string, max: number): string {
-  // Firefox before 125 has no Intl.Segmenter; there, only keep surrogate pairs whole.
-  if (typeof Intl.Segmenter !== 'function') {
-    const cut = value.slice(0, max);
-    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+  if (typeof Intl.Segmenter === 'function') {
+    let end = 0;
+    for (const { index, segment } of new Intl.Segmenter().segment(value)) {
+      if (index + segment.length > max) break;
+      end = index + segment.length;
+    }
+    if (end) return value.slice(0, end);
   }
-  let end = 0;
-  for (const { index, segment } of new Intl.Segmenter().segment(value)) {
-    if (index + segment.length > max) break;
-    end = index + segment.length;
-  }
-  return value.slice(0, end);
+  // Firefox before 125 has no Intl.Segmenter, and a character can run past
+  // max (a letter with hundreds of accents); there, keep surrogate pairs whole.
+  const cut = value.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
 }
 
 /**
