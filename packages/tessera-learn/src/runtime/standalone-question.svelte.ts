@@ -117,9 +117,9 @@ export class StandaloneQuestion implements UseQuestionHandle {
     const correct = isCorrect(response);
     const unscored = this.#unscored(correct);
     // An unscored answer's 100 is a placeholder the page score leaves out.
-    const score = unscored
-      ? 100
-      : clampScore(this.#opts.score?.() ?? (correct ? 100 : 0));
+    const score = clampScore(
+      this.#opts.score?.() ?? (correct === false ? 0 : 100),
+    );
 
     this.#deps.markScore(score, {
       retries: this.#retryCount,

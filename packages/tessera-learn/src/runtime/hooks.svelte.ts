@@ -221,14 +221,12 @@ export function useQuestion<I extends Interaction = Interaction>(
         navCtx.manifest.pages[pageIndex].slug,
       );
     }
-    navCtx.progress.registerStandaloneQuestion(
-      pageIndex,
-      opts.id,
-      !!opts.graded,
-      opts.weight,
-      opts.maxRetries,
-      !!opts.score,
-    );
+    navCtx.progress.registerStandaloneQuestion(pageIndex, opts.id, {
+      graded: !!opts.graded,
+      weight: opts.weight,
+      maxRetries: opts.maxRetries,
+      customScore: !!opts.score,
+    });
     saved = navCtx.progress.standaloneResult(pageIndex, opts.id);
     markScore = (score, submit) =>
       navCtx.progress.markStandaloneQuestion(

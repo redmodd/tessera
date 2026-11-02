@@ -30,7 +30,7 @@ export interface StandaloneResult {
   retries: number;
   /** The submit's verdict, or null when its response had no `correct` to judge it by. */
   correct: boolean | null;
-  /** No `correct` and no `score()`: `score` is a placeholder 100 the page score leaves out. */
+  /** No `correct` and no `score()`: the page score leaves it out. */
   unscored: boolean;
   /** The submitted response, as JSON. */
   response?: string;
@@ -49,6 +49,15 @@ export interface StandaloneSubmit {
   unscored?: boolean;
   /** No retries are left. A score of 100 is final either way. */
   final?: boolean;
+}
+
+/** How a mounted standalone question is set up, which outranks its saved answer. */
+export interface StandaloneRegistration {
+  graded?: boolean;
+  weight?: number;
+  maxRetries?: number;
+  /** The question passes `score()`. */
+  customScore?: boolean;
 }
 
 /** What a standalone question last submitted, for the handle a remount seeds. */
@@ -367,19 +376,21 @@ export class ProgressState {
    * Record a mounted question, so its page counts as answered only once every
    * graded question on it is, and correct a restored answer's `graded` flag,
    * weight, finality and whether it is scored from it, which outrank what the
-   * save was written with. The
-   * manifest lists the built-in questions the source fixes, so only a custom
-   * or dynamically identified one behind a reveal waits to register.
+   * save was written with. The manifest lists the built-in questions the
+   * source fixes, so only a custom or dynamically identified one behind a
+   * reveal waits to register.
    * ponytail: only pages the learner opens are corrected; a full sweep needs
    * each question's weight at build time, which custom question components hide.
    */
   registerStandaloneQuestion(
     pageIndex: number,
     questionId: string,
-    graded: boolean,
-    weight?: number,
-    maxRetries?: number,
-    customScore = false,
+    {
+      graded = false,
+      weight,
+      maxRetries,
+      customScore = false,
+    }: StandaloneRegistration = {},
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);

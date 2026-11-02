@@ -489,7 +489,7 @@ describe('standalone feedback', () => {
     expect(result.textContent?.trim()).toBe('Submitted');
     expect(result.className).not.toMatch(/\b(correct|incorrect)\b/);
     expect(result.querySelector('svg')).toBeNull();
-    expect(() => mounted.button('Try again')).toThrow();
+    expect(() => mounted.button('Try again')).toThrow(/no button named/);
   });
 
   it('skips a hidden input when focusing the first control after Try again', async () => {
