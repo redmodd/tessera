@@ -32,7 +32,7 @@ interface Question {
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100, no retry
+  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100 (not one with no `correct` and no `score()`), no retry
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
   commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
@@ -45,9 +45,9 @@ A widget that builds its answer incrementally (matching, ordering, multi-select)
 
 `Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging: `useQuestion` reports `null` correctness, the LMS records no result, `q.correct` stays `null` and `QuestionReview` shows a neutral `Submitted` result.
 
-- **In a quiz:** the question is left out of the score and the built-in `<Quiz>`'s correct count. An `incorrect-only` retry keeps its answer, still editable.
-- **A quiz with no `correct` on any question** scores 100, reports `useQuiz().scored` as `false`, and the built-in `<Quiz>` shows no score. Leave its `graded` off (the default), or every learner adds a 100 to the course score and a dev warning fires.
-- **Standalone:** the question scores 0 unless you pass `score()`, so it offers Try again and pulls a graded page down. Pass `score: () => 100` to accept any answer.
+- **Score:** the question is left out of the page score, in a quiz and standalone alike, unless a standalone one passes `score()`. A quiz with no `correct` on any question, or a graded standalone page whose graded questions have no `correct` and no `score()`, scores 100, and `useProgress().pageUnscored()` is `true` for it, so show no score. Leave `graded` off on such a quiz or page (the default), or every learner adds a 100 to the course score. Either logs a dev warning.
+- **In a quiz:** the built-in `<Quiz>`'s correct count leaves it out, and an `incorrect-only` retry keeps its answer, still editable. With no `correct` on any question, `useQuiz().scored` is `false` and the built-in `<Quiz>` shows no score.
+- **Standalone:** a submitted answer offers no Try again. Pass `score()` to score it yourself instead.
 
 ```ts
 type Interaction =
@@ -256,6 +256,7 @@ function useProgress(): {
   quizScore(pageIndex: number): number | undefined; // 0–100, to 2 decimal places; undefined until the quiz is submitted
   quizUnscored(pageIndex: number): boolean; // true once a quiz with no `correct` on any question is submitted: its quizScore is a placeholder 100, so show no score
   pageScore(pageIndex?: number): number | undefined; // 0–100, to 2 decimal places; graded quiz score, else the page's graded standalone mean; undefined until answered. Defaults to the page on screen
+  pageUnscored(pageIndex?: number): boolean; // true when that pageScore is a placeholder 100: a submitted quiz with no `correct`, or graded standalone answers that all have no `correct` and no `score()`, so show no score. Defaults to the page on screen
   readonly gradedScore: { average: number; attempted: boolean }; // course-wide, to 2 decimal places; what successStatus is judged on
   readonly passingScore: number; // 0–100; reflects an LMS masteryScore override when one is supplied
   readonly chunkProgress: Map<number, number>; // pageIndex → highest revealed chunk index
@@ -270,6 +271,7 @@ function useProgress(): {
 
 - **Only the questions answered so far count**, so a three-question page reads 100% after one correct answer. Print it once the page is done, or label it.
 - **Only graded work counts.** Practice answers and an ungraded practice quiz read `undefined`.
+- **Show no score while `pageUnscored()` is `true`:** the 100 is a placeholder. A page that mixes such questions with scored ones reads `true` until a scored one is answered.
 
 `gradedScore`: the course average that `successStatus` is judged on. Use it for a course or module summary page; averaging `quizScore` by hand omits standalone questions and drifts from the LMS. `attempted` is `false` until at least one graded page is answered.
 

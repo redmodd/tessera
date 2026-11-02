@@ -253,7 +253,7 @@ Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` 
 
 ## Recipe 3: Graded standalone question
 
-A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`; omit `correct` to accept any answer. Course success rolls up across every declared graded page, quiz and standalone pages alike.
+A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`. With no `correct` and no `score()`, it is left out of the page score, as in a quiz. Course success rolls up across every declared graded page, quiz and standalone pages alike.
 
 ```svelte
 <script>

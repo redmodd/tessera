@@ -48,7 +48,7 @@ async function start(
 
 // What a page's useQuestion() calls register as it mounts.
 function mountQuestion(progress: ProgressState, id: string, graded: boolean) {
-  progress.registerStandaloneQuestion(1, id, graded);
+  progress.registerStandaloneQuestion(1, id, { graded });
   progress.pageMounted(1);
 }
 

@@ -30,6 +30,8 @@ export interface StandaloneResult {
   retries: number;
   /** The submit's verdict, or null when its response had no `correct` to judge it by. */
   correct: boolean | null;
+  /** No `correct` and no `score()`: the page score leaves it out. */
+  unscored: boolean;
   /** The submitted response, as JSON. */
   response?: string;
   /** Graded, with no retry left to change the score. */
@@ -43,8 +45,19 @@ export interface StandaloneSubmit {
   response?: unknown;
   /** The verdict, or null when the response had no `correct` to judge it by. Default: what the score gives. */
   correct?: boolean | null;
+  /** No `correct` and no `score()` to judge the response by. */
+  unscored?: boolean;
   /** No retries are left. A score of 100 is final either way. */
   final?: boolean;
+}
+
+/** How a mounted standalone question is set up, which outranks its saved answer. */
+export interface StandaloneRegistration {
+  graded: boolean;
+  weight?: number;
+  maxRetries?: number;
+  /** The question passes `score()`. */
+  customScore?: boolean;
 }
 
 /** What a standalone question last submitted, for the handle a remount seeds. */
@@ -126,6 +139,14 @@ export function retriesLeft(retries: number, maxRetries?: number): boolean {
   return retries < (maxRetries ?? Infinity);
 }
 
+/** No `correct` and no `score()` to judge the response by, so the page score leaves it out, as in a quiz. */
+export function isUnscored(
+  correct: boolean | null,
+  customScore: boolean,
+): boolean {
+  return correct === null && !customScore;
+}
+
 export function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
@@ -142,6 +163,17 @@ export function weightedScore(
   if (totalWeight === 0) return 0;
   const mean = weighted / totalWeight;
   return Math.round(Number((mean * 100).toPrecision(15))) / 100;
+}
+
+/**
+ * Weighted mean of the entries that can be scored, or null when none can.
+ * Quiz and standalone share it, so an unscored question counts the same in both.
+ */
+export function scoredMean(
+  entries: { score: number; weight: number; unscored?: boolean }[],
+): number | null {
+  const scored = entries.filter((entry) => !entry.unscored);
+  return scored.length ? weightedScore(scored) : null;
 }
 
 /**
@@ -172,6 +204,7 @@ export class ProgressState {
   #pageWeights: ReadonlyMap<number, number>;
   #listedQuestions: ReadonlyMap<number, ReadonlySet<string>>;
   #undeclaredWarned = new Set<number>();
+  #unscoredWarned = new Set<number>();
   #expected: SvelteMap<number, ReadonlySet<string>>;
   #unconfirmed = new Map<number, Set<string>>();
 
@@ -322,7 +355,7 @@ export class ProgressState {
     score: number,
     graded: boolean,
     weight?: number,
-    { retries, response, correct, final }: StandaloneSubmit = {},
+    { retries, response, correct, unscored, final }: StandaloneSubmit = {},
   ) {
     const questions =
       this.gradedUnits.get(pageIndex)?.questions ??
@@ -334,10 +367,32 @@ export class ProgressState {
       graded,
       retries: normalizeRetries(retries),
       correct: correct === undefined ? clamped >= 100 : correct,
+      unscored: !!unscored,
       response: encodeResponse(response),
       final: graded && (clamped >= 100 || final === true),
     });
     this.#writeQuestions(pageIndex, questions);
+    if (graded) this.#warnUnscoredPage(pageIndex, questionId);
+  }
+
+  /** The standalone side of the graded quiz warning in QuizEngine.submit. */
+  #warnUnscoredPage(pageIndex: number, questionId: string) {
+    if (
+      !import.meta.env?.DEV ||
+      this.#replaying ||
+      this.#unscoredWarned.has(pageIndex) ||
+      !this.#declaredGradedIndices.has(pageIndex) ||
+      this.#quizMaxAttempts.has(pageIndex) ||
+      !this.#allAnswered(pageIndex) ||
+      !this.pageUnscored(pageIndex)
+    )
+      return;
+    this.#unscoredWarned.add(pageIndex);
+    console.warn(
+      `[tessera] useQuestion("${questionId}"): this page is graded, but none of its graded questions ` +
+        'has a `correct` answer or `score()`, so every learner scores 100 toward the course score. ' +
+        'Leave `graded` off for a survey or reflection page.',
+    );
   }
 
   standaloneResult(
@@ -361,18 +416,17 @@ export class ProgressState {
   /**
    * Record a mounted question, so its page counts as answered only once every
    * graded question on it is, and correct a restored answer's `graded` flag,
-   * weight and finality from it, which outrank what the save was written with. The
-   * manifest lists the built-in questions the source fixes, so only a custom
-   * or dynamically identified one behind a reveal waits to register.
+   * weight, finality and whether it is scored from it, which outrank what the
+   * save was written with. The manifest lists the built-in questions the
+   * source fixes, so only a custom or dynamically identified one behind a
+   * reveal waits to register.
    * ponytail: only pages the learner opens are corrected; a full sweep needs
    * each question's weight at build time, which custom question components hide.
    */
   registerStandaloneQuestion(
     pageIndex: number,
     questionId: string,
-    graded: boolean,
-    weight?: number,
-    maxRetries?: number,
+    { graded, weight, maxRetries, customScore = false }: StandaloneRegistration,
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
@@ -380,16 +434,27 @@ export class ProgressState {
     const result = questions?.get(questionId);
     if (questions && result) {
       const next = normalizeWeight(weight);
+      const unscored = isUnscored(result.correct, customScore);
       const final =
         graded &&
-        (result.score >= 100 || !retriesLeft(result.retries, maxRetries));
+        (result.score >= 100 ||
+          unscored ||
+          !retriesLeft(result.retries, maxRetries));
       if (
         next !== result.weight ||
         graded !== result.graded ||
-        final !== result.final
+        final !== result.final ||
+        unscored !== result.unscored
       ) {
-        questions.set(questionId, { ...result, weight: next, graded, final });
+        questions.set(questionId, {
+          ...result,
+          weight: next,
+          graded,
+          final,
+          unscored,
+        });
         this.#writeQuestions(pageIndex, questions);
+        if (graded) this.#warnUnscoredPage(pageIndex, questionId);
         return;
       }
     }
@@ -445,12 +510,27 @@ export class ProgressState {
       : undefined;
   }
 
+  /** As in a quiz, unscored standalone answers are left out, and a page of only those scores 100. */
   pageScore(pageIndex: number): number | undefined {
+    const quiz = this.#submittedGradedQuiz(pageIndex);
+    if (quiz) return quiz.quizScore;
+    const results = this.#gradedResults(pageIndex);
+    return results.length ? (scoredMean(results) ?? 100) : undefined;
+  }
+
+  /** The page score is a placeholder 100: nothing on the page had a `correct` or `score()` to score it by. */
+  pageUnscored(pageIndex: number): boolean {
+    const quiz = this.#submittedGradedQuiz(pageIndex);
+    if (quiz) return !!quiz.unscored;
+    const results = this.#gradedResults(pageIndex);
+    return results.length > 0 && results.every((result) => result.unscored);
+  }
+
+  /** A submitted graded quiz's score outranks the page's standalone answers. */
+  #submittedGradedQuiz(pageIndex: number): GradedUnit | undefined {
     const unit = this.gradedUnits.get(pageIndex);
-    if (this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined)
-      return unit.quizScore;
-    return this.#gradedResults(pageIndex).length
-      ? this.getPageStandaloneAverage(pageIndex)
+    return this.#quizMaxAttempts.has(pageIndex) && unit?.quizScore !== undefined
+      ? unit
       : undefined;
   }
 
@@ -463,11 +543,6 @@ export class ProgressState {
     return questions
       ? [...questions.values()].filter((result) => result.graded)
       : [];
-  }
-
-  /** Weighted mean of graded standalone scores on a page, or 0 if none. */
-  getPageStandaloneAverage(pageIndex: number): number {
-    return weightedScore(this.#gradedResults(pageIndex));
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it
@@ -576,7 +651,8 @@ export class ProgressState {
             const verdict =
               correct === null ? 2 : correct === score >= 100 ? 0 : 4;
             const final = result.final && score < 100 ? 8 : 0;
-            const flags = (result.graded ? 1 : 0) + verdict + final;
+            const unscored = result.unscored ? 16 : 0;
+            const flags = (result.graded ? 1 : 0) + verdict + final + unscored;
             const bare: number | SavedQuestion =
               retries > 0
                 ? [score, weight, flags, retries]
@@ -677,12 +753,13 @@ export class ProgressState {
             ? entry
             : [entry, 1, 1];
           if (typeof score !== 'number') continue;
-          // Flags 1, 2, 4 and 8, never 2 with 4.
+          // Flags 1, 2, 4, 8 and 16, never 2 with 4, and 16 only with 2.
           const bits =
             Number.isInteger(flags) &&
             flags >= 0 &&
-            flags < 16 &&
-            (flags & 6) !== 6
+            flags < 32 &&
+            (flags & 6) !== 6 &&
+            (flags & 18) !== 16
               ? flags
               : 0;
           this.markStandaloneQuestion(
@@ -695,6 +772,7 @@ export class ProgressState {
               retries,
               response: swapIds(response),
               correct: bits & 2 ? null : score >= 100 !== !!(bits & 4),
+              unscored: !!(bits & 16),
               final: !!(bits & 8),
             },
           );

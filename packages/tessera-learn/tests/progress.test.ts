@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   ProgressState,
   weightedScore,
 } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
+
+const UNSCORED = { correct: null, unscored: true };
 
 describe('weightedScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
@@ -168,7 +170,7 @@ describe('ProgressState', () => {
         p: 250,
       });
       expect(progress.quizScore(0)).toBe(100);
-      expect(progress.getPageStandaloneAverage(1)).toBe(0);
+      expect(progress.pageScore(1)).toBe(0);
       expect(progress.reportedScore).toBe(100);
     });
 
@@ -523,6 +525,27 @@ describe('ProgressState', () => {
       });
       expect(restored.standaloneResult(0, 'rated')?.correct).toBe(null);
       expect(restored.pageScore(0)).toBe(0);
+    });
+
+    it('saves that a standalone submit had nothing to score it by', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.markStandaloneQuestion(0, 'survey', 100, true, 1, UNSCORED);
+
+      const { saved, restored } = roundTrip(progress);
+
+      expect(saved.g[0].q).toEqual({ survey: [100, 1, 19] });
+      expect(restored.gradedUnits.get(0)?.questions?.get('survey')).toEqual(
+        expect.objectContaining({ correct: null, unscored: true, final: true }),
+      );
+    });
+
+    it('drops an unscored flag saved without its missing verdict', () => {
+      const restored = new ProgressState(createManifest(6), createConfig());
+      restored.restoreFrom({ v: [], g: { 0: { q: { a: [100, 1, 17] } } } });
+
+      expect(restored.gradedUnits.get(0)?.questions?.get('a')).toEqual(
+        expect.objectContaining({ graded: false, unscored: false }),
+      );
     });
 
     it('saves a verdict that the score does not give', () => {
@@ -1018,7 +1041,7 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 80, true);
       progress.markStandaloneQuestion(3, 'q2', 100, true);
-      expect(progress.getPageStandaloneAverage(3)).toBe(90);
+      expect(progress.pageScore(3)).toBe(90);
     });
 
     it.each([
@@ -1034,38 +1057,108 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('getPageStandaloneAverage', () => {
-    it('returns 0 when no questions recorded for the page', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      expect(progress.getPageStandaloneAverage(3)).toBe(0);
-    });
-
+  describe('standalone page score', () => {
     it('averages the graded question scores on the page', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 60, true);
       progress.markStandaloneQuestion(3, 'q2', 80, true);
       progress.markStandaloneQuestion(3, 'q3', 100, true);
-      expect(progress.getPageStandaloneAverage(3)).toBe(80);
+      expect(progress.pageScore(3)).toBe(80);
     });
 
     it('weights each question, Σ(w·score)/Σ(w), to 2 decimal places', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 2);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      expect(progress.getPageStandaloneAverage(3)).toBe(66.67);
+      expect(progress.pageScore(3)).toBe(66.67);
     });
 
     it('skips ungraded practice answers', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'graded', 100, true);
       progress.markStandaloneQuestion(3, 'practice', 0, false);
-      expect(progress.getPageStandaloneAverage(3)).toBe(100);
+      expect(progress.pageScore(3)).toBe(100);
     });
 
-    it('returns 0 on a page of ungraded practice answers', () => {
+    it('is undefined on a page of ungraded practice answers', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'practice', 80, false);
-      expect(progress.getPageStandaloneAverage(3)).toBe(0);
+      expect(progress.pageScore(3)).toBeUndefined();
+    });
+
+    it('leaves out unscored answers, and scores a page of only those 100', () => {
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
+      expect(progress.pageScore(3)).toBe(100);
+
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+      expect(progress.pageScore(3)).toBe(0);
+    });
+
+    it('warns once a graded page has nothing to score it by', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const manifest = createManifest(4, {}, { 3: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      progress.registerStandaloneQuestion(3, 'survey', { graded: true });
+      progress.registerStandaloneQuestion(3, 'reflection', { graded: true });
+
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
+      expect(warn).not.toHaveBeenCalled();
+      progress.markStandaloneQuestion(3, 'reflection', 100, true, 1, UNSCORED);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toMatch(/this page is graded/);
+
+      const restored = new ProgressState(manifest, createConfig());
+      restored.restoreFrom(JSON.parse(JSON.stringify(progress.toSaved())));
+      restored.markStandaloneQuestion(3, 'practice', 0, false);
+      expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it('warns when a removed score() leaves a graded page nothing to score it by', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const manifest = createManifest(4, {}, { 3: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      progress.markStandaloneQuestion(3, 'rated', 40, true, 1, {
+        correct: null,
+        retries: 0,
+      });
+      expect(warn).not.toHaveBeenCalled();
+
+      progress.registerStandaloneQuestion(3, 'rated', { graded: true });
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toMatch(/useQuestion\("rated"\)/);
+    });
+
+    it('does not warn on a graded page with a scored answer', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const manifest = createManifest(4, {}, { 3: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('flags a page score with nothing to score it by as unscored', () => {
+      const manifest = createManifest(4, { 1: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      expect(progress.pageUnscored(1)).toBe(false);
+      expect(progress.pageUnscored(3)).toBe(false);
+
+      progress.quizCompleted(1, 100, [], false);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
+      progress.markStandaloneQuestion(3, 'practice', 0, false);
+      expect(progress.pageUnscored(1)).toBe(true);
+      expect(progress.pageUnscored(3)).toBe(true);
+
+      const restored = new ProgressState(manifest, createConfig());
+      restored.restoreFrom(JSON.parse(JSON.stringify(progress.toSaved())));
+      expect(restored.pageUnscored(1)).toBe(true);
+      expect(restored.pageUnscored(3)).toBe(true);
+
+      progress.quizCompleted(1, 50);
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+      expect(progress.pageUnscored(1)).toBe(false);
+      expect(progress.pageUnscored(3)).toBe(false);
     });
 
     it('treats a non-positive or non-finite weight as 1', () => {
@@ -1073,7 +1166,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true, 0);
       progress.markStandaloneQuestion(3, 'q2', 0, true, -5);
       progress.markStandaloneQuestion(3, 'q3', 50, true, Infinity);
-      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+      expect(progress.pageScore(3)).toBe(50);
     });
   });
 
@@ -1150,7 +1243,7 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      progress.registerStandaloneQuestion(3, 'q1', true, 1);
+      progress.registerStandaloneQuestion(3, 'q1', { graded: true, weight: 1 });
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')).toEqual({
         score: 100,
@@ -1158,9 +1251,10 @@ describe('ProgressState', () => {
         graded: true,
         retries: 0,
         correct: true,
+        unscored: false,
         final: true,
       });
-      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+      expect(progress.pageScore(3)).toBe(50);
     });
 
     it('treats a restored bare score as weight 1 until the page is reopened', () => {
@@ -1168,14 +1262,17 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true);
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.registerStandaloneQuestion(3, 'q1', true, 3);
+      progress.registerStandaloneQuestion(3, 'q1', { graded: true, weight: 3 });
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(3);
     });
 
     it('corrects a graded flag that drifted since the answer was saved', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 1);
-      progress.registerStandaloneQuestion(3, 'q1', false, 1);
+      progress.registerStandaloneQuestion(3, 'q1', {
+        graded: false,
+        weight: 1,
+      });
 
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.graded).toBe(
         false,
@@ -1195,7 +1292,11 @@ describe('ProgressState', () => {
           retries: 1,
           final: !final,
         });
-        progress.registerStandaloneQuestion(3, 'q1', true, 1, maxRetries);
+        progress.registerStandaloneQuestion(3, 'q1', {
+          graded: true,
+          weight: 1,
+          maxRetries,
+        });
 
         expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.final).toBe(
           final,
@@ -1203,14 +1304,49 @@ describe('ProgressState', () => {
       },
     );
 
+    it('scores a restored answer with no verdict, or leaves it out, as score() is now added or removed', () => {
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
+      progress.markStandaloneQuestion(3, 'rated', 40, true, 1, {
+        correct: null,
+        retries: 0,
+      });
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+
+      progress.registerStandaloneQuestion(3, 'survey', {
+        graded: true,
+        weight: 1,
+        customScore: true,
+      });
+      progress.registerStandaloneQuestion(3, 'rated', {
+        graded: true,
+        weight: 1,
+      });
+
+      const questions = progress.gradedUnits.get(3)?.questions;
+      expect(questions?.get('survey')).toEqual(
+        expect.objectContaining({ unscored: false }),
+      );
+      expect(questions?.get('rated')).toEqual(
+        expect.objectContaining({ unscored: true, final: true }),
+      );
+      expect(progress.pageScore(3)).toBe(50);
+    });
+
     it('normalizes an unusable weight and ignores an unanswered question', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);
-      progress.registerStandaloneQuestion(3, 'q1', true, -2);
+      progress.registerStandaloneQuestion(3, 'q1', {
+        graded: true,
+        weight: -2,
+      });
       expect(progress.gradedUnits.get(3)?.questions?.get('q1')?.weight).toBe(1);
 
-      progress.registerStandaloneQuestion(3, 'unanswered', true, 5);
-      progress.registerStandaloneQuestion(9, 'q1', true, 5);
+      progress.registerStandaloneQuestion(3, 'unanswered', {
+        graded: true,
+        weight: 5,
+      });
+      progress.registerStandaloneQuestion(9, 'q1', { graded: true, weight: 5 });
       expect(progress.gradedUnits.get(3)?.questions?.has('unanswered')).toBe(
         false,
       );
@@ -1224,9 +1360,15 @@ describe('ProgressState', () => {
         createManifest(1, {}, { 0: { graded: true } }),
         createConfig(),
       );
-      progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
-      progress.registerStandaloneQuestion(0, 'q-light', true, 1);
-      progress.registerStandaloneQuestion(0, 'q-practice', false);
+      progress.registerStandaloneQuestion(0, 'q-heavy', {
+        graded: true,
+        weight: 3,
+      });
+      progress.registerStandaloneQuestion(0, 'q-light', {
+        graded: true,
+        weight: 1,
+      });
+      progress.registerStandaloneQuestion(0, 'q-practice', { graded: false });
       progress.markVisited(0);
       return progress;
     };
@@ -1276,8 +1418,14 @@ describe('ProgressState', () => {
           0: { q: { 'q-heavy': [100, 3, 1] }, w: ['q-light', 'q-removed'] },
         },
       });
-      progress.registerStandaloneQuestion(0, 'q-heavy', true, 3);
-      progress.registerStandaloneQuestion(0, 'q-light', true, 1);
+      progress.registerStandaloneQuestion(0, 'q-heavy', {
+        graded: true,
+        weight: 3,
+      });
+      progress.registerStandaloneQuestion(0, 'q-light', {
+        graded: true,
+        weight: 1,
+      });
       progress.pageMounted(0);
 
       expect(progress.toSaved().g?.[0]?.w).toEqual(['q-light']);
@@ -1293,14 +1441,14 @@ describe('ProgressState', () => {
         createConfig({ completion: { mode: 'quiz' } }),
       );
       progress.markVisited(0);
-      progress.registerStandaloneQuestion(0, 'q1', true);
+      progress.registerStandaloneQuestion(0, 'q1', { graded: true });
       progress.markStandaloneQuestion(0, 'q1', 100, true);
 
       expect(progress.awaitingScore(0)).toBe(true);
       expect(progress.reportedCompletionStatus).toBe('incomplete');
       expect(progress.successStatus).toBe('unknown');
 
-      progress.registerStandaloneQuestion(0, 'q2', true);
+      progress.registerStandaloneQuestion(0, 'q2', { graded: true });
       progress.markStandaloneQuestion(0, 'q2', 0, true);
 
       expect(progress.gradedScoreFinal).toBe(true);
@@ -1320,7 +1468,7 @@ describe('ProgressState', () => {
 
       const progress = new ProgressState(manifest, createConfig());
       progress.restoreFrom({ g: { 0: { q: { q1: 100 }, w: ['q2'] } } });
-      progress.registerStandaloneQuestion(0, 'q1', true);
+      progress.registerStandaloneQuestion(0, 'q1', { graded: true });
       progress.pageMounted(0);
 
       expect(progress.awaitingScore(0)).toBe(true);

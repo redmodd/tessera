@@ -221,13 +221,12 @@ export function useQuestion<I extends Interaction = Interaction>(
         navCtx.manifest.pages[pageIndex].slug,
       );
     }
-    navCtx.progress.registerStandaloneQuestion(
-      pageIndex,
-      opts.id,
-      !!opts.graded,
-      opts.weight,
-      opts.maxRetries,
-    );
+    navCtx.progress.registerStandaloneQuestion(pageIndex, opts.id, {
+      graded: !!opts.graded,
+      weight: opts.weight,
+      maxRetries: opts.maxRetries,
+      customScore: !!opts.score,
+    });
     saved = navCtx.progress.standaloneResult(pageIndex, opts.id);
     markScore = (score, submit) =>
       navCtx.progress.markStandaloneQuestion(
@@ -314,6 +313,9 @@ export function useProgress() {
       return pageIndex === undefined
         ? undefined
         : progress.pageScore(pageIndex);
+    },
+    pageUnscored(pageIndex = pageCtx?.index) {
+      return pageIndex !== undefined && progress.pageUnscored(pageIndex);
     },
     get gradedScore() {
       return progress.gradedScore;
