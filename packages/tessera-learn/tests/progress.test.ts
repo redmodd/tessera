@@ -1110,7 +1110,23 @@ describe('ProgressState', () => {
 
       const restored = new ProgressState(manifest, createConfig());
       restored.restoreFrom(JSON.parse(JSON.stringify(progress.toSaved())));
+      restored.markStandaloneQuestion(3, 'practice', 0, false);
       expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it('warns when a removed score() leaves a graded page nothing to score it by', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const manifest = createManifest(4, {}, { 3: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      progress.markStandaloneQuestion(3, 'rated', 40, true, 1, {
+        correct: null,
+        retries: 0,
+      });
+      expect(warn).not.toHaveBeenCalled();
+
+      progress.registerStandaloneQuestion(3, 'rated', { graded: true });
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toMatch(/useQuestion\("rated"\)/);
     });
 
     it('does not warn on a graded page with a scored answer', () => {
@@ -1288,7 +1304,7 @@ describe('ProgressState', () => {
       },
     );
 
-    it('rescores a restored answer with no verdict as score() now gives', () => {
+    it('scores a restored answer with no verdict, or leaves it out, as score() is now added or removed', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
       progress.markStandaloneQuestion(3, 'rated', 40, true, 1, {

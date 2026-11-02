@@ -372,7 +372,7 @@ export class ProgressState {
       final: graded && (clamped >= 100 || final === true),
     });
     this.#writeQuestions(pageIndex, questions);
-    this.#warnUnscoredPage(pageIndex, questionId);
+    if (graded) this.#warnUnscoredPage(pageIndex, questionId);
   }
 
   /** The standalone side of the graded quiz warning in QuizEngine.submit. */
@@ -454,6 +454,7 @@ export class ProgressState {
           unscored,
         });
         this.#writeQuestions(pageIndex, questions);
+        if (graded) this.#warnUnscoredPage(pageIndex, questionId);
         return;
       }
     }
