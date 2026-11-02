@@ -53,7 +53,7 @@ export interface StandaloneSubmit {
 
 /** How a mounted standalone question is set up, which outranks its saved answer. */
 export interface StandaloneRegistration {
-  graded?: boolean;
+  graded: boolean;
   weight?: number;
   maxRetries?: number;
   /** The question passes `score()`. */
@@ -372,13 +372,14 @@ export class ProgressState {
       final: graded && (clamped >= 100 || final === true),
     });
     this.#writeQuestions(pageIndex, questions);
-    if (import.meta.env?.DEV && !this.#replaying)
-      this.#warnUnscoredPage(pageIndex, questionId);
+    this.#warnUnscoredPage(pageIndex, questionId);
   }
 
   /** The standalone side of the graded quiz warning in QuizEngine.submit. */
   #warnUnscoredPage(pageIndex: number, questionId: string) {
     if (
+      !import.meta.env?.DEV ||
+      this.#replaying ||
       this.#unscoredWarned.has(pageIndex) ||
       !this.#declaredGradedIndices.has(pageIndex) ||
       this.#quizMaxAttempts.has(pageIndex) ||
@@ -425,12 +426,7 @@ export class ProgressState {
   registerStandaloneQuestion(
     pageIndex: number,
     questionId: string,
-    {
-      graded = false,
-      weight,
-      maxRetries,
-      customScore = false,
-    }: StandaloneRegistration = {},
+    { graded, weight, maxRetries, customScore = false }: StandaloneRegistration,
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
@@ -513,12 +509,12 @@ export class ProgressState {
       : undefined;
   }
 
+  /** As in a quiz, unscored standalone answers are left out, and a page of only those scores 100. */
   pageScore(pageIndex: number): number | undefined {
     const quiz = this.#submittedGradedQuiz(pageIndex);
     if (quiz) return quiz.quizScore;
-    return this.#gradedResults(pageIndex).length
-      ? this.getPageStandaloneAverage(pageIndex)
-      : undefined;
+    const results = this.#gradedResults(pageIndex);
+    return results.length ? (scoredMean(results) ?? 100) : undefined;
   }
 
   /** The page score is a placeholder 100: nothing on the page had a `correct` or `score()` to score it by. */
@@ -546,15 +542,6 @@ export class ProgressState {
     return questions
       ? [...questions.values()].filter((result) => result.graded)
       : [];
-  }
-
-  /**
-   * Weighted mean of graded standalone scores on a page, or 0 if none. As in
-   * a quiz, unscored answers are left out, and a page of only those scores 100.
-   */
-  getPageStandaloneAverage(pageIndex: number): number {
-    const results = this.#gradedResults(pageIndex);
-    return scoredMean(results) ?? (results.length ? 100 : 0);
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it

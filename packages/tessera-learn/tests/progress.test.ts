@@ -5,6 +5,8 @@ import {
 } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
 
+const UNSCORED = { correct: null, unscored: true };
+
 describe('weightedScore', () => {
   it('rounds to 2 decimal places, halves up despite float drift', () => {
     expect(weightedScore([{ score: 68.335, weight: 1 }])).toBe(68.34);
@@ -168,7 +170,7 @@ describe('ProgressState', () => {
         p: 250,
       });
       expect(progress.quizScore(0)).toBe(100);
-      expect(progress.getPageStandaloneAverage(1)).toBe(0);
+      expect(progress.pageScore(1)).toBe(0);
       expect(progress.reportedScore).toBe(100);
     });
 
@@ -527,10 +529,7 @@ describe('ProgressState', () => {
 
     it('saves that a standalone submit had nothing to score it by', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
-      progress.markStandaloneQuestion(0, 'survey', 100, true, 1, {
-        correct: null,
-        unscored: true,
-      });
+      progress.markStandaloneQuestion(0, 'survey', 100, true, 1, UNSCORED);
 
       const { saved, restored } = roundTrip(progress);
 
@@ -1042,7 +1041,7 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 80, true);
       progress.markStandaloneQuestion(3, 'q2', 100, true);
-      expect(progress.getPageStandaloneAverage(3)).toBe(90);
+      expect(progress.pageScore(3)).toBe(90);
     });
 
     it.each([
@@ -1058,90 +1057,79 @@ describe('ProgressState', () => {
     });
   });
 
-  describe('getPageStandaloneAverage', () => {
-    it('returns 0 when no questions recorded for the page', () => {
-      const progress = new ProgressState(createManifest(0), createConfig());
-      expect(progress.getPageStandaloneAverage(3)).toBe(0);
-    });
-
+  describe('standalone page score', () => {
     it('averages the graded question scores on the page', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 60, true);
       progress.markStandaloneQuestion(3, 'q2', 80, true);
       progress.markStandaloneQuestion(3, 'q3', 100, true);
-      expect(progress.getPageStandaloneAverage(3)).toBe(80);
+      expect(progress.pageScore(3)).toBe(80);
     });
 
     it('weights each question, Σ(w·score)/Σ(w), to 2 decimal places', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 2);
       progress.markStandaloneQuestion(3, 'q2', 0, true, 1);
-      expect(progress.getPageStandaloneAverage(3)).toBe(66.67);
+      expect(progress.pageScore(3)).toBe(66.67);
     });
 
     it('skips ungraded practice answers', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'graded', 100, true);
       progress.markStandaloneQuestion(3, 'practice', 0, false);
-      expect(progress.getPageStandaloneAverage(3)).toBe(100);
+      expect(progress.pageScore(3)).toBe(100);
     });
 
-    it('returns 0 on a page of ungraded practice answers', () => {
+    it('is undefined on a page of ungraded practice answers', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'practice', 80, false);
-      expect(progress.getPageStandaloneAverage(3)).toBe(0);
+      expect(progress.pageScore(3)).toBeUndefined();
     });
 
     it('leaves out unscored answers, and scores a page of only those 100', () => {
-      const unscored = { correct: null, unscored: true };
       const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
-      expect(progress.getPageStandaloneAverage(3)).toBe(100);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
+      expect(progress.pageScore(3)).toBe(100);
 
       progress.markStandaloneQuestion(3, 'wrong', 0, true);
-      expect(progress.getPageStandaloneAverage(3)).toBe(0);
+      expect(progress.pageScore(3)).toBe(0);
     });
 
     it('warns once a graded page has nothing to score it by', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const unscored = { correct: null, unscored: true };
       const manifest = createManifest(4, {}, { 3: { graded: true } });
       const progress = new ProgressState(manifest, createConfig());
       progress.registerStandaloneQuestion(3, 'survey', { graded: true });
       progress.registerStandaloneQuestion(3, 'reflection', { graded: true });
 
-      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
       expect(warn).not.toHaveBeenCalled();
-      progress.markStandaloneQuestion(3, 'reflection', 100, true, 1, unscored);
+      progress.markStandaloneQuestion(3, 'reflection', 100, true, 1, UNSCORED);
       expect(warn).toHaveBeenCalledOnce();
       expect(warn.mock.calls[0][0]).toMatch(/this page is graded/);
 
       const restored = new ProgressState(manifest, createConfig());
       restored.restoreFrom(JSON.parse(JSON.stringify(progress.toSaved())));
       expect(warn).toHaveBeenCalledOnce();
-      warn.mockRestore();
     });
 
     it('does not warn on a graded page with a scored answer', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const unscored = { correct: null, unscored: true };
       const manifest = createManifest(4, {}, { 3: { graded: true } });
       const progress = new ProgressState(manifest, createConfig());
       progress.markStandaloneQuestion(3, 'wrong', 0, true);
-      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
       expect(warn).not.toHaveBeenCalled();
-      warn.mockRestore();
     });
 
     it('flags a page score with nothing to score it by as unscored', () => {
-      const unscored = { correct: null, unscored: true };
       const manifest = createManifest(4, { 1: { graded: true } });
       const progress = new ProgressState(manifest, createConfig());
       expect(progress.pageUnscored(1)).toBe(false);
       expect(progress.pageUnscored(3)).toBe(false);
 
       progress.quizCompleted(1, 100, [], false);
-      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
       progress.markStandaloneQuestion(3, 'practice', 0, false);
       expect(progress.pageUnscored(1)).toBe(true);
       expect(progress.pageUnscored(3)).toBe(true);
@@ -1162,7 +1150,7 @@ describe('ProgressState', () => {
       progress.markStandaloneQuestion(3, 'q1', 100, true, 0);
       progress.markStandaloneQuestion(3, 'q2', 0, true, -5);
       progress.markStandaloneQuestion(3, 'q3', 50, true, Infinity);
-      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+      expect(progress.pageScore(3)).toBe(50);
     });
   });
 
@@ -1250,7 +1238,7 @@ describe('ProgressState', () => {
         unscored: false,
         final: true,
       });
-      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+      expect(progress.pageScore(3)).toBe(50);
     });
 
     it('treats a restored bare score as weight 1 until the page is reopened', () => {
@@ -1302,10 +1290,7 @@ describe('ProgressState', () => {
 
     it('rescores a restored answer with no verdict as score() now gives', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
-      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, {
-        correct: null,
-        unscored: true,
-      });
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, UNSCORED);
       progress.markStandaloneQuestion(3, 'rated', 40, true, 1, {
         correct: null,
         retries: 0,
@@ -1329,7 +1314,7 @@ describe('ProgressState', () => {
       expect(questions?.get('rated')).toEqual(
         expect.objectContaining({ unscored: true, final: true }),
       );
-      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+      expect(progress.pageScore(3)).toBe(50);
     });
 
     it('normalizes an unusable weight and ignores an unanswered question', () => {
