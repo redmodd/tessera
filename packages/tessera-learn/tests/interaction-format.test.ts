@@ -275,6 +275,7 @@ describe('SCORM 2004 ids inside a response', () => {
 
 describe('cutting a response', () => {
   const zalgo = 'a' + '́'.repeat(300);
+  const flag = '\u{1F3F4}' + '\u{E0061}'.repeat(200);
 
   it.each([
     [SCORM12_INTERACTION_FORMAT, zalgo, zalgo.slice(0, 255)],
@@ -283,6 +284,8 @@ describe('cutting a response', () => {
       `ok[,]${zalgo}`,
       `ok[,]${zalgo.slice(0, 250)}`,
     ],
+    [SCORM2004_INTERACTION_FORMAT, `ok${zalgo}`, `ok${zalgo.slice(0, 248)}`],
+    [SCORM12_INTERACTION_FORMAT, flag, flag.slice(0, 254)],
   ])(
     'cuts a character longer than the cap rather than dropping it (%#)',
     (fmt, response, recorded) => {

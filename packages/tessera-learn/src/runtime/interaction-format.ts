@@ -669,12 +669,11 @@ function wholeItems(items: string[], delim: string, max: number): string {
 /** Cuts on a character boundary, so an emoji or accented letter stays whole. */
 function cutText(value: string, max: number): string {
   if (typeof Intl.Segmenter === 'function') {
-    let end = 0;
     for (const { index, segment } of new Intl.Segmenter().segment(value)) {
-      if (index + segment.length > max) break;
-      end = index + segment.length;
+      if (index + segment.length <= max) continue;
+      if (segment.length <= max) return value.slice(0, index);
+      break;
     }
-    if (end) return value.slice(0, end);
   }
   // Firefox before 125 has no Intl.Segmenter, and a character can run past
   // max (a letter with hundreds of accents); there, keep surrogate pairs whole.
@@ -683,10 +682,11 @@ function cutText(value: string, max: number): string {
 }
 
 /**
- * Cuts a response to the format's length caps. A list keeps only whole items,
- * since a half-written id or pair is wrong data, but a performance response
- * whose first step doesn't fit keeps that step with its answer cut. Null when
- * nothing fits.
+ * Cuts a response to the format's length caps. Each SCORM 2004 fill-in part
+ * and performance step answer is cut on its own first. A list keeps only
+ * whole items, since a half-written id or pair is wrong data, but a
+ * performance response whose first step doesn't fit keeps that step with its
+ * answer cut. Null when nothing fits.
  */
 function fitResponse(
   questionId: string,
@@ -713,7 +713,7 @@ function fitResponse(
   checkValue(i, 'response', items, fmt);
   if (longPart) {
     console.warn(
-      `Tessera: interaction "${questionId}" has ${longPart} over the ${partMax} characters this export standard records; the LMS gets its first ${partMax} characters.`,
+      `Tessera: interaction "${questionId}" has ${longPart} over the ${partMax} characters this export standard records; the LMS gets at most its first ${partMax} characters.`,
     );
   }
   const value = items.join(fmt.itemDelim);

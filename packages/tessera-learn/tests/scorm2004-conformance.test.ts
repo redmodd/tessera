@@ -210,7 +210,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           '"q1" has 1 correct answer(s) over the 250 characters this export standard records per [,]-separated part',
         ),
         expect.stringContaining(
-          '"q1" has a response part over the 250 characters this export standard records; the LMS gets its first 250 characters',
+          '"q1" has a response part over the 250 characters this export standard records; the LMS gets at most its first 250 characters',
         ),
       ]);
     });
@@ -259,7 +259,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       ).toBe('0');
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets its first 250 characters',
+          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets at most its first 250 characters',
         ),
       );
       expect(warn).toHaveBeenCalledWith(
