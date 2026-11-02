@@ -321,18 +321,20 @@ export const LMS_BUILD: Record<
         'http://www.imsglobal.org/xsd/imsss imsss_v1p0.xsd',
       // Without deliveryControls an LMS marks an attempt that ends with no
       // reported completion or success as completed and passed.
-      itemData: (score) => `<imsss:sequencing>${
-        score === null
-          ? ''
-          : `
+      itemData: (score) => {
+        const objectives =
+          score === null
+            ? ''
+            : `
           <imsss:objectives>
             <imsss:primaryObjective objectiveID="primary" satisfiedByMeasure="true">
               <imsss:minNormalizedMeasure>${formatReal107(toScaled(score))}</imsss:minNormalizedMeasure>
             </imsss:primaryObjective>
-          </imsss:objectives>`
-      }
+          </imsss:objectives>`;
+        return `<imsss:sequencing>${objectives}
           <imsss:deliveryControls completionSetByContent="true" objectiveSetByContent="true"/>
-        </imsss:sequencing>`,
+        </imsss:sequencing>`;
+      },
     }),
     adapter: 'SCORM2004Adapter',
   },
