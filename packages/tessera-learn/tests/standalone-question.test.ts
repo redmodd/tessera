@@ -424,6 +424,13 @@ describe('StandaloneQuestion', () => {
       expect(q.isLockedCorrect).toBe(false);
     });
 
+    it('offers no retry on a scored answer once score() is removed', () => {
+      const { q } = make({}, { score: 40, retries: 0, correct: null });
+
+      expect(q.canRetry).toBe(false);
+      expect(q.isLockedCorrect).toBe(false);
+    });
+
     it('shows no answer when the widget has no restore()', () => {
       const { q } = make(
         {},

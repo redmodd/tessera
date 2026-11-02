@@ -1238,6 +1238,38 @@ describe('ProgressState', () => {
       },
     );
 
+    it('rescores a restored answer with no verdict as score() now gives', () => {
+      const progress = new ProgressState(createManifest(0), createConfig());
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, {
+        correct: null,
+        unscored: true,
+      });
+      progress.markStandaloneQuestion(3, 'rated', 40, true, 1, {
+        correct: null,
+        retries: 0,
+      });
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+
+      progress.registerStandaloneQuestion(
+        3,
+        'survey',
+        true,
+        1,
+        undefined,
+        true,
+      );
+      progress.registerStandaloneQuestion(3, 'rated', true, 1);
+
+      const questions = progress.gradedUnits.get(3)?.questions;
+      expect(questions?.get('survey')).toEqual(
+        expect.objectContaining({ unscored: false }),
+      );
+      expect(questions?.get('rated')).toEqual(
+        expect.objectContaining({ unscored: true, final: true }),
+      );
+      expect(progress.getPageStandaloneAverage(3)).toBe(50);
+    });
+
     it('normalizes an unusable weight and ignores an unanswered question', () => {
       const progress = new ProgressState(createManifest(0), createConfig());
       progress.markStandaloneQuestion(3, 'q1', 100, true, 3);

@@ -227,6 +227,7 @@ export function useQuestion<I extends Interaction = Interaction>(
       !!opts.graded,
       opts.weight,
       opts.maxRetries,
+      !!opts.score,
     );
     saved = navCtx.progress.standaloneResult(pageIndex, opts.id);
     markScore = (score, submit) =>

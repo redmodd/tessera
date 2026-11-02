@@ -32,7 +32,7 @@ interface Question {
   readonly answerComplete: boolean; // is the answer whole enough to submit? false at 2 of 5 pairs matched
   readonly feedbackVisible: boolean;
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
-  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100 (not one with no `correct`), no retry
+  readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100 (not one with no `correct` and no `score()`), no retry
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
   setAnswer(answer: unknown): void;
   commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
@@ -45,7 +45,7 @@ A widget that builds its answer incrementally (matching, ordering, multi-select)
 
 `Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging: `useQuestion` reports `null` correctness, the LMS records no result, `q.correct` stays `null` and `QuestionReview` shows a neutral `Submitted` result.
 
-- **Score:** the question is left out of the page score, in a quiz and standalone alike. A quiz, or a graded standalone page, with no `correct` on any of its questions scores 100. Leave such a quiz's `graded` off (the default), or every learner adds a 100 to the course score and a dev warning fires.
+- **Score:** the question is left out of the page score, in a quiz and standalone alike. A quiz, or a graded standalone page, with no `correct` on any of its questions scores 100. Leave `graded` off on such a quiz or page (the default), or every learner adds a 100 to the course score. A graded quiz also logs a dev warning.
 - **In a quiz:** the built-in `<Quiz>`'s correct count leaves it out, and an `incorrect-only` retry keeps its answer, still editable. With no `correct` on any question, `useQuiz().scored` is `false` and the built-in `<Quiz>` shows no score.
 - **Standalone:** a submitted answer offers no Try again. Pass `score()` to score it yourself instead.
 

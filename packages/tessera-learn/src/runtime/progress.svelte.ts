@@ -366,7 +366,8 @@ export class ProgressState {
   /**
    * Record a mounted question, so its page counts as answered only once every
    * graded question on it is, and correct a restored answer's `graded` flag,
-   * weight and finality from it, which outrank what the save was written with. The
+   * weight, finality and whether it is scored from it, which outrank what the
+   * save was written with. The
    * manifest lists the built-in questions the source fixes, so only a custom
    * or dynamically identified one behind a reveal waits to register.
    * ponytail: only pages the learner opens are corrected; a full sweep needs
@@ -378,6 +379,7 @@ export class ProgressState {
     graded: boolean,
     weight?: number,
     maxRetries?: number,
+    customScore = false,
   ) {
     this.#unconfirmed.get(pageIndex)?.delete(questionId);
     const expectedChanged = this.#expect(pageIndex, [questionId], graded);
@@ -385,15 +387,25 @@ export class ProgressState {
     const result = questions?.get(questionId);
     if (questions && result) {
       const next = normalizeWeight(weight);
+      const unscored = result.correct === null && !customScore;
       const final =
         graded &&
-        (result.score >= 100 || !retriesLeft(result.retries, maxRetries));
+        (result.score >= 100 ||
+          unscored ||
+          !retriesLeft(result.retries, maxRetries));
       if (
         next !== result.weight ||
         graded !== result.graded ||
-        final !== result.final
+        final !== result.final ||
+        unscored !== result.unscored
       ) {
-        questions.set(questionId, { ...result, weight: next, graded, final });
+        questions.set(questionId, {
+          ...result,
+          weight: next,
+          graded,
+          final,
+          unscored,
+        });
         this.#writeQuestions(pageIndex, questions);
         return;
       }
@@ -477,7 +489,8 @@ export class ProgressState {
   getPageStandaloneAverage(pageIndex: number): number {
     const results = this.#gradedResults(pageIndex);
     const scored = results.filter((result) => !result.unscored);
-    return weightedScore(scored.length ? scored : results);
+    if (scored.length) return weightedScore(scored);
+    return results.length ? 100 : 0;
   }
 
   // Replaces the entry rather than mutating it: SvelteMap tracks the value it

@@ -78,7 +78,12 @@ export class StandaloneQuestion implements UseQuestionHandle {
   }
 
   get canRetry(): boolean {
-    return this.#submitted && this.#score < 100 && this.#retriesLeft;
+    return (
+      this.#submitted &&
+      this.#score < 100 &&
+      !this.#unscored(this.#correct) &&
+      this.#retriesLeft
+    );
   }
 
   /** No `correct` and no `score()`: left out of the page score, like in a quiz. */
