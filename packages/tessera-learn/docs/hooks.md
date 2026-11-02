@@ -45,7 +45,7 @@ A widget that builds its answer incrementally (matching, ordering, multi-select)
 
 `Interaction` uses SCORM 2004 vocabulary. Omit `correct` to skip auto-judging: `useQuestion` reports `null` correctness, the LMS records no result, `q.correct` stays `null` and `QuestionReview` shows a neutral `Submitted` result.
 
-- **Score:** the question is left out of the page score, in a quiz and standalone alike. A quiz, or a graded standalone page, with no `correct` on any of its questions scores 100, and `useProgress().pageUnscored()` is `true` for it, so show no score. Leave `graded` off on such a quiz or page (the default), or every learner adds a 100 to the course score. A graded quiz also logs a dev warning.
+- **Score:** the question is left out of the page score, in a quiz and standalone alike. A quiz, or a graded standalone page, with no `correct` on any of its questions scores 100, and `useProgress().pageUnscored()` is `true` for it, so show no score. Leave `graded` off on such a quiz or page (the default), or every learner adds a 100 to the course score. Either logs a dev warning.
 - **In a quiz:** the built-in `<Quiz>`'s correct count leaves it out, and an `incorrect-only` retry keeps its answer, still editable. With no `correct` on any question, `useQuiz().scored` is `false` and the built-in `<Quiz>` shows no score.
 - **Standalone:** a submitted answer offers no Try again. Pass `score()` to score it yourself instead.
 

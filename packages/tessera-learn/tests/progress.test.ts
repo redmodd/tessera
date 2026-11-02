@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   ProgressState,
   weightedScore,
@@ -1100,6 +1100,37 @@ describe('ProgressState', () => {
 
       progress.markStandaloneQuestion(3, 'wrong', 0, true);
       expect(progress.getPageStandaloneAverage(3)).toBe(0);
+    });
+
+    it('warns once a graded page has nothing to score it by', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const unscored = { correct: null, unscored: true };
+      const manifest = createManifest(4, {}, { 3: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      progress.registerStandaloneQuestion(3, 'survey', { graded: true });
+      progress.registerStandaloneQuestion(3, 'reflection', { graded: true });
+
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      expect(warn).not.toHaveBeenCalled();
+      progress.markStandaloneQuestion(3, 'reflection', 100, true, 1, unscored);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toMatch(/this page is graded/);
+
+      const restored = new ProgressState(manifest, createConfig());
+      restored.restoreFrom(JSON.parse(JSON.stringify(progress.toSaved())));
+      expect(warn).toHaveBeenCalledOnce();
+      warn.mockRestore();
+    });
+
+    it('does not warn on a graded page with a scored answer', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const unscored = { correct: null, unscored: true };
+      const manifest = createManifest(4, {}, { 3: { graded: true } });
+      const progress = new ProgressState(manifest, createConfig());
+      progress.markStandaloneQuestion(3, 'wrong', 0, true);
+      progress.markStandaloneQuestion(3, 'survey', 100, true, 1, unscored);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     it('flags a page score with nothing to score it by as unscored', () => {

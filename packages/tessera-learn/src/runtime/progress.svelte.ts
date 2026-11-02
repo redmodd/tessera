@@ -204,6 +204,7 @@ export class ProgressState {
   #pageWeights: ReadonlyMap<number, number>;
   #listedQuestions: ReadonlyMap<number, ReadonlySet<string>>;
   #undeclaredWarned = new Set<number>();
+  #unscoredWarned = new Set<number>();
   #expected: SvelteMap<number, ReadonlySet<string>>;
   #unconfirmed = new Map<number, Set<string>>();
 
@@ -371,6 +372,26 @@ export class ProgressState {
       final: graded && (clamped >= 100 || final === true),
     });
     this.#writeQuestions(pageIndex, questions);
+    if (import.meta.env?.DEV && !this.#replaying)
+      this.#warnUnscoredPage(pageIndex, questionId);
+  }
+
+  /** The standalone side of the graded quiz warning in QuizEngine.submit. */
+  #warnUnscoredPage(pageIndex: number, questionId: string) {
+    if (
+      this.#unscoredWarned.has(pageIndex) ||
+      !this.#declaredGradedIndices.has(pageIndex) ||
+      this.#quizMaxAttempts.has(pageIndex) ||
+      !this.#allAnswered(pageIndex) ||
+      !this.pageUnscored(pageIndex)
+    )
+      return;
+    this.#unscoredWarned.add(pageIndex);
+    console.warn(
+      `[tessera] useQuestion("${questionId}"): this page is graded, but none of its graded questions ` +
+        'has a `correct` answer or `score()`, so every learner scores 100 toward the course score. ' +
+        'Leave `graded` off for a survey or reflection page.',
+    );
   }
 
   standaloneResult(
