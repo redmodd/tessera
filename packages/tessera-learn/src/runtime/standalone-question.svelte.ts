@@ -3,6 +3,7 @@ import type { UseQuestionHandle, UseQuestionOptions } from './hooks.svelte.js';
 import type { QuizEngineDeps } from './quiz-engine.svelte.js';
 import {
   clampScore,
+  isUnscored,
   retriesLeft,
   type StandaloneRestore,
   type StandaloneSubmit,
@@ -86,9 +87,8 @@ export class StandaloneQuestion implements UseQuestionHandle {
     );
   }
 
-  /** No `correct` and no `score()`: left out of the page score, like in a quiz. */
   #unscored(correct: boolean | null): boolean {
-    return correct === null && !this.#opts.score;
+    return isUnscored(correct, !!this.#opts.score);
   }
 
   get #retriesLeft(): boolean {

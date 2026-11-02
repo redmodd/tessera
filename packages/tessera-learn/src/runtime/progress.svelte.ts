@@ -139,6 +139,14 @@ export function retriesLeft(retries: number, maxRetries?: number): boolean {
   return retries < (maxRetries ?? Infinity);
 }
 
+/** No `correct` and no `score()` to judge the response by, so the page score leaves it out, as in a quiz. */
+export function isUnscored(
+  correct: boolean | null,
+  customScore: boolean,
+): boolean {
+  return correct === null && !customScore;
+}
+
 export function clampScore(score: number): number {
   return Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
 }
@@ -409,7 +417,7 @@ export class ProgressState {
     const result = questions?.get(questionId);
     if (questions && result) {
       const next = normalizeWeight(weight);
-      const unscored = result.correct === null && !customScore;
+      const unscored = isUnscored(result.correct, customScore);
       const final =
         graded &&
         (result.score >= 100 ||
