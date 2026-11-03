@@ -1200,6 +1200,15 @@ describe('CMI5Adapter', () => {
       );
     });
 
+    it('replaces a lone surrogate in the question id instead of throwing', async () => {
+      const body = await initAndReport(
+        'q\uD83D',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      expect(body.object.id).toBe('https://example.com/course/1#q%EF%BF%BD');
+    });
+
     it('passes named identifiers through to result.response unchanged (xAPI has no CMIIdentifier validation)', async () => {
       const body = await initAndReport(
         'q1',
