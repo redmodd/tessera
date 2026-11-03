@@ -1189,6 +1189,26 @@ describe('CMI5Adapter', () => {
       expect(body.result.success).toBe(false);
     });
 
+    it('percent-encodes the question id into a valid IRI fragment', async () => {
+      const body = await initAndReport(
+        'Question 1#é',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      expect(body.object.id).toBe(
+        'https://example.com/course/1#Question%201%23%C3%A9',
+      );
+    });
+
+    it('replaces a lone surrogate in the question id instead of throwing', async () => {
+      const body = await initAndReport(
+        'q\uD83D',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      expect(body.object.id).toBe('https://example.com/course/1#q%EF%BF%BD');
+    });
+
     it('passes named identifiers through to result.response unchanged (xAPI has no CMIIdentifier validation)', async () => {
       const body = await initAndReport(
         'q1',

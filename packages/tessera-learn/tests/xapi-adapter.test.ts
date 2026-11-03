@@ -387,6 +387,25 @@ describe('XAPIAdapter', () => {
     expect(posted()).toHaveLength(0);
   });
 
+  it('percent-encodes the question id in the Answered object id', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await flush();
+    fetchMock.mockClear();
+
+    adapter.reportInteraction(
+      'Question 1#é',
+      { type: 'choice', response: ['a'], correct: ['a'] },
+      true,
+    );
+    await flush();
+
+    expect(posted()[0].object.id).toBe(
+      'urn:tessera:au:abc#Question%201%23%C3%A9',
+    );
+  });
+
   it('exit sends Terminated and stays on the page', async () => {
     setXAPILaunch();
     const adapter = new XAPIAdapter();
