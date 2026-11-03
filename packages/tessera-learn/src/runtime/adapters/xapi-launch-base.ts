@@ -103,7 +103,7 @@ function linkedController(...signals: AbortSignal[]): AbortController {
 
 type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
-  'sessionId' | 'cmi5Mode'
+  'sessionId' | 'cmi5Mode' | 'contextTemplate'
 >;
 
 /**

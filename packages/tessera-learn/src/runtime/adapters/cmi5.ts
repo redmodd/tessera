@@ -4,6 +4,7 @@ import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 import type { Verdict } from '../types.js';
+import type { XAPIContext } from '../xapi/types.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -29,17 +30,9 @@ const LMS_LAUNCH_DATA_STATE_ID = 'LMS.LaunchData';
 /** Agent Profile id (cmi5 §11) where the LMS stores learner preferences. */
 const CMI5_LEARNER_PREFS_PROFILE_ID = 'cmi5LearnerPreferences';
 
-/** cmi5 §10 `LMS.LaunchData` document. `contextTemplate` is the base context for every Defined Statement (§9.6.2). */
+/** cmi5 §10 `LMS.LaunchData` document. `contextTemplate` is the base context for every statement to the LMS (§10.2.1). */
 interface CMI5LaunchData {
-  contextTemplate?: {
-    contextActivities?: {
-      category?: Array<{ id: string; objectType?: string }>;
-      grouping?: Array<{ id: string }>;
-      [k: string]: unknown;
-    };
-    extensions?: Record<string, unknown>;
-    [k: string]: unknown;
-  };
+  contextTemplate?: XAPIContext;
   launchMode?: CMI5LaunchMode;
   launchMethod?: 'OwnWindow' | 'AnyWindow';
   returnURL?: string;
@@ -64,9 +57,6 @@ interface CMI5LaunchData {
  * Agent Profile GET.
  */
 export class CMI5Adapter extends BaseXAPILaunchAdapter {
-  // cmi5 §10 LMS.LaunchData; `contextTemplate` (§9.6.2) is the base context
-  // strict LRSes validate every Defined Statement against.
-  #launchData: CMI5LaunchData | null = null;
   /** cmi5 §10.2.2 — Browse/Review forbid every Defined Statement except Initialized/Terminated. */
   #launchMode: CMI5LaunchMode = 'Normal';
   #heldFailed = false;
@@ -157,7 +147,6 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       this.#fetchLaunchData(),
       this.#fetchLearnerPreferences(),
     ]);
-    this.#launchData = launchData;
     if (launchData) {
       if (
         typeof launchData.launchMode === 'string' &&
@@ -185,7 +174,11 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       launchData?.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
     const sessionId =
       typeof session === 'string' ? session.trim() || undefined : undefined;
-    return { sessionId, cmi5Mode: true };
+    return {
+      sessionId,
+      cmi5Mode: true,
+      contextTemplate: launchData?.contextTemplate,
+    };
   }
 
   override seedLifecycle(
@@ -256,54 +249,25 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
   }
 
   /**
-   * Build the cmi5 context for a Defined Statement, starting from the
-   * LMS contextTemplate (§9.6.2 — AU MUST NOT overwrite). Adds the
-   * cmi5 Category Activity (§9.6.2.1), the moveOn Category for
-   * Completed/Passed/Failed (§9.6.2.2), and the masteryScore extension
-   * for Passed/Failed (§9.6.3.2).
+   * The cmi5 additions to a Defined Statement's context, which the publisher
+   * lays over the LMS contextTemplate: the cmi5 Category (§9.6.2.1), moveOn
+   * for Completed/Passed/Failed (§9.6.2.2), and masteryScore for Passed/Failed
+   * (§9.6.3.2).
    */
   protected override buildContext(
     opts: { moveOn?: boolean; mastery?: boolean } = {},
   ): Record<string, unknown> {
-    const tmpl = this.#launchData?.contextTemplate ?? {};
-    const tmplActivities = tmpl.contextActivities ?? {};
-
-    // Concat-dedupe category to preserve any template-supplied entries
-    // (§10.2.1 forbids overwriting them).
-    const seen = new Set<string>();
-    const category: Array<{ id: string; objectType: string }> = [];
-    const push = (id: string) => {
-      if (!seen.has(id)) {
-        seen.add(id);
-        category.push({ id, objectType: 'Activity' });
-      }
-    };
-    const templateCategory = Array.isArray(tmplActivities.category)
-      ? tmplActivities.category
-      : [];
-    for (const c of templateCategory) {
-      if (c && typeof c.id === 'string') push(c.id);
+    const category = [{ id: CMI5_CATEGORY_CMI5, objectType: 'Activity' }];
+    if (opts.moveOn) {
+      category.push({ id: CMI5_CATEGORY_MOVEON, objectType: 'Activity' });
     }
-    push(CMI5_CATEGORY_CMI5);
-    if (opts.moveOn) push(CMI5_CATEGORY_MOVEON);
-
-    const contextActivities: Record<string, unknown> = {
-      ...tmplActivities,
-      category,
+    return {
+      contextActivities: { category },
+      ...(opts.mastery &&
+        this.masteryScore !== null && {
+          extensions: { [CMI5_MASTERYSCORE_EXT]: this.masteryScore },
+        }),
     };
-
-    const ctx: Record<string, unknown> = {
-      ...tmpl,
-      contextActivities,
-    };
-    // cmi5 §9.6.3.2 — masteryScore extension is scoped to Passed/Failed.
-    if (opts.mastery && this.masteryScore !== null) {
-      ctx.extensions = {
-        ...(tmpl.extensions ?? {}),
-        [CMI5_MASTERYSCORE_EXT]: this.masteryScore,
-      };
-    }
-    return ctx;
   }
 
   /** cmi5 §11 — Agent Profile URL. Scoped to agent only (no activity/registration). */

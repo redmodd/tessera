@@ -504,6 +504,79 @@ describe('CMI5Adapter', () => {
     ]);
   });
 
+  describe('contextTemplate on statements that are not Defined (cmi5 §10.2.1)', () => {
+    const publisherActivity = 'https://lms.example.com/publisher/1';
+    const LMS_EXT = 'https://lms.example/ext/x';
+    const launchData = {
+      contextTemplate: {
+        contextActivities: {
+          grouping: [{ id: publisherActivity }],
+          category: [{ id: 'https://lms.example/category/c' }],
+        },
+        extensions: {
+          [SESSION_ID_EXT]: '11111111-2222-3333-4444-555555555555',
+          [LMS_EXT]: 'lms',
+        },
+      },
+    };
+
+    it('starts Answered from the template', async () => {
+      const adapter = await initAdapter({ launchData });
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      await flush();
+
+      expect(statementFor('answered').context).toEqual({
+        registration: CMI5_LAUNCH.registration,
+        contextActivities: launchData.contextTemplate.contextActivities,
+        extensions: launchData.contextTemplate.extensions,
+      });
+    });
+
+    it('adds an author context to the template without overwriting it', async () => {
+      const adapter = await initAdapter({ launchData });
+      await adapter.launchPublisher()!.sendStatement({
+        verb: { id: `${VERB}experienced` },
+        context: {
+          contextActivities: {
+            grouping: [
+              { id: 'https://author/group' },
+              { id: publisherActivity },
+            ],
+            parent: [{ id: 'https://author/parent' }],
+          },
+          extensions: { [LMS_EXT]: 'author', 'https://author/ext': 1 },
+        },
+      });
+
+      expect(statementFor('experienced').context).toEqual({
+        registration: CMI5_LAUNCH.registration,
+        contextActivities: {
+          grouping: [{ id: publisherActivity }, { id: 'https://author/group' }],
+          category: launchData.contextTemplate.contextActivities.category,
+          parent: [{ id: 'https://author/parent' }],
+        },
+        extensions: {
+          ...launchData.contextTemplate.extensions,
+          'https://author/ext': 1,
+        },
+      });
+    });
+
+    it('keeps template categories ahead of the cmi5 categories on Defined Statements', async () => {
+      await initAdapter({ launchData });
+      expect(
+        statementFor('initialized').context.contextActivities.category,
+      ).toEqual([
+        { id: 'https://lms.example/category/c' },
+        { id: CMI5_CAT, objectType: 'Activity' },
+      ]);
+    });
+  });
+
   it('falls back to a minted UUID when LMS.LaunchData has no session id', async () => {
     // When the LMS doesn't pre-populate sessionid (non-conformant or
     // dev fixtures), the publisher mints a UUID — the cmi5 v1 fallback.

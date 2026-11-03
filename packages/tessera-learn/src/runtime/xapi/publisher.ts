@@ -3,6 +3,7 @@ import type {
   Statement,
   PartialStatement,
   SendStatementOptions,
+  XAPIContext,
   SendStatementResult,
   DestinationOutcome,
 } from './types.js';
@@ -47,6 +48,8 @@ export interface XAPIPublisherOptions {
    * Set by the cmi5 adapter and by 'lms'-inherited destinations under cmi5.
    */
   cmi5Mode?: boolean;
+  /** cmi5 §10.2.1: the LMS `contextTemplate` every statement's context starts from. */
+  contextTemplate?: XAPIContext;
   /** When set, every send method rejects with the returned Error without hitting the network. */
   unavailableReason?: () => Error;
 }
@@ -84,6 +87,25 @@ const QUEUE_DEPTH_SATURATED = 1000;
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
 
+/** cmi5 §10.2.1: a statement may add to the template's context but never overwrite it. */
+function applyTemplate(template: XAPIContext, ctx: XAPIContext): XAPIContext {
+  const activities: Record<string, Array<{ id: string }>> = {
+    ...ctx.contextActivities,
+  };
+  for (const [key, list] of Object.entries(template.contextActivities ?? {})) {
+    if (!Array.isArray(list)) continue;
+    const ids = new Set(list.map((a) => a.id));
+    const added = (activities[key] ?? []).filter((a) => !ids.has(a.id));
+    activities[key] = [...list, ...added];
+  }
+  return {
+    ...ctx,
+    ...template,
+    contextActivities: activities,
+    extensions: { ...ctx.extensions, ...template.extensions },
+  };
+}
+
 function isClientError(status: number | undefined): boolean {
   return status !== undefined && status >= 400 && status < 500;
 }
@@ -104,6 +126,7 @@ export class XAPIPublisher {
   readonly #registration?: string;
   readonly #sessionId: string;
   readonly #cmi5Mode: boolean;
+  readonly #contextTemplate: XAPIContext | null;
 
   // When set, every send method short-circuits with a rejected promise.
   readonly #unavailableReason: (() => Error) | null;
@@ -152,6 +175,7 @@ export class XAPIPublisher {
     this.#activityId = opts.activityId;
     this.#registration = opts.registration;
     this.#cmi5Mode = !!opts.cmi5Mode;
+    this.#contextTemplate = opts.contextTemplate ?? null;
     this.#authValue = opts.auth;
     this.#actorValue = opts.actor;
     this.#sessionId = opts.sessionId ?? uuidv4();
@@ -243,7 +267,8 @@ export class XAPIPublisher {
    * Build a fully-formed statement from a partial. Mints a UUID, fills in
    * actor / timestamp / context.registration / context.contextActivities.grouping
    * and (when in cmi5 mode) the cmi5 sessionid extension. Caller-supplied
-   * `context` keys are preserved; publisher-supplied values fill gaps.
+   * `context` keys are preserved; publisher-supplied values fill gaps. A
+   * cmi5 `contextTemplate` underlies the caller's context and wins over it.
    *
    * `opts.id` lets a fan-out wrapper share a single UUID across every
    * destination's statement so all LRSes see the same id (idempotent
@@ -255,7 +280,9 @@ export class XAPIPublisher {
         'XAPIPublisher.buildStatement() called before init() resolved.',
       );
     }
-    const userCtx = partial.context ?? {};
+    const userCtx = this.#contextTemplate
+      ? applyTemplate(this.#contextTemplate, partial.context ?? {})
+      : (partial.context ?? {});
     const userCtxActivities = userCtx.contextActivities ?? {};
     const grouping = userCtxActivities.grouping ?? [{ id: this.#activityId }];
 
