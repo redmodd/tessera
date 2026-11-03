@@ -3,6 +3,8 @@ import type {
   Statement,
   PartialStatement,
   SendStatementOptions,
+  XAPIContext,
+  XAPIObject,
   SendStatementResult,
   DestinationOutcome,
 } from './types.js';
@@ -17,6 +19,7 @@ import {
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 import { httpOrigin } from '../standards.js';
+import { isRecord } from '../types.js';
 
 /** cmi5 §9.6.3.1: the cmi5 session id context extension IRI. */
 export const CMI5_SESSIONID_EXT =
@@ -44,9 +47,11 @@ export interface XAPIPublisherOptions {
   sessionId?: string;
   /**
    * When true, every statement carries the cmi5 sessionid context extension.
-   * Set by the cmi5 adapter and by 'lms'-inherited destinations under cmi5.
+   * Set by the cmi5 adapter.
    */
   cmi5Mode?: boolean;
+  /** cmi5 §10.2.1: the LMS `contextTemplate` every statement's context starts from. */
+  contextTemplate?: XAPIContext;
   /** When set, every send method rejects with the returned Error without hitting the network. */
   unavailableReason?: () => Error;
 }
@@ -84,6 +89,40 @@ const QUEUE_DEPTH_SATURATED = 1000;
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
 
+const isActivity = (a: unknown): a is { id: string } =>
+  isRecord(a) && typeof a.id === 'string';
+
+/** xAPI 1.0.3 §2.4.6.2 allows a single Activity in place of a list; entries without a string id are dropped. */
+export function toActivityList(value: unknown): Array<{ id: string }> {
+  return [value].flat().filter(isActivity);
+}
+
+/** cmi5 §10.2.1: a statement may add to the template's context but never overwrite it. */
+function applyTemplate(
+  template: XAPIContext,
+  ctx: XAPIContext,
+  object: XAPIObject,
+): XAPIContext {
+  const activities: Record<string, Array<{ id: string }>> = {
+    ...ctx.contextActivities,
+  };
+  for (const [key, list] of Object.entries(template.contextActivities ?? {})) {
+    const ids = new Set(list.map((a) => a.id));
+    const added = [activities[key] ?? []]
+      .flat()
+      .filter((a) => !(isActivity(a) && ids.has(a.id)));
+    activities[key] = [...list, ...added];
+  }
+  // xAPI §2.4.6: revision and platform are only allowed with an Activity object.
+  const { revision: _revision, platform: _platform, ...rest } = template;
+  return {
+    ...ctx,
+    ...((object.objectType ?? 'Activity') === 'Activity' ? template : rest),
+    contextActivities: activities,
+    extensions: { ...ctx.extensions, ...template.extensions },
+  };
+}
+
 function isClientError(status: number | undefined): boolean {
   return status !== undefined && status >= 400 && status < 500;
 }
@@ -104,6 +143,7 @@ export class XAPIPublisher {
   readonly #registration?: string;
   readonly #sessionId: string;
   readonly #cmi5Mode: boolean;
+  readonly #contextTemplate: XAPIContext | null;
 
   // When set, every send method short-circuits with a rejected promise.
   readonly #unavailableReason: (() => Error) | null;
@@ -152,6 +192,7 @@ export class XAPIPublisher {
     this.#activityId = opts.activityId;
     this.#registration = opts.registration;
     this.#cmi5Mode = !!opts.cmi5Mode;
+    this.#contextTemplate = opts.contextTemplate ?? null;
     this.#authValue = opts.auth;
     this.#actorValue = opts.actor;
     this.#sessionId = opts.sessionId ?? uuidv4();
@@ -243,7 +284,8 @@ export class XAPIPublisher {
    * Build a fully-formed statement from a partial. Mints a UUID, fills in
    * actor / timestamp / context.registration / context.contextActivities.grouping
    * and (when in cmi5 mode) the cmi5 sessionid extension. Caller-supplied
-   * `context` keys are preserved; publisher-supplied values fill gaps.
+   * `context` keys are preserved and publisher-supplied values fill gaps,
+   * except that a cmi5 `contextTemplate`'s values win over the caller's.
    *
    * `opts.id` lets a fan-out wrapper share a single UUID across every
    * destination's statement so all LRSes see the same id (idempotent
@@ -255,17 +297,23 @@ export class XAPIPublisher {
         'XAPIPublisher.buildStatement() called before init() resolved.',
       );
     }
+    const object = partial.object ?? {
+      id: this.#activityId,
+      objectType: 'Activity',
+    };
     const userCtx = partial.context ?? {};
-    const userCtxActivities = userCtx.contextActivities ?? {};
-    const grouping = userCtxActivities.grouping ?? [{ id: this.#activityId }];
-
-    const context: NonNullable<Statement['context']> = {
+    const ctx: XAPIContext = {
       ...userCtx,
       contextActivities: {
-        ...userCtxActivities,
-        grouping,
+        ...userCtx.contextActivities,
+        grouping: userCtx.contextActivities?.grouping ?? [
+          { id: this.#activityId },
+        ],
       },
     };
+    const context = this.#contextTemplate
+      ? applyTemplate(this.#contextTemplate, ctx, object)
+      : ctx;
     if (this.#registration && context.registration === undefined) {
       context.registration = this.#registration;
     }
@@ -280,11 +328,6 @@ export class XAPIPublisher {
     const verb = partial.verb.display
       ? partial.verb
       : { id: partial.verb.id, display: { 'en-US': verbName } };
-
-    const object = partial.object ?? {
-      id: this.#activityId,
-      objectType: 'Activity',
-    };
 
     const statement: Statement = {
       id: opts?.id ?? uuidv4(),

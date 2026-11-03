@@ -501,19 +501,227 @@ describe('CMI5Adapter', () => {
     expect(initialized.context.extensions[SESSION_ID_EXT]).toBe(lmsSession);
     expect(initialized.context.contextActivities.grouping).toEqual([
       { id: publisherActivity },
+      { id: CMI5_LAUNCH.activityId },
     ]);
   });
 
-  it('falls back to a minted UUID when LMS.LaunchData has no session id', async () => {
-    // When the LMS doesn't pre-populate sessionid (non-conformant or
-    // dev fixtures), the publisher mints a UUID — the cmi5 v1 fallback.
-    await initAdapter();
+  describe('contextTemplate (cmi5 §10.2.1)', () => {
+    const publisherActivity = 'https://lms.example.com/publisher/1';
+    const LMS_EXT = 'https://lms.example/ext/x';
+    const launchData = {
+      contextTemplate: {
+        contextActivities: {
+          grouping: [{ id: publisherActivity }],
+          category: [{ id: 'https://lms.example/category/c' }],
+        },
+        extensions: {
+          [SESSION_ID_EXT]: '11111111-2222-3333-4444-555555555555',
+          [LMS_EXT]: 'lms',
+        },
+      },
+    };
 
-    const initialized = statementFor('initialized');
-    const sid = initialized?.context?.extensions?.[SESSION_ID_EXT];
-    expect(sid).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    );
+    it('starts Answered from the template', async () => {
+      const adapter = await initAdapter({ launchData });
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      await flush();
+
+      expect(statementFor('answered').context).toEqual({
+        registration: CMI5_LAUNCH.registration,
+        contextActivities: {
+          ...launchData.contextTemplate.contextActivities,
+          grouping: [{ id: publisherActivity }, { id: CMI5_LAUNCH.activityId }],
+        },
+        extensions: launchData.contextTemplate.extensions,
+      });
+    });
+
+    it('adds an author context to the template without overwriting it', async () => {
+      const adapter = await initAdapter({ launchData });
+      await adapter.launchPublisher()!.sendStatement({
+        verb: { id: `${VERB}experienced` },
+        context: {
+          contextActivities: {
+            grouping: [
+              { id: 'https://author/group' },
+              { id: publisherActivity },
+            ],
+            parent: [{ id: 'https://author/parent' }],
+          },
+          extensions: { [LMS_EXT]: 'author', 'https://author/ext': 1 },
+        },
+      });
+
+      expect(statementFor('experienced').context).toEqual({
+        registration: CMI5_LAUNCH.registration,
+        contextActivities: {
+          grouping: [{ id: publisherActivity }, { id: 'https://author/group' }],
+          category: launchData.contextTemplate.contextActivities.category,
+          parent: [{ id: 'https://author/parent' }],
+        },
+        extensions: {
+          ...launchData.contextTemplate.extensions,
+          'https://author/ext': 1,
+        },
+      });
+    });
+
+    it('keeps template categories ahead of the cmi5 categories on Defined Statements', async () => {
+      const adapter = await initAdapter({ launchData });
+      adapter.setCompletionStatus('complete');
+      adapter.commit();
+      await flush();
+      expect(
+        statementFor('completed').context.contextActivities.category,
+      ).toEqual([
+        { id: 'https://lms.example/category/c' },
+        { id: CMI5_CAT, objectType: 'Activity' },
+        { id: MOVEON_CAT, objectType: 'Activity' },
+      ]);
+    });
+
+    it('reads a single template activity as a list and skips entries without an id', async () => {
+      await initAdapter({
+        launchData: {
+          contextTemplate: {
+            contextActivities: {
+              grouping: { id: publisherActivity },
+              category: [null, 'x', { id: 7 }, { id: 'https://lms/cat' }],
+            },
+          },
+        },
+      });
+      const { contextActivities } = statementFor('initialized').context;
+      expect(contextActivities.grouping).toEqual([
+        { id: publisherActivity },
+        { id: CMI5_LAUNCH.activityId },
+      ]);
+      expect(contextActivities.category).toEqual([
+        { id: 'https://lms/cat' },
+        { id: CMI5_CAT, objectType: 'Activity' },
+      ]);
+    });
+
+    it('reads a single author activity as a list and sends malformed entries as written', async () => {
+      const adapter = await initAdapter({ launchData });
+      await adapter.launchPublisher()!.sendStatement({
+        verb: { id: `${VERB}experienced` },
+        context: {
+          contextActivities: {
+            grouping: { id: 'https://author/group' } as never,
+            category: [null, { id: 7 }] as never,
+          },
+        },
+      });
+      const { contextActivities } = statementFor('experienced').context;
+      expect(contextActivities.grouping).toEqual([
+        { id: publisherActivity },
+        { id: 'https://author/group' },
+      ]);
+      expect(contextActivities.category).toEqual([
+        ...launchData.contextTemplate.contextActivities.category,
+        null,
+        { id: 7 },
+      ]);
+    });
+
+    it('keeps the default grouping when the template grouping has no activities', async () => {
+      const adapter = await initAdapter({
+        launchData: {
+          contextTemplate: { contextActivities: { grouping: [{ id: 7 }] } },
+        },
+      });
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      await flush();
+      expect(
+        statementFor('answered').context.contextActivities.grouping,
+      ).toEqual([{ id: CMI5_LAUNCH.activityId }]);
+    });
+
+    it('drops null template values and non-string string fields', async () => {
+      await initAdapter({
+        launchData: {
+          contextTemplate: {
+            registration: 7,
+            language: null,
+            revision: { v: 1 },
+            platform: ['LMS'],
+          },
+        },
+      });
+      const { context } = statementFor('initialized');
+      expect(context.registration).toBe(CMI5_LAUNCH.registration);
+      expect(context).not.toHaveProperty('language');
+      expect(context).not.toHaveProperty('revision');
+      expect(context).not.toHaveProperty('platform');
+    });
+
+    it('leaves template revision and platform off statements about a non-Activity', async () => {
+      const adapter = await initAdapter({
+        launchData: { contextTemplate: { revision: 'r1', platform: 'LMS' } },
+      });
+      const publisher = adapter.launchPublisher()!;
+      await publisher.sendStatement({ verb: { id: `${VERB}experienced` } });
+      await publisher.sendStatement({
+        verb: { id: `${VERB}mentored` },
+        object: { id: 'mailto:a@example.com', objectType: 'Agent' },
+      });
+      expect(statementFor('experienced').context).toMatchObject({
+        revision: 'r1',
+        platform: 'LMS',
+      });
+      const { context } = statementFor('mentored');
+      expect(context).not.toHaveProperty('revision');
+      expect(context).not.toHaveProperty('platform');
+    });
+
+    it('ignores a template that is not an object', async () => {
+      await initAdapter({ launchData: { contextTemplate: 'x' } });
+      const { context } = statementFor('initialized');
+      expect(Object.keys(context).sort()).toEqual([
+        'contextActivities',
+        'extensions',
+        'registration',
+      ]);
+    });
+
+    it('sends the template session id exactly as the LMS wrote it', async () => {
+      await initAdapter({
+        launchData: {
+          contextTemplate: { extensions: { [SESSION_ID_EXT]: ' abc ' } },
+        },
+      });
+      expect(
+        statementFor('initialized').context.extensions[SESSION_ID_EXT],
+      ).toBe(' abc ');
+    });
+  });
+
+  // The LMS should always send a session id (cmi5 §9.6.3.1); without a
+  // usable one the publisher mints a UUID.
+  it.each([
+    ['has no session id', {}],
+    [
+      'has a blank session id',
+      {
+        launchData: {
+          contextTemplate: { extensions: { [SESSION_ID_EXT]: '  ' } },
+        },
+      },
+    ],
+  ])('mints a session UUID when LMS.LaunchData %s', async (_, lms) => {
+    await initAdapter(lms);
+    expect(
+      statementFor('initialized').context.extensions[SESSION_ID_EXT],
+    ).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 
   it('parses the spec-conformant JSON token body from the fetch URL', async () => {
@@ -1430,36 +1638,6 @@ describe('CMI5Adapter', () => {
       expect(urls.indexOf(CMI5_LAUNCH.fetch)).toBeLessThan(launchData);
       const [, init] = mockFetch.mock.calls[launchData];
       expect(init.headers.get('Authorization')).toBe('Basic test-auth-token');
-    });
-  });
-
-  describe('contextTemplate merge (cmi5 §10.2.1)', () => {
-    it('concats LMS-supplied template categories with cmi5 + moveOn instead of overwriting', async () => {
-      // cmi5 §10.2.1 — the AU MUST NOT overwrite contextTemplate values.
-      // If the LMS pre-populates `category`, the AU must merge (concat
-      // + dedupe), not replace.
-      const lmsCategory = {
-        id: 'https://lms.example.com/cat/custom',
-        objectType: 'Activity',
-      };
-      const adapter = await initAdapter({
-        launchData: {
-          contextTemplate: {
-            contextActivities: { category: [lmsCategory] },
-          },
-        },
-      });
-      mockFetch.mockClear();
-      adapter.setCompletionStatus('complete');
-      adapter.commit();
-      await flush();
-      const completed = statementFor('completed');
-      const ids = completed.context.contextActivities.category.map(
-        (c: any) => c.id,
-      );
-      expect(ids).toContain(lmsCategory.id);
-      expect(ids).toContain(CMI5_CAT);
-      expect(ids).toContain(MOVEON_CAT);
     });
   });
 
