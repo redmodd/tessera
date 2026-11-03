@@ -41,6 +41,13 @@ interface CMI5LaunchData {
   [k: string]: unknown;
 }
 
+const STRING_CONTEXT_KEYS = new Set([
+  'registration',
+  'revision',
+  'platform',
+  'language',
+]);
+
 function readContextTemplate(raw: unknown): XAPIContext | undefined {
   if (!isRecord(raw)) return undefined;
   const { contextActivities, extensions, ...rest } = raw;
@@ -48,8 +55,13 @@ function readContextTemplate(raw: unknown): XAPIContext | undefined {
     isRecord(contextActivities) ? contextActivities : {},
   ).map(([key, list]) => [key, toActivityList(list)]);
   return {
-    // null is never a valid xAPI context value.
-    ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== null)),
+    // The template lands on every statement, so one bad value would 400 them all.
+    ...Object.fromEntries(
+      Object.entries(rest).filter(
+        ([k, v]) =>
+          v !== null && (typeof v === 'string' || !STRING_CONTEXT_KEYS.has(k)),
+      ),
+    ),
     contextActivities: Object.fromEntries(activities),
     extensions: isRecord(extensions) ? extensions : undefined,
   };

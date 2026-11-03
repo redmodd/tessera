@@ -646,13 +646,22 @@ describe('CMI5Adapter', () => {
       ).toEqual([{ id: CMI5_LAUNCH.activityId }]);
     });
 
-    it('drops null template values', async () => {
+    it('drops null template values and non-string string fields', async () => {
       await initAdapter({
-        launchData: { contextTemplate: { registration: null, language: null } },
+        launchData: {
+          contextTemplate: {
+            registration: 7,
+            language: null,
+            revision: { v: 1 },
+            platform: ['LMS'],
+          },
+        },
       });
       const { context } = statementFor('initialized');
       expect(context.registration).toBe(CMI5_LAUNCH.registration);
       expect(context).not.toHaveProperty('language');
+      expect(context).not.toHaveProperty('revision');
+      expect(context).not.toHaveProperty('platform');
     });
 
     it('leaves template revision and platform off statements about a non-Activity', async () => {
