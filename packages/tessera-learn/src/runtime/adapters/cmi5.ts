@@ -1,6 +1,6 @@
 import { parseMastery } from './format.js';
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
-import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
+import { CMI5_SESSIONID_EXT, toActivityList } from '../xapi/publisher.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 import { isRecord, type Verdict } from '../types.js';
@@ -41,23 +41,19 @@ interface CMI5LaunchData {
   [k: string]: unknown;
 }
 
-const isActivity = (a: unknown): a is { id: string } =>
-  isRecord(a) && typeof a.id === 'string';
-
-/** xAPI 1.0.3 §2.4.6.2 allows a single Activity in place of a list; entries without a string id are dropped. */
 function readContextTemplate(raw: unknown): XAPIContext | undefined {
   if (!isRecord(raw)) return undefined;
-  const { contextActivities, extensions } = raw;
+  const { contextActivities, extensions, ...rest } = raw;
+  const activities = Object.entries(
+    isRecord(contextActivities) ? contextActivities : {},
+  )
+    .map(([key, list]) => [key, toActivityList(list)] as const)
+    // An empty list would hide the publisher's default grouping.
+    .filter(([, list]) => list.length > 0);
   return {
-    ...raw,
-    contextActivities: isRecord(contextActivities)
-      ? Object.fromEntries(
-          Object.entries(contextActivities).map(([key, list]) => [
-            key,
-            [list].flat().filter(isActivity),
-          ]),
-        )
-      : undefined,
+    // null is never a valid xAPI context value.
+    ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== null)),
+    contextActivities: Object.fromEntries(activities),
     extensions: isRecord(extensions) ? extensions : undefined,
   };
 }
@@ -194,7 +190,8 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
     const contextTemplate = readContextTemplate(launchData?.contextTemplate);
     const session = contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
     return {
-      sessionId: typeof session === 'string' && session ? session : undefined,
+      sessionId:
+        typeof session === 'string' && session.trim() ? session : undefined,
       cmi5Mode: true,
       contextTemplate,
     };

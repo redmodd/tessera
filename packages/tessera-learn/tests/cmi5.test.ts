@@ -622,6 +622,64 @@ describe('CMI5Adapter', () => {
       ).toEqual([{ id: publisherActivity }, { id: 'https://author/group' }]);
     });
 
+    it('keeps the default grouping when the template grouping has no activities', async () => {
+      const adapter = await initAdapter({
+        launchData: {
+          contextTemplate: { contextActivities: { grouping: [{ id: 7 }] } },
+        },
+      });
+      adapter.reportInteraction(
+        'q1',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      await flush();
+      expect(
+        statementFor('answered').context.contextActivities.grouping,
+      ).toEqual([{ id: CMI5_LAUNCH.activityId }]);
+    });
+
+    it('skips author activities that are not objects with an id', async () => {
+      const adapter = await initAdapter({ launchData });
+      await adapter.launchPublisher()!.sendStatement({
+        verb: { id: `${VERB}experienced` },
+        context: {
+          contextActivities: { grouping: [null, { id: 7 }] as never },
+        },
+      });
+      expect(
+        statementFor('experienced').context.contextActivities.grouping,
+      ).toEqual([{ id: publisherActivity }]);
+    });
+
+    it('drops null template values', async () => {
+      await initAdapter({
+        launchData: { contextTemplate: { registration: null, language: null } },
+      });
+      const { context } = statementFor('initialized');
+      expect(context.registration).toBe(CMI5_LAUNCH.registration);
+      expect(context).not.toHaveProperty('language');
+    });
+
+    it('leaves template revision and platform off statements about a non-Activity', async () => {
+      const adapter = await initAdapter({
+        launchData: { contextTemplate: { revision: 'r1', platform: 'LMS' } },
+      });
+      const publisher = adapter.launchPublisher()!;
+      await publisher.sendStatement({ verb: { id: `${VERB}experienced` } });
+      await publisher.sendStatement({
+        verb: { id: `${VERB}mentored` },
+        object: { id: 'mailto:a@example.com', objectType: 'Agent' },
+      });
+      expect(statementFor('experienced').context).toMatchObject({
+        revision: 'r1',
+        platform: 'LMS',
+      });
+      const { context } = statementFor('mentored');
+      expect(context).not.toHaveProperty('revision');
+      expect(context).not.toHaveProperty('platform');
+    });
+
     it('ignores a template that is not an object', async () => {
       await initAdapter({ launchData: { contextTemplate: 'x' } });
       const { context } = statementFor('initialized');
@@ -652,6 +710,17 @@ describe('CMI5Adapter', () => {
     const initialized = statementFor('initialized');
     const sid = initialized?.context?.extensions?.[SESSION_ID_EXT];
     expect(sid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it('mints a UUID when the template session id is blank', async () => {
+    const adapter = await initAdapter({
+      launchData: {
+        contextTemplate: { extensions: { [SESSION_ID_EXT]: '  ' } },
+      },
+    });
+    expect(adapter.launchPublisher()!.getSessionId()).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
   });

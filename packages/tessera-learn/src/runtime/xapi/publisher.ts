@@ -18,6 +18,7 @@ import {
 } from './validation.js';
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 import { httpOrigin } from '../standards.js';
+import { isRecord } from '../types.js';
 
 /** cmi5 §9.6.3.1: the cmi5 session id context extension IRI. */
 export const CMI5_SESSIONID_EXT =
@@ -87,20 +88,33 @@ const QUEUE_DEPTH_SATURATED = 1000;
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
 
+const isActivity = (a: unknown): a is { id: string } =>
+  isRecord(a) && typeof a.id === 'string';
+
+/** xAPI 1.0.3 §2.4.6.2 allows a single Activity in place of a list; entries without a string id are dropped. */
+export function toActivityList(value: unknown): Array<{ id: string }> {
+  return [value].flat().filter(isActivity);
+}
+
 /** cmi5 §10.2.1: a statement may add to the template's context but never overwrite it. */
-function applyTemplate(template: XAPIContext, ctx: XAPIContext): XAPIContext {
+function applyTemplate(
+  template: XAPIContext,
+  ctx: XAPIContext,
+  activityObject: boolean,
+): XAPIContext {
   const activities: Record<string, Array<{ id: string }>> = {
     ...ctx.contextActivities,
   };
   for (const [key, list] of Object.entries(template.contextActivities ?? {})) {
     const ids = new Set(list.map((a) => a.id));
-    // An author may pass a single Activity in place of a list (xAPI §2.4.6.2).
-    const added = [activities[key] ?? []].flat().filter((a) => !ids.has(a?.id));
+    const added = toActivityList(activities[key]).filter((a) => !ids.has(a.id));
     activities[key] = [...list, ...added];
   }
+  // xAPI §2.4.6: revision and platform are only allowed with an Activity object.
+  const { revision: _revision, platform: _platform, ...rest } = template;
   return {
     ...ctx,
-    ...template,
+    ...(activityObject ? template : rest),
     contextActivities: activities,
     extensions: { ...ctx.extensions, ...template.extensions },
   };
@@ -267,8 +281,8 @@ export class XAPIPublisher {
    * Build a fully-formed statement from a partial. Mints a UUID, fills in
    * actor / timestamp / context.registration / context.contextActivities.grouping
    * and (when in cmi5 mode) the cmi5 sessionid extension. Caller-supplied
-   * `context` keys are preserved; publisher-supplied values fill gaps. A
-   * cmi5 `contextTemplate` underlies the caller's context and wins over it.
+   * `context` keys are preserved and publisher-supplied values fill gaps,
+   * except that a cmi5 `contextTemplate`'s values win over the caller's.
    *
    * `opts.id` lets a fan-out wrapper share a single UUID across every
    * destination's statement so all LRSes see the same id (idempotent
@@ -280,16 +294,24 @@ export class XAPIPublisher {
         'XAPIPublisher.buildStatement() called before init() resolved.',
       );
     }
-    const userCtx = this.#contextTemplate
-      ? applyTemplate(this.#contextTemplate, partial.context ?? {})
+    const object = partial.object ?? {
+      id: this.#activityId,
+      objectType: 'Activity',
+    };
+    const baseCtx = this.#contextTemplate
+      ? applyTemplate(
+          this.#contextTemplate,
+          partial.context ?? {},
+          (object.objectType ?? 'Activity') === 'Activity',
+        )
       : (partial.context ?? {});
-    const userCtxActivities = userCtx.contextActivities ?? {};
-    const grouping = userCtxActivities.grouping ?? [{ id: this.#activityId }];
+    const baseActivities = baseCtx.contextActivities ?? {};
+    const grouping = baseActivities.grouping ?? [{ id: this.#activityId }];
 
     const context: NonNullable<Statement['context']> = {
-      ...userCtx,
+      ...baseCtx,
       contextActivities: {
-        ...userCtxActivities,
+        ...baseActivities,
         grouping,
       },
     };
@@ -307,11 +329,6 @@ export class XAPIPublisher {
     const verb = partial.verb.display
       ? partial.verb
       : { id: partial.verb.id, display: { 'en-US': verbName } };
-
-    const object = partial.object ?? {
-      id: this.#activityId,
-      objectType: 'Activity',
-    };
 
     const statement: Statement = {
       id: opts?.id ?? uuidv4(),

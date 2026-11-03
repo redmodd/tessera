@@ -36,6 +36,8 @@ export interface XAPIObject {
 
 export interface XAPIContext {
   registration?: string;
+  revision?: string;
+  platform?: string;
   contextActivities?: {
     parent?: Array<{ id: string }>;
     grouping?: Array<{ id: string }>;
