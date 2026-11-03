@@ -41,6 +41,8 @@ export interface XAPIPublisherOptions {
   actor: XAPIAgent | (() => XAPIAgent | Promise<XAPIAgent>);
   /** xAPI activity IRI scoped to this destination. */
   activityId: string;
+  /** Definition sent with the activity when a statement's object defaults to it. */
+  activityDefinition?: Record<string, unknown>;
   /** Optional UUID — primarily a cmi5 launch concept. */
   registration?: string;
   /** Optional caller-supplied session id. cmi5 adapter supplies its own. */
@@ -140,6 +142,7 @@ export class XAPIPublisher {
   readonly #endpoint: string;
   readonly #statementsUrl: string;
   readonly #activityId: string;
+  readonly #activityDefinition: Record<string, unknown> | undefined;
   readonly #registration?: string;
   readonly #sessionId: string;
   readonly #cmi5Mode: boolean;
@@ -190,6 +193,7 @@ export class XAPIPublisher {
     this.#endpoint = opts.endpoint.replace(/\/?$/, '/');
     this.#statementsUrl = `${this.#endpoint}statements`;
     this.#activityId = opts.activityId;
+    this.#activityDefinition = opts.activityDefinition;
     this.#registration = opts.registration;
     this.#cmi5Mode = !!opts.cmi5Mode;
     this.#contextTemplate = opts.contextTemplate ?? null;
@@ -283,7 +287,8 @@ export class XAPIPublisher {
   /**
    * Build a fully-formed statement from a partial. Mints a UUID, fills in
    * actor / timestamp / context.registration / context.contextActivities.grouping
-   * and (when in cmi5 mode) the cmi5 sessionid extension. Caller-supplied
+   * (unless the activity is already the statement's parent) and (when in cmi5
+   * mode) the cmi5 sessionid extension. Caller-supplied
    * `context` keys are preserved and publisher-supplied values fill gaps,
    * except that a cmi5 `contextTemplate`'s values win over the caller's.
    *
@@ -300,17 +305,19 @@ export class XAPIPublisher {
     const object = partial.object ?? {
       id: this.#activityId,
       objectType: 'Activity',
+      ...(this.#activityDefinition && {
+        definition: this.#activityDefinition,
+      }),
     };
     const userCtx = partial.context ?? {};
-    const ctx: XAPIContext = {
-      ...userCtx,
-      contextActivities: {
-        ...userCtx.contextActivities,
-        grouping: userCtx.contextActivities?.grouping ?? [
-          { id: this.#activityId },
-        ],
-      },
-    };
+    const activities = { ...userCtx.contextActivities };
+    if (
+      !activities.grouping &&
+      !toActivityList(activities.parent).some((a) => a.id === this.#activityId)
+    ) {
+      activities.grouping = [{ id: this.#activityId }];
+    }
+    const ctx: XAPIContext = { ...userCtx, contextActivities: activities };
     const context = this.#contextTemplate
       ? applyTemplate(this.#contextTemplate, ctx, object)
       : ctx;

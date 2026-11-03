@@ -525,6 +525,17 @@ describe('SCORM12Adapter', () => {
     const interaction0 = () =>
       valuesUnder(api.LMSSetValue.mock.calls, 'cmi.interactions.0');
 
+    it('writes no description, which SCORM 1.2 lacks', async () => {
+      adapter.reportInteraction(
+        'q1',
+        { type: 'true-false', response: true },
+        null,
+        'Is it?',
+      );
+      await flush();
+      expect(interaction0()).not.toHaveProperty('description');
+    });
+
     it('writes choice interaction with student_response and HH:MM:SS time', async () => {
       adapter.reportInteraction(
         'q1',

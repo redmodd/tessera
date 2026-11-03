@@ -28,6 +28,7 @@ export interface QuizEngineDeps {
     id: string,
     interaction: Interaction,
     correct: boolean | null,
+    text?: string,
   ) => void;
   /** Records the submitted score and responses against the current page's progress. */
   onComplete: (
@@ -53,6 +54,7 @@ interface InternalQuestion {
   reset?: () => void;
   complete?: () => boolean;
   interaction?: () => Interaction | undefined;
+  text?: () => string | undefined;
   restore?: UseQuizQuestionApi['restore'];
   render: unknown;
 }
@@ -216,6 +218,7 @@ export class QuizEngine implements UseQuizHandle {
       reset: api.reset,
       complete: api.complete,
       interaction: api.interaction,
+      text: api.text,
       restore: api.restore,
       render: undefined,
     };
@@ -382,7 +385,7 @@ export class QuizEngine implements UseQuizHandle {
     if (!interaction) return;
     const fingerprint = JSON.stringify(interaction);
     if (this.#reportedAnswers.get(index) === fingerprint) return;
-    this.#deps.report(q.id, interaction, q.checkAnswer());
+    this.#deps.report(q.id, interaction, q.checkAnswer(), q.text?.());
     this.#reportedAnswers.set(index, fingerprint);
   }
 

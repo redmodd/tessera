@@ -31,6 +31,13 @@ import {
   waitForTesseraContent,
 } from './helpers.js';
 
+/** The graded quiz's questions, in order, as the learner reads them. */
+const QUIZ_TEXT = [
+  'What is 2 + 2?',
+  'What color is the sky on a clear day?',
+  'Match the numbers with their words.',
+];
+
 async function expectRestoreToEndSession(page: Page): Promise<void> {
   await expect(page.locator('.tessera-exit-btn')).toBeVisible();
   await bfcacheRoundTrip(page);
@@ -313,6 +320,7 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
       'fill-in',
       'matching',
     ]);
+    expect(await interactionField(page, 'description')).toEqual([]);
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
@@ -579,6 +587,7 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       'fill-in',
       'matching',
     ]);
+    expect(await interactionField(page, 'description')).toEqual(QUIZ_TEXT);
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);
@@ -736,7 +745,13 @@ test.describe.serial('LMS round-trip — CMI5', () => {
         /^http:\/\/tessera\.test\/activity\/course-1#/,
       );
       expect(s.result?.response).toBeTruthy();
+      expect(s.context?.contextActivities?.parent).toEqual([
+        { id: 'http://tessera.test/activity/course-1' },
+      ]);
     }
+    expect(
+      answered.map((s) => s.object?.definition?.description?.['en-US']),
+    ).toEqual(QUIZ_TEXT);
 
     await finishFreeCourse(page);
 
@@ -1018,7 +1033,17 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     const initStmt = findStatement(statements, 'initialized');
     expect(initStmt).toBeTruthy();
     expect(initStmt.actor?.account?.name).toBe('learner-1');
-    expect(initStmt.object?.id).toBe('http://tessera.test/activity/course-1');
+    expect(initStmt.object).toEqual({
+      id: 'http://tessera.test/activity/course-1',
+      objectType: 'Activity',
+      definition: {
+        type: 'http://adlnet.gov/expapi/activities/course',
+        name: { 'en-US': 'E2E Test Course' },
+        description: {
+          'en-US': 'A comprehensive course for end-to-end testing',
+        },
+      },
+    });
     expect(initStmt.context?.registration).toBe('test-registration-xapi');
 
     // Every statement request declares xAPI 1.0.3 and the Basic credential
@@ -1078,6 +1103,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'fill-in',
       'matching',
     ]);
+    expect(
+      answered.map((s) => s.object?.definition?.description?.['en-US']),
+    ).toEqual(QUIZ_TEXT);
 
     await finishFreeCourse(page);
 

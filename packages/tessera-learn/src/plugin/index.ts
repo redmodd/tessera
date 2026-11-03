@@ -632,8 +632,8 @@ function generateLmsAdapterModule(standard: LMSStandard): string {
   return `
 import { ${adapterClass} } from 'tessera-learn/runtime/adapters/${standard}.js';
 import { missingApiError } from 'tessera-learn/runtime/adapters/lms-error.js';
-export function createAdapter() {
-  const adapter = ${adapterClass}.connect();
+export function createAdapter(config) {
+  const adapter = ${adapterClass}.connect(config);
   if (!adapter) throw missingApiError('${standard}');
   return adapter;
 }

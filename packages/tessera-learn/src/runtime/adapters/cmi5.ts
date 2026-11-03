@@ -53,7 +53,9 @@ function readContextTemplate(raw: unknown): XAPIContext | undefined {
   const { contextActivities, extensions, ...rest } = raw;
   const activities = Object.entries(
     isRecord(contextActivities) ? contextActivities : {},
-  ).map(([key, list]) => [key, toActivityList(list)]);
+  )
+    .map(([key, list]) => [key, toActivityList(list)] as const)
+    .filter(([, list]) => list.length > 0);
   return {
     // The template lands on every statement, so one bad value would 400 them all.
     ...Object.fromEntries(

@@ -345,6 +345,33 @@ describe('SCORM2004Adapter', () => {
     const interaction0 = () =>
       valuesUnder(api.SetValue.mock.calls, 'cmi.interactions.0');
 
+    it('writes the question text as the description, cut to 250 characters', async () => {
+      adapter.reportInteraction(
+        'q1',
+        { type: 'true-false', response: true },
+        null,
+        'Is it?',
+      );
+      adapter.reportInteraction(
+        'q2',
+        { type: 'true-false', response: true },
+        null,
+        'x'.repeat(260),
+      );
+      adapter.reportInteraction(
+        'q3',
+        { type: 'true-false', response: true },
+        null,
+        '{lang=fr} Vrai?',
+      );
+      await flush();
+      const at = (n: number) =>
+        valuesUnder(api.SetValue.mock.calls, `cmi.interactions.${n}`);
+      expect(at(0).description).toBe('Is it?');
+      expect(at(1).description).toBe('x'.repeat(250));
+      expect(at(2)).not.toHaveProperty('description');
+    });
+
     it('writes choice interaction fields', async () => {
       adapter.reportInteraction(
         'q1',

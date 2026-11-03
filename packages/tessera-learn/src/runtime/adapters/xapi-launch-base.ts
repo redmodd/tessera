@@ -3,7 +3,7 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import type { Verdict } from '../types.js';
+import type { CourseConfig, Verdict } from '../types.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatPatterns } from '../interaction-format.js';
 import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
@@ -102,9 +102,9 @@ function linkedController(...signals: AbortSignal[]): AbortController {
   return controller;
 }
 
-type PublisherLaunchOptions = Pick<
+export type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
-  'sessionId' | 'cmi5Mode' | 'contextTemplate'
+  'sessionId' | 'cmi5Mode' | 'contextTemplate' | 'activityDefinition'
 >;
 
 /**
@@ -124,6 +124,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
+  protected config: CourseConfig | undefined;
 
   protected scaled: number | null = null;
   protected sessionSeconds = 0;
@@ -147,8 +148,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return this.#termination.signal.aborted;
   }
 
-  static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
+  static connect<T extends BaseXAPILaunchAdapter>(
+    this: new () => T,
+    config?: CourseConfig,
+  ): T | null {
     const adapter = new this();
+    adapter.config = config;
     const params = new URLSearchParams(window.location.search);
     const required = [
       'endpoint',
@@ -367,6 +372,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
+    text?: string,
   ): void {
     if (!this.publisher) return;
     const { interactionFormat } = this.profile;
@@ -376,6 +382,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
+    if (text) definition.description = { 'en-US': text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     const result: Record<string, unknown> = {};
     if (response !== null) result.response = response;
@@ -388,6 +395,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         definition,
       },
       ...(Object.keys(result).length > 0 && { result }),
+      context: { contextActivities: { parent: [{ id: this.#activityId }] } },
     });
   }
 

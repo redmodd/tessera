@@ -38,7 +38,7 @@ describe('StandaloneQuestion', () => {
     q.submit();
 
     expect(report).toHaveBeenCalledTimes(1);
-    expect(report).toHaveBeenCalledWith('q1', right, true);
+    expect(report).toHaveBeenCalledWith('q1', right, true, undefined);
     expect(markScore).toHaveBeenCalledTimes(1);
     expect(markScore).toHaveBeenCalledWith(100, expect.anything());
     expect(q.submitted).toBe(true);
@@ -74,7 +74,7 @@ describe('StandaloneQuestion', () => {
     const wrongQ = make({ response: () => wrong });
     wrongQ.q.submit();
     expect(wrongQ.q.correct).toBe(false);
-    expect(wrongQ.report).toHaveBeenCalledWith('q1', wrong, false);
+    expect(wrongQ.report).toHaveBeenCalledWith('q1', wrong, false, undefined);
     expect(wrongQ.markScore).toHaveBeenCalledWith(0, expect.anything());
 
     const scored = make({ response: () => wrong, score: () => 40 });
@@ -87,7 +87,7 @@ describe('StandaloneQuestion', () => {
     const { q, report, markScore } = make({ response: () => likert });
     q.submit();
 
-    expect(report).toHaveBeenCalledWith('q1', likert, null);
+    expect(report).toHaveBeenCalledWith('q1', likert, null, undefined);
     expect(markScore).toHaveBeenCalledWith(
       100,
       expect.objectContaining({ correct: null, unscored: true }),
@@ -118,7 +118,7 @@ describe('StandaloneQuestion', () => {
     q.commit();
 
     expect(report).toHaveBeenCalledTimes(2);
-    expect(report).toHaveBeenLastCalledWith('q1', right, true);
+    expect(report).toHaveBeenLastCalledWith('q1', right, true, undefined);
     expect(markScore).toHaveBeenCalledWith(100, expect.anything());
   });
 

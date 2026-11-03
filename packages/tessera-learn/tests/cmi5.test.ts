@@ -521,20 +521,25 @@ describe('CMI5Adapter', () => {
       },
     };
 
-    it('starts Answered from the template', async () => {
+    it('starts Answered from the template, with the AU as parent', async () => {
       const adapter = await initAdapter({ launchData });
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['a'], correct: ['a'] },
         true,
+        'Pick a',
       );
       await flush();
 
-      expect(statementFor('answered').context).toEqual({
+      const answered = statementFor('answered');
+      expect(answered.object.definition.description).toEqual({
+        'en-US': 'Pick a',
+      });
+      expect(answered.context).toEqual({
         registration: CMI5_LAUNCH.registration,
         contextActivities: {
           ...launchData.contextTemplate.contextActivities,
-          grouping: [{ id: publisherActivity }, { id: CMI5_LAUNCH.activityId }],
+          parent: [{ id: CMI5_LAUNCH.activityId }],
         },
         extensions: launchData.contextTemplate.extensions,
       });
@@ -629,7 +634,7 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
-    it('keeps the default grouping when the template grouping has no activities', async () => {
+    it('leaves out a template list with no activities', async () => {
       const adapter = await initAdapter({
         launchData: {
           contextTemplate: { contextActivities: { grouping: [{ id: 7 }] } },
@@ -641,9 +646,9 @@ describe('CMI5Adapter', () => {
         true,
       );
       await flush();
-      expect(
-        statementFor('answered').context.contextActivities.grouping,
-      ).toEqual([{ id: CMI5_LAUNCH.activityId }]);
+      expect(statementFor('answered').context.contextActivities).toEqual({
+        parent: [{ id: CMI5_LAUNCH.activityId }],
+      });
     });
 
     it('drops null template values and non-string string fields', async () => {

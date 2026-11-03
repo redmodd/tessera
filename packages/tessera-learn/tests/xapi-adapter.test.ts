@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
 import {
+  createConfig,
   flush,
   noDeadline,
   postedStatements,
@@ -404,6 +405,49 @@ describe('XAPIAdapter', () => {
     expect(posted()[0].object.id).toBe(
       'urn:tessera:au:abc#Question%201%23%C3%A9',
     );
+  });
+
+  it('sends the question text and puts the course in parent on Answered', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter();
+    await adapter.init();
+    await flush();
+    fetchMock.mockClear();
+
+    adapter.reportInteraction(
+      'q1',
+      { type: 'choice', response: ['a'], correct: ['a'] },
+      true,
+      'Pick a',
+    );
+    await flush();
+
+    const [answered] = posted();
+    expect(answered.object.definition.description).toEqual({
+      'en-US': 'Pick a',
+    });
+    expect(answered.context.contextActivities).toEqual({
+      parent: [{ id: 'urn:tessera:au:abc' }],
+    });
+  });
+
+  it('sends the course name and description on the course activity', async () => {
+    setXAPILaunch();
+    const adapter = XAPIAdapter.connect(
+      createConfig({ title: 'Safety 101', description: 'Shop floor basics' }),
+    )!;
+    await adapter.init();
+    await flush();
+
+    expect(posted()[0].object).toEqual({
+      id: 'urn:tessera:au:abc',
+      objectType: 'Activity',
+      definition: {
+        type: 'http://adlnet.gov/expapi/activities/course',
+        name: { 'en-US': 'Safety 101' },
+        description: { 'en-US': 'Shop floor basics' },
+      },
+    });
   });
 
   it('exit sends Terminated and stays on the page', async () => {

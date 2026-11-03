@@ -24,6 +24,7 @@ interface EngineProbe {
     id: string;
     interaction: Interaction;
     correct: boolean | null;
+    text?: string;
   }>;
 }
 
@@ -47,8 +48,8 @@ function makeEngine(
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
-    report: (id, interaction, correct) =>
-      reports.push({ id, interaction, correct }),
+    report: (id, interaction, correct, text) =>
+      reports.push({ id, interaction, correct, text }),
     onComplete: (score, answered) => {
       completed.push(score);
       responses.push(Object.fromEntries(answered));
@@ -217,6 +218,17 @@ describe('QuizEngine', () => {
 
     engine.submit();
     expect(reports).toHaveLength(2);
+  });
+
+  it('reports the question text the widget gives', () => {
+    const { engine, reports } = makeEngine();
+    engine.registerQuestion({
+      ...tfQuestion('a', true, true),
+      text: () => 'Is the sky blue?',
+    });
+    engine.setAnswer(0, true);
+    engine.submit();
+    expect(reports[0].text).toBe('Is the sky blue?');
   });
 
   it('submit() reports any questions whose widget never called commit()', () => {

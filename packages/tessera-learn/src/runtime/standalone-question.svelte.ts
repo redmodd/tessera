@@ -151,7 +151,7 @@ export class StandaloneQuestion implements UseQuestionHandle {
   #report(response: Interaction, correct: boolean | null): void {
     const fingerprint = JSON.stringify(response);
     if (this.#reported === fingerprint) return;
-    this.#deps.report(this.#opts.id, response, correct);
+    this.#deps.report(this.#opts.id, response, correct, this.#opts.text);
     this.#reported = fingerprint;
   }
 

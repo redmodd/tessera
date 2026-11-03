@@ -22,7 +22,10 @@ export interface CreateAdapterOptions {
   manifest?: Manifest;
 }
 
-const LMS_ADAPTERS: Record<LMSStandard, { connect(): BaseAdapter | null }> = {
+const LMS_ADAPTERS: Record<
+  LMSStandard,
+  { connect(config: CourseConfig): BaseAdapter | null }
+> = {
   scorm12: SCORM12Adapter,
   scorm2004: SCORM2004Adapter,
   cmi5: CMI5Adapter,
@@ -47,7 +50,7 @@ export function createAdapter(
   const allowFallback = options.allowFallback ?? import.meta.env?.DEV === true;
   const profile = standardProfile(config.export?.standard);
   if (profile?.packaged) {
-    const adapter = LMS_ADAPTERS[profile.id].connect();
+    const adapter = LMS_ADAPTERS[profile.id].connect(config);
     if (adapter) return adapter;
     if (!allowFallback) throw missingApiError(profile.id);
     console.warn(

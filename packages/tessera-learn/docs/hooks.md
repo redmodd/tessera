@@ -135,6 +135,7 @@ Register a question widget so the runtime can submit, score, persist, and report
 ```ts
 function useQuestion(opts: {
   id: string; // unique on the page; LMS interaction id (letters, digits, inner underscores)
+  text?: string; // the question as the learner reads it; the LMS shows it as the interaction's description (not in SCORM 1.2)
   graded?: boolean; // standalone only
   response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)

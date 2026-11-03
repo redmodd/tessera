@@ -100,7 +100,7 @@ beforeEach(() => {
 // ============ useQuestion (standalone) ============
 
 describe('useQuestion — standalone mode', () => {
-  it('reports the interaction through the adapter on submit', () => {
+  it('reports the interaction and question text through the adapter on submit', () => {
     const { adapter } = provideNavCtx();
 
     const interaction: Interaction = {
@@ -108,13 +108,18 @@ describe('useQuestion — standalone mode', () => {
       response: ['a'],
       correct: ['a'],
     };
-    const q = useQuestion({ id: 'q1', response: () => interaction });
+    const q = useQuestion({
+      id: 'q1',
+      text: 'Pick a',
+      response: () => interaction,
+    });
     q.submit();
 
     expect(adapter.reportInteraction).toHaveBeenCalledWith(
       'q1',
       interaction,
       true,
+      'Pick a',
     );
     expect(q.submitted).toBe(true);
     expect(q.correct).toBe(true);
@@ -164,6 +169,7 @@ describe('useQuestion — standalone mode', () => {
       'q1',
       interaction,
       false,
+      undefined,
     );
 
     vi.stubEnv('DEV', false);

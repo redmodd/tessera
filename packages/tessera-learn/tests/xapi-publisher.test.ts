@@ -147,6 +147,28 @@ describe('XAPIPublisher — buildStatement', () => {
       { id: 'https://example.com/courses/1' },
     ]);
   });
+  it('leaves grouping out when the activity is already the parent', async () => {
+    const pub = await initPublisher();
+    const course = { id: 'https://example.com/courses/1' };
+    const s = pub.buildStatement({
+      verb: { id: 'http://verb/a' },
+      context: { contextActivities: { parent: [course] } },
+    });
+    expect(s.context?.contextActivities).toEqual({ parent: [course] });
+  });
+  it('sends activityDefinition on the default object only', async () => {
+    const definition = { name: { 'en-US': 'Course' } };
+    const pub = await initPublisher({ activityDefinition: definition });
+    expect(
+      pub.buildStatement({ verb: { id: 'http://verb/a' } }).object.definition,
+    ).toEqual(definition);
+    expect(
+      pub.buildStatement({
+        verb: { id: 'http://verb/a' },
+        object: { id: 'https://example.com/other' },
+      }).object.definition,
+    ).toBeUndefined();
+  });
   it('attaches cmi5 sessionid extension under cmi5Mode', async () => {
     const pub = await initPublisher({ cmi5Mode: true, sessionId: 'sess-42' });
     const s = pub.buildStatement({ verb: { id: 'http://verb/a' } });
