@@ -15,8 +15,16 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   protected readonly credentialLabel =
     "credential from launch parameter 'auth'";
 
-  constructor(private readonly config: CourseConfig) {
+  /** The course definition tincan.xml declares, for an LRS that never reads the package. */
+  readonly #activityDefinition: Record<string, unknown>;
+
+  constructor({ title, description }: CourseConfig) {
     super();
+    this.#activityDefinition = {
+      type: XAPI_COURSE_TYPE,
+      name: { 'en-US': title },
+      ...(description && { description: { 'en-US': description } }),
+    };
   }
 
   protected async resolveAuth(auth: string): Promise<string> {
@@ -25,15 +33,7 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
     return auth.replace(/^Basic(\s+|$)/i, '');
   }
 
-  /** The course definition tincan.xml declares, for an LRS that never reads the package. */
   protected override async prepareLaunch() {
-    const { title, description } = this.config;
-    return {
-      activityDefinition: {
-        type: XAPI_COURSE_TYPE,
-        name: { 'en-US': title },
-        ...(description && { description: { 'en-US': description } }),
-      },
-    };
+    return { activityDefinition: this.#activityDefinition };
   }
 }

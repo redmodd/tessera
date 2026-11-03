@@ -650,6 +650,9 @@ describe('CMI5Adapter', () => {
       expect(statementFor('answered').context.contextActivities).toEqual({
         parent: [{ id: CMI5_LAUNCH.activityId }],
       });
+      expect(
+        statementFor('initialized').context.contextActivities.grouping,
+      ).toEqual([{ id: CMI5_LAUNCH.activityId }]);
     });
 
     it('drops null template values and non-string string fields', async () => {
