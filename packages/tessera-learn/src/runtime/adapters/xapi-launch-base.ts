@@ -383,7 +383,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.dispatch('Answered', {
       verb: { id: VERBS.answered, display: { 'en-US': 'answered' } },
       object: {
-        id: `${this.#activityId}#${questionId}`,
+        id: `${this.#activityId}#${encodeURIComponent(questionId)}`,
         objectType: 'Activity',
         definition,
       },

@@ -1189,6 +1189,17 @@ describe('CMI5Adapter', () => {
       expect(body.result.success).toBe(false);
     });
 
+    it('percent-encodes the question id into a valid IRI fragment', async () => {
+      const body = await initAndReport(
+        'Question 1#é',
+        { type: 'choice', response: ['a'], correct: ['a'] },
+        true,
+      );
+      expect(body.object.id).toBe(
+        'https://example.com/course/1#Question%201%23%C3%A9',
+      );
+    });
+
     it('passes named identifiers through to result.response unchanged (xAPI has no CMIIdentifier validation)', async () => {
       const body = await initAndReport(
         'q1',
