@@ -19,6 +19,7 @@ import {
 } from '../xapi/agent-rules.js';
 import type {
   XAPIAgent,
+  XAPIContext,
   PartialStatement,
   DestinationOutcome,
 } from '../xapi/types.js';
@@ -211,7 +212,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   /** Profile context for a Defined Statement. Plain xAPI adds nothing — the publisher injects context.registration on its own. */
   protected buildContext(
     _opts: { moveOn?: boolean; mastery?: boolean } = {},
-  ): Record<string, unknown> | undefined {
+  ): XAPIContext | undefined {
     return undefined;
   }
 

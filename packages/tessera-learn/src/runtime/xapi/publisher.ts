@@ -4,6 +4,7 @@ import type {
   PartialStatement,
   SendStatementOptions,
   XAPIContext,
+  XAPIObject,
   SendStatementResult,
   DestinationOutcome,
 } from './types.js';
@@ -46,7 +47,7 @@ export interface XAPIPublisherOptions {
   sessionId?: string;
   /**
    * When true, every statement carries the cmi5 sessionid context extension.
-   * Set by the cmi5 adapter and by 'lms'-inherited destinations under cmi5.
+   * Set by the cmi5 adapter.
    */
   cmi5Mode?: boolean;
   /** cmi5 §10.2.1: the LMS `contextTemplate` every statement's context starts from. */
@@ -100,7 +101,7 @@ export function toActivityList(value: unknown): Array<{ id: string }> {
 function applyTemplate(
   template: XAPIContext,
   ctx: XAPIContext,
-  activityObject: boolean,
+  object: XAPIObject,
 ): XAPIContext {
   const activities: Record<string, Array<{ id: string }>> = {
     ...ctx.contextActivities,
@@ -114,7 +115,7 @@ function applyTemplate(
   const { revision: _revision, platform: _platform, ...rest } = template;
   return {
     ...ctx,
-    ...(activityObject ? template : rest),
+    ...((object.objectType ?? 'Activity') === 'Activity' ? template : rest),
     contextActivities: activities,
     extensions: { ...ctx.extensions, ...template.extensions },
   };
@@ -298,13 +299,10 @@ export class XAPIPublisher {
       id: this.#activityId,
       objectType: 'Activity',
     };
+    const userCtx = partial.context ?? {};
     const baseCtx = this.#contextTemplate
-      ? applyTemplate(
-          this.#contextTemplate,
-          partial.context ?? {},
-          (object.objectType ?? 'Activity') === 'Activity',
-        )
-      : (partial.context ?? {});
+      ? applyTemplate(this.#contextTemplate, userCtx, object)
+      : userCtx;
     const baseActivities = baseCtx.contextActivities ?? {};
     const grouping = baseActivities.grouping ?? [{ id: this.#activityId }];
 

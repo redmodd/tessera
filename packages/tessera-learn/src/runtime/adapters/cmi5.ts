@@ -272,7 +272,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
    */
   protected override buildContext(
     opts: { moveOn?: boolean; mastery?: boolean } = {},
-  ): Record<string, unknown> {
+  ): XAPIContext {
     const category = [{ id: CMI5_CATEGORY_CMI5, objectType: 'Activity' }];
     if (opts.moveOn) {
       category.push({ id: CMI5_CATEGORY_MOVEON, objectType: 'Activity' });
