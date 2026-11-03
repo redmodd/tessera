@@ -46,10 +46,7 @@ function readContextTemplate(raw: unknown): XAPIContext | undefined {
   const { contextActivities, extensions, ...rest } = raw;
   const activities = Object.entries(
     isRecord(contextActivities) ? contextActivities : {},
-  )
-    .map(([key, list]) => [key, toActivityList(list)] as const)
-    // An empty list would hide the publisher's default grouping.
-    .filter(([, list]) => list.length > 0);
+  ).map(([key, list]) => [key, toActivityList(list)]);
   return {
     // null is never a valid xAPI context value.
     ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== null)),
