@@ -44,7 +44,7 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
-    // localized_string_type, SPM 250. scorm-again rejects one starting with `{lang=` even after a tag.
+    // localized_string_type, SPM 250. A leading `{lang=` is read as a language tag or rejected, and no tag can escape it.
     description: (text) =>
       text.startsWith('{lang=') ? null : cutText(text, 250),
   },
