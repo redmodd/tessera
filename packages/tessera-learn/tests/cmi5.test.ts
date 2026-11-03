@@ -575,6 +575,73 @@ describe('CMI5Adapter', () => {
         { id: CMI5_CAT, objectType: 'Activity' },
       ]);
     });
+
+    it('skips template activities that are not objects with an id', async () => {
+      await initAdapter({
+        launchData: {
+          contextTemplate: {
+            contextActivities: {
+              category: [null, 'x', { id: 7 }, { id: 'https://lms/cat' }],
+            },
+          },
+        },
+      });
+      expect(
+        statementFor('initialized').context.contextActivities.category,
+      ).toEqual([
+        { id: 'https://lms/cat' },
+        { id: CMI5_CAT, objectType: 'Activity' },
+      ]);
+    });
+
+    it('reads a single template activity object as a one-item list', async () => {
+      await initAdapter({
+        launchData: {
+          contextTemplate: {
+            contextActivities: { grouping: { id: publisherActivity } },
+          },
+        },
+      });
+      expect(
+        statementFor('initialized').context.contextActivities.grouping,
+      ).toEqual([{ id: publisherActivity }]);
+    });
+
+    it('reads a single author activity object as a one-item list', async () => {
+      const adapter = await initAdapter({ launchData });
+      await adapter.launchPublisher()!.sendStatement({
+        verb: { id: `${VERB}experienced` },
+        context: {
+          contextActivities: {
+            grouping: { id: 'https://author/group' } as never,
+          },
+        },
+      });
+      expect(
+        statementFor('experienced').context.contextActivities.grouping,
+      ).toEqual([{ id: publisherActivity }, { id: 'https://author/group' }]);
+    });
+
+    it('ignores a template that is not an object', async () => {
+      await initAdapter({ launchData: { contextTemplate: 'x' } });
+      const { context } = statementFor('initialized');
+      expect(Object.keys(context).sort()).toEqual([
+        'contextActivities',
+        'extensions',
+        'registration',
+      ]);
+    });
+
+    it('sends the template session id exactly as the LMS wrote it', async () => {
+      await initAdapter({
+        launchData: {
+          contextTemplate: { extensions: { [SESSION_ID_EXT]: ' abc ' } },
+        },
+      });
+      expect(
+        statementFor('initialized').context.extensions[SESSION_ID_EXT],
+      ).toBe(' abc ');
+    });
   });
 
   it('falls back to a minted UUID when LMS.LaunchData has no session id', async () => {

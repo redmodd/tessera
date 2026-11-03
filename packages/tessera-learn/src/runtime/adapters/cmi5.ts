@@ -3,7 +3,7 @@ import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { CMI5_SESSIONID_EXT } from '../xapi/publisher.js';
 import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
-import type { Verdict } from '../types.js';
+import { isRecord, type Verdict } from '../types.js';
 import type { XAPIContext } from '../xapi/types.js';
 
 const CMI5_MASTERYSCORE_EXT =
@@ -32,13 +32,34 @@ const CMI5_LEARNER_PREFS_PROFILE_ID = 'cmi5LearnerPreferences';
 
 /** cmi5 §10 `LMS.LaunchData` document. `contextTemplate` is the base context for every statement to the LMS (§10.2.1). */
 interface CMI5LaunchData {
-  contextTemplate?: XAPIContext;
+  contextTemplate?: unknown;
   launchMode?: CMI5LaunchMode;
   launchMethod?: 'OwnWindow' | 'AnyWindow';
   returnURL?: string;
   masteryScore?: number;
   entitlementKey?: Record<string, string>;
   [k: string]: unknown;
+}
+
+const isActivity = (a: unknown): a is { id: string } =>
+  isRecord(a) && typeof a.id === 'string';
+
+/** xAPI 1.0.3 §2.4.6.2 allows a single Activity in place of a list; entries without a string id are dropped. */
+function readContextTemplate(raw: unknown): XAPIContext | undefined {
+  if (!isRecord(raw)) return undefined;
+  const { contextActivities, extensions } = raw;
+  return {
+    ...raw,
+    contextActivities: isRecord(contextActivities)
+      ? Object.fromEntries(
+          Object.entries(contextActivities).map(([key, list]) => [
+            key,
+            [list].flat().filter(isActivity),
+          ]),
+        )
+      : undefined,
+    extensions: isRecord(extensions) ? extensions : undefined,
+  };
 }
 
 /**
@@ -170,14 +191,12 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
         this.masteryScore = launchMastery;
       }
     }
-    const session =
-      launchData?.contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
-    const sessionId =
-      typeof session === 'string' ? session.trim() || undefined : undefined;
+    const contextTemplate = readContextTemplate(launchData?.contextTemplate);
+    const session = contextTemplate?.extensions?.[CMI5_SESSIONID_EXT];
     return {
-      sessionId,
+      sessionId: typeof session === 'string' && session ? session : undefined,
       cmi5Mode: true,
-      contextTemplate: launchData?.contextTemplate,
+      contextTemplate,
     };
   }
 

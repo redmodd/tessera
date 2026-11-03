@@ -93,9 +93,9 @@ function applyTemplate(template: XAPIContext, ctx: XAPIContext): XAPIContext {
     ...ctx.contextActivities,
   };
   for (const [key, list] of Object.entries(template.contextActivities ?? {})) {
-    if (!Array.isArray(list)) continue;
     const ids = new Set(list.map((a) => a.id));
-    const added = (activities[key] ?? []).filter((a) => !ids.has(a.id));
+    // An author may pass a single Activity in place of a list (xAPI §2.4.6.2).
+    const added = [activities[key] ?? []].flat().filter((a) => !ids.has(a?.id));
     activities[key] = [...list, ...added];
   }
   return {
