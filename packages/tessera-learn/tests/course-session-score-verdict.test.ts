@@ -41,7 +41,7 @@ describe('a graded submit that decides the verdict', () => {
     const verbs = (): string[] =>
       postedStatements(fetch).map((s) => s.verb.display['en-US']);
 
-    const progress = await start(new XAPIAdapter());
+    const progress = await start(new XAPIAdapter(createConfig()));
     await vi.waitFor(() => expect(verbs()).toContain('initialized'));
     fetch.mockClear();
 

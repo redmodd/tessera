@@ -14,7 +14,11 @@ import {
   resolveSuccess,
   type CourseConfig,
 } from '../runtime/types.js';
-import type { LMSStandard, StandardProfile } from '../runtime/standards.js';
+import {
+  XAPI_COURSE_TYPE,
+  type LMSStandard,
+  type StandardProfile,
+} from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 
 function slugify(text: string): string {
@@ -221,7 +225,7 @@ export function generateTincanXml(config: ExportConfig): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <tincan xmlns="http://projecttincan.com/tincan.xsd">
   <activities>
-    <activity id="${auId}" type="http://adlnet.gov/expapi/activities/course">
+    <activity id="${auId}" type="${XAPI_COURSE_TYPE}">
       <name>${title}</name>
       <description lang="en-US">${description}</description>
       <launch lang="en-US">index.html</launch>

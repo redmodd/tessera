@@ -6,6 +6,7 @@ import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
 import {
   CMI5_LAUNCH,
   cmi5Fetch,
+  createConfig,
   flush,
   noDeadline,
   postedStatements,
@@ -53,7 +54,7 @@ function pendingUntilAborted(init?: RequestInit): Promise<Response> {
 describe('CMI5Adapter.connect', () => {
   it('connects when all params are present', () => {
     setLaunchParams(CMI5_LAUNCH);
-    expect(CMI5Adapter.connect()).toBeInstanceOf(CMI5Adapter);
+    expect(CMI5Adapter.connect(createConfig())).toBeInstanceOf(CMI5Adapter);
   });
 
   it.each(['fetch', 'endpoint', 'activityId', 'actor'] as const)(
@@ -61,13 +62,13 @@ describe('CMI5Adapter.connect', () => {
     (param) => {
       const { [param]: _, ...rest } = CMI5_LAUNCH;
       setLaunchParams(rest);
-      expect(CMI5Adapter.connect()).toBeNull();
+      expect(CMI5Adapter.connect(createConfig())).toBeNull();
     },
   );
 
   it('returns null with empty search', () => {
     setLaunchParams();
-    expect(CMI5Adapter.connect()).toBeNull();
+    expect(CMI5Adapter.connect(createConfig())).toBeNull();
   });
 });
 

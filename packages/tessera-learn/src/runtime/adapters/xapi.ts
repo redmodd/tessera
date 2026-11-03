@@ -1,8 +1,6 @@
-import {
-  BaseXAPILaunchAdapter,
-  type PublisherLaunchOptions,
-} from './xapi-launch-base.js';
-import { STANDARDS } from '../standards.js';
+import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
+import { STANDARDS, XAPI_COURSE_TYPE } from '../standards.js';
+import type { CourseConfig } from '../types.js';
 
 /**
  * Plain xAPI ("Tin Can") launch adapter. Reads launch params straight off the
@@ -17,6 +15,10 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   protected readonly credentialLabel =
     "credential from launch parameter 'auth'";
 
+  constructor(private readonly config: CourseConfig) {
+    super();
+  }
+
   protected async resolveAuth(auth: string): Promise<string> {
     // Tin Can launch passes `auth` as the full "Basic <base64>" header value;
     // strip the scheme so we don't double-prefix it when sending.
@@ -24,12 +26,11 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   }
 
   /** The course definition tincan.xml declares, for an LRS that never reads the package. */
-  protected override async prepareLaunch(): Promise<PublisherLaunchOptions> {
-    if (!this.config) return {};
+  protected override async prepareLaunch() {
     const { title, description } = this.config;
     return {
       activityDefinition: {
-        type: 'http://adlnet.gov/expapi/activities/course',
+        type: XAPI_COURSE_TYPE,
         name: { 'en-US': title },
         ...(description && { description: { 'en-US': description } }),
       },

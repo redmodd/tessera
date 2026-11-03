@@ -23,7 +23,7 @@ const saved = { b: 0, v: [0], d: 100, f: structureFingerprint(manifest) };
 
 function xapiLaunch() {
   setXAPILaunch();
-  return new XAPIAdapter();
+  return new XAPIAdapter(createConfig());
 }
 
 const quizCourse = () =>

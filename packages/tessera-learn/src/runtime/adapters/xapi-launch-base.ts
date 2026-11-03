@@ -102,7 +102,7 @@ function linkedController(...signals: AbortSignal[]): AbortController {
   return controller;
 }
 
-export type PublisherLaunchOptions = Pick<
+type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
   'sessionId' | 'cmi5Mode' | 'contextTemplate' | 'activityDefinition'
 >;
@@ -124,7 +124,6 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   /** Prefix for this adapter's console warnings (e.g. "cmi5", "xAPI"). */
   protected abstract readonly logName: string;
   protected abstract readonly profile: (typeof STANDARDS)[LaunchLRSStandard];
-  protected config: CourseConfig | undefined;
 
   protected scaled: number | null = null;
   protected sessionSeconds = 0;
@@ -149,11 +148,10 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   }
 
   static connect<T extends BaseXAPILaunchAdapter>(
-    this: new () => T,
-    config?: CourseConfig,
+    this: new (config: CourseConfig) => T,
+    config: CourseConfig,
   ): T | null {
-    const adapter = new this();
-    adapter.config = config;
+    const adapter = new this(config);
     const params = new URLSearchParams(window.location.search);
     const required = [
       'endpoint',

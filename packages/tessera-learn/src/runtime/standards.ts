@@ -17,6 +17,8 @@ export type StandardId = (typeof STANDARD_IDS)[number];
 
 export const DEFAULT_STANDARD = 'web' satisfies StandardId;
 
+export const XAPI_COURSE_TYPE = 'http://adlnet.gov/expapi/activities/course';
+
 interface ProfileShape {
   id: StandardId;
   name: string;

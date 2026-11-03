@@ -21,7 +21,7 @@ const posted = () => postedStatements(fetchMock);
 
 async function sentActor(actor: unknown) {
   setXAPILaunch({ actor: JSON.stringify(actor) });
-  const adapter = new XAPIAdapter();
+  const adapter = new XAPIAdapter(createConfig());
   await adapter.init();
   adapter.setCompletionStatus('complete');
   adapter.commit();
@@ -43,7 +43,7 @@ const TIN_CAN_ACCOUNT = [
 describe('XAPIAdapter.connect', () => {
   it('connects when all params are present', () => {
     setXAPILaunch();
-    expect(XAPIAdapter.connect()).toBeInstanceOf(XAPIAdapter);
+    expect(XAPIAdapter.connect(createConfig())).toBeInstanceOf(XAPIAdapter);
   });
 
   it.each(['endpoint', 'auth', 'actor', 'activity_id'] as const)(
@@ -51,19 +51,19 @@ describe('XAPIAdapter.connect', () => {
     (param) => {
       const { [param]: _, ...rest } = XAPI_LAUNCH;
       setLaunchParams(rest);
-      expect(XAPIAdapter.connect()).toBeNull();
+      expect(XAPIAdapter.connect(createConfig())).toBeNull();
     },
   );
 
   it('returns null when activity_id is empty', () => {
     setXAPILaunch({ activity_id: '' });
-    expect(XAPIAdapter.connect()).toBeNull();
+    expect(XAPIAdapter.connect(createConfig())).toBeNull();
   });
 
   it('returns null for a cmi5 launch, which names the activity activityId', () => {
     const { activity_id, ...rest } = XAPI_LAUNCH;
     setLaunchParams({ ...rest, activityId: activity_id });
-    expect(XAPIAdapter.connect()).toBeNull();
+    expect(XAPIAdapter.connect(createConfig())).toBeNull();
   });
 });
 
@@ -75,7 +75,7 @@ describe('XAPIAdapter', () => {
 
   it('parses snake_case Tin Can launch params and sends the version header', async () => {
     setXAPILaunch({ registration: '2d8b1e1e-0000-4000-8000-000000000000' });
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     adapter.setCompletionStatus('complete');
     adapter.commit();
@@ -95,7 +95,7 @@ describe('XAPIAdapter', () => {
         objectType: 'Agent',
       }),
     });
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await adapter.loadState();
     adapter.setCompletionStatus('complete');
@@ -219,7 +219,7 @@ describe('XAPIAdapter', () => {
 
   it('sends nothing after init rejects an actor it cannot reshape', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await expect(adapter.init()).rejects.toThrow(/actor/);
     adapter.setCompletionStatus('complete');
     adapter.commit();
@@ -229,14 +229,16 @@ describe('XAPIAdapter', () => {
 
   it('throws on malformed actor JSON', async () => {
     setXAPILaunch({ actor: 'not-json' });
-    await expect(new XAPIAdapter().init()).rejects.toThrow(/actor/);
+    await expect(new XAPIAdapter(createConfig()).init()).rejects.toThrow(
+      /actor/,
+    );
   });
 
   it('rejects a launch actor left with no IFI, blaming the launch param', async () => {
     setXAPILaunch({
       actor: JSON.stringify({ objectType: 'Person', name: ['Learner Name'] }),
     });
-    await expect(new XAPIAdapter().init()).rejects.toThrow(
+    await expect(new XAPIAdapter(createConfig()).init()).rejects.toThrow(
       /launch parameter 'actor' is malformed \(actor: must have one of mbox/,
     );
     expect(calls('/xapi')).toHaveLength(0);
@@ -244,7 +246,7 @@ describe('XAPIAdapter', () => {
 
   it('rejects a relative endpoint before any request', async () => {
     setXAPILaunch({ endpoint: '/lrs' });
-    await expect(new XAPIAdapter().init()).rejects.toThrow(
+    await expect(new XAPIAdapter(createConfig()).init()).rejects.toThrow(
       /launch parameter 'endpoint' is not an absolute http\(s\) URL/,
     );
     expect(fetchMock).not.toHaveBeenCalled();
@@ -254,7 +256,7 @@ describe('XAPIAdapter', () => {
     'rejects an auth param of %j, which carries only the scheme, before any request',
     async (auth) => {
       setXAPILaunch({ auth });
-      await expect(XAPIAdapter.connect()!.init()).rejects.toThrow(
+      await expect(XAPIAdapter.connect(createConfig())!.init()).rejects.toThrow(
         /launch parameter 'auth' must be a non-empty string/,
       );
       expect(fetchMock).not.toHaveBeenCalled();
@@ -263,7 +265,7 @@ describe('XAPIAdapter', () => {
 
   it('stops State API writes after the actor fails validation', async () => {
     setXAPILaunch({ actor: JSON.stringify({ name: 'Learner Name' }) });
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await expect(adapter.init()).rejects.toThrow(/actor/);
     adapter.saveState({ page: 1 } as never);
     await flush();
@@ -272,7 +274,7 @@ describe('XAPIAdapter', () => {
 
   it('sends a scored statement when the score changes without a Passed/Failed', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await flush();
     fetchMock.mockClear();
@@ -298,7 +300,7 @@ describe('XAPIAdapter', () => {
 
   it('sends the cumulative time on every statement, Terminated included', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await adapter.loadState();
     await flush();
@@ -325,7 +327,7 @@ describe('XAPIAdapter', () => {
 
   it('builds status statements on commit, whatever order the setters ran in', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await adapter.loadState();
     await flush();
@@ -350,7 +352,7 @@ describe('XAPIAdapter', () => {
 
   it('sends no duration while the saved state is unread', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await flush();
     fetchMock.mockClear();
@@ -374,7 +376,7 @@ describe('XAPIAdapter', () => {
 
   it('does not re-send the resumed score on launch', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await flush();
     fetchMock.mockClear();
@@ -390,7 +392,7 @@ describe('XAPIAdapter', () => {
 
   it('percent-encodes the question id in the Answered object id', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await flush();
     fetchMock.mockClear();
@@ -409,7 +411,7 @@ describe('XAPIAdapter', () => {
 
   it('sends the question text and puts the course in parent on Answered', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await flush();
     fetchMock.mockClear();
@@ -452,7 +454,7 @@ describe('XAPIAdapter', () => {
 
   it('exit sends Terminated and stays on the page', async () => {
     setXAPILaunch();
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
     await flush();
 
