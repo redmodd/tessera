@@ -108,7 +108,9 @@ function applyTemplate(
   };
   for (const [key, list] of Object.entries(template.contextActivities ?? {})) {
     const ids = new Set(list.map((a) => a.id));
-    const added = toActivityList(activities[key]).filter((a) => !ids.has(a.id));
+    const added = [activities[key] ?? []]
+      .flat()
+      .filter((a) => !(isActivity(a) && ids.has(a.id)));
     activities[key] = [...list, ...added];
   }
   // xAPI §2.4.6: revision and platform are only allowed with an Activity object.
@@ -300,19 +302,18 @@ export class XAPIPublisher {
       objectType: 'Activity',
     };
     const userCtx = partial.context ?? {};
-    const baseCtx = this.#contextTemplate
-      ? applyTemplate(this.#contextTemplate, userCtx, object)
-      : userCtx;
-    const baseActivities = baseCtx.contextActivities ?? {};
-    const grouping = baseActivities.grouping ?? [{ id: this.#activityId }];
-
-    const context: NonNullable<Statement['context']> = {
-      ...baseCtx,
+    const ctx: XAPIContext = {
+      ...userCtx,
       contextActivities: {
-        ...baseActivities,
-        grouping,
+        ...userCtx.contextActivities,
+        grouping: userCtx.contextActivities?.grouping ?? [
+          { id: this.#activityId },
+        ],
       },
     };
+    const context = this.#contextTemplate
+      ? applyTemplate(this.#contextTemplate, ctx, object)
+      : ctx;
     if (this.#registration && context.registration === undefined) {
       context.registration = this.#registration;
     }

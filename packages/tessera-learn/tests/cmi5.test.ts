@@ -501,6 +501,7 @@ describe('CMI5Adapter', () => {
     expect(initialized.context.extensions[SESSION_ID_EXT]).toBe(lmsSession);
     expect(initialized.context.contextActivities.grouping).toEqual([
       { id: publisherActivity },
+      { id: CMI5_LAUNCH.activityId },
     ]);
   });
 
@@ -531,7 +532,10 @@ describe('CMI5Adapter', () => {
 
       expect(statementFor('answered').context).toEqual({
         registration: CMI5_LAUNCH.registration,
-        contextActivities: launchData.contextTemplate.contextActivities,
+        contextActivities: {
+          ...launchData.contextTemplate.contextActivities,
+          grouping: [{ id: publisherActivity }, { id: CMI5_LAUNCH.activityId }],
+        },
         extensions: launchData.contextTemplate.extensions,
       });
     });
@@ -592,14 +596,17 @@ describe('CMI5Adapter', () => {
         },
       });
       const { contextActivities } = statementFor('initialized').context;
-      expect(contextActivities.grouping).toEqual([{ id: publisherActivity }]);
+      expect(contextActivities.grouping).toEqual([
+        { id: publisherActivity },
+        { id: CMI5_LAUNCH.activityId },
+      ]);
       expect(contextActivities.category).toEqual([
         { id: 'https://lms/cat' },
         { id: CMI5_CAT, objectType: 'Activity' },
       ]);
     });
 
-    it('reads a single author activity as a list and skips entries without an id', async () => {
+    it('reads a single author activity as a list and sends malformed entries as written', async () => {
       const adapter = await initAdapter({ launchData });
       await adapter.launchPublisher()!.sendStatement({
         verb: { id: `${VERB}experienced` },
@@ -615,9 +622,11 @@ describe('CMI5Adapter', () => {
         { id: publisherActivity },
         { id: 'https://author/group' },
       ]);
-      expect(contextActivities.category).toEqual(
-        launchData.contextTemplate.contextActivities.category,
-      );
+      expect(contextActivities.category).toEqual([
+        ...launchData.contextTemplate.contextActivities.category,
+        null,
+        { id: 7 },
+      ]);
     });
 
     it('keeps the default grouping when the template grouping has no activities', async () => {
