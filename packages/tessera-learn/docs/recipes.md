@@ -174,7 +174,7 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
       type: 'choice',
       response: selected !== null ? [String(selected)] : [],
       correct: correct === undefined ? undefined : [String(correct)],
-      options: options.map((_, i) => String(i)),
+      options: options.map((text, i) => ({ id: String(i), text })),
     }),
     reset: () => {
       selected = null;

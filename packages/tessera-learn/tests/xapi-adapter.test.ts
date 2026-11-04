@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
+import type { Interaction } from '../src/runtime/interaction.js';
 import {
   createConfig,
   flush,
@@ -431,6 +432,105 @@ describe('XAPIAdapter', () => {
     expect(answered.context.contextActivities).toEqual({
       parent: [{ id: 'urn:tessera:au:abc' }],
     });
+  });
+
+  it.each<[Interaction, Record<string, unknown>]>([
+    [
+      {
+        type: 'choice',
+        response: ['0'],
+        options: [{ id: '0', text: '3' }, '1'],
+      },
+      { choices: [{ id: '0', description: { 'en-US': '3' } }, { id: '1' }] },
+    ],
+    [
+      {
+        type: 'sequencing',
+        response: ['b', 'a'],
+        options: [
+          { id: 'a', text: 'First' },
+          { id: 'b', text: 'Second' },
+        ],
+      },
+      {
+        choices: [
+          { id: 'a', description: { 'en-US': 'First' } },
+          { id: 'b', description: { 'en-US': 'Second' } },
+        ],
+      },
+    ],
+    [
+      {
+        type: 'matching',
+        response: [['0', '0']],
+        optionPairs: {
+          left: [{ id: '0', text: 'Hydrogen' }],
+          right: [{ id: '0', text: 'H' }],
+        },
+      },
+      {
+        source: [{ id: '0', description: { 'en-US': 'Hydrogen' } }],
+        target: [{ id: '0', description: { 'en-US': 'H' } }],
+      },
+    ],
+    [
+      {
+        type: 'likert',
+        response: 'agree',
+        options: [{ id: 'agree', text: 'Agree' }],
+      },
+      { scale: [{ id: 'agree', description: { 'en-US': 'Agree' } }] },
+    ],
+    [
+      {
+        type: 'performance',
+        response: [['mix', 2]],
+        options: [{ id: 'mix', text: 'Mix the batter' }],
+      },
+      { steps: [{ id: 'mix', description: { 'en-US': 'Mix the batter' } }] },
+    ],
+  ])(
+    'sends %o option text as interaction components',
+    async (interaction, lists) => {
+      setXAPILaunch();
+      const adapter = new XAPIAdapter(createConfig());
+      await adapter.init();
+      await flush();
+      fetchMock.mockClear();
+
+      adapter.reportInteraction('q1', interaction, null);
+      await flush();
+
+      expect(posted()[0].object.definition).toMatchObject(lists);
+    },
+  );
+
+  it('leaves out a component list whose ids repeat', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    setXAPILaunch();
+    const adapter = new XAPIAdapter(createConfig());
+    await adapter.init();
+    await flush();
+    fetchMock.mockClear();
+
+    adapter.reportInteraction(
+      'q1',
+      {
+        type: 'choice',
+        response: ['a'],
+        options: [
+          { id: 'a', text: 'Yes' },
+          { id: 'a', text: 'No' },
+        ],
+      },
+      null,
+    );
+    await flush();
+
+    expect(posted()[0].object.definition.choices).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"q1" leaves its choices list out'),
+    );
   });
 
   it('sends the course name and description on the course activity', async () => {

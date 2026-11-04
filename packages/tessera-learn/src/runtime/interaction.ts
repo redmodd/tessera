@@ -11,7 +11,7 @@ export type Interaction =
       type: 'choice';
       response: string[];
       correct?: string[];
-      options?: string[];
+      options?: InteractionOption[];
     }
   | { type: 'true-false'; response: boolean; correct?: boolean }
   | {
@@ -30,28 +30,41 @@ export type Interaction =
       type: 'matching';
       response: Array<[string, string]>;
       correct?: Array<[string, string]>;
-      optionPairs?: { left: string[]; right: string[] };
+      optionPairs?: { left: InteractionOption[]; right: InteractionOption[] };
     }
   | {
       type: 'sequencing';
       response: string[];
       correct?: string[];
-      options?: string[];
+      options?: InteractionOption[];
     }
   | {
       type: 'numeric';
       response: number;
       correct?: NumericRange;
     }
-  | { type: 'likert'; response: string; correct?: string }
+  | {
+      type: 'likert';
+      response: string;
+      correct?: string;
+      options?: InteractionOption[];
+    }
   | {
       type: 'performance';
       response: Array<[string, string | number]>;
       correct?: Array<[string, string | number]>;
+      options?: InteractionOption[];
     }
   | { type: 'other'; response: string; correct?: string };
 
 export type InteractionResponse = Interaction['response'];
+
+/** An option's id, or its id and the text the learner reads. */
+export type InteractionOption = string | { id: string; text: string };
+
+export function optionId(option: InteractionOption): string {
+  return typeof option === 'string' ? option : option.id;
+}
 
 type NumericRange = { min?: number; max?: number };
 

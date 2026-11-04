@@ -80,6 +80,13 @@ export function indexIds(list: readonly unknown[]): string[] {
   return list.map((_, i) => String(i));
 }
 
+/** {@link indexIds} with the text each option shows, for LRS reports. */
+export function indexOptions(
+  texts: readonly string[],
+): Array<{ id: string; text: string }> {
+  return texts.map((text, i) => ({ id: String(i), text }));
+}
+
 /**
  * Roving-focus target for item `i` of `length`: `step` maps arrow keys to a
  * wrapping offset, plus Home and End. Undefined for other keys or modifiers.

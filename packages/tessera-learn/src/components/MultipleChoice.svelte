@@ -3,7 +3,7 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     QUESTION_ID_PREFIX,
-    indexIds,
+    indexOptions,
     questionId,
     savedIndex,
   } from './util.js';
@@ -57,7 +57,7 @@
       type: 'choice',
       response: selectedOption !== null ? [String(selectedOption)] : [],
       correct: [String(correct)],
-      options: indexIds(options),
+      options: indexOptions(options),
     }),
     reset: () => {
       selectedOption = null;

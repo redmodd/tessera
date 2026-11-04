@@ -5,6 +5,7 @@
   import {
     QUESTION_ID_PREFIX,
     indexIds,
+    indexOptions,
     questionId,
     savedIndex,
     shuffle,
@@ -83,7 +84,10 @@
           String(t),
         ]),
         correct: itemIds.map((id, i) => [id, String(correct[i])]),
-        optionPairs: { left: itemIds, right: indexIds(targets) },
+        optionPairs: {
+          left: indexOptions(items),
+          right: indexOptions(targets),
+        },
       };
     },
     reset: resetState,

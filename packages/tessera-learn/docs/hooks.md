@@ -55,13 +55,13 @@ type Interaction =
       type: 'choice';
       response: string[];
       correct?: string[];
-      options?: string[];
+      options?: InteractionOption[];
     }
   | {
       type: 'sequencing';
       response: string[]; // ordered ids
       correct?: string[];
-      options?: string[];
+      options?: InteractionOption[];
     }
   | { type: 'true-false'; response: boolean; correct?: boolean }
   | {
@@ -74,20 +74,31 @@ type Interaction =
       type: 'matching';
       response: [string, string][];
       correct?: [string, string][];
-      optionPairs?: { left: string[]; right: string[] };
+      optionPairs?: { left: InteractionOption[]; right: InteractionOption[] };
     }
   | {
       type: 'numeric';
       response: number;
       correct?: { min?: number; max?: number };
     }
-  | { type: 'likert' | 'other'; response: string; correct?: string }
+  | {
+      type: 'likert';
+      response: string;
+      correct?: string;
+      options?: InteractionOption[]; // the scale
+    }
+  | { type: 'other'; response: string; correct?: string }
   | {
       type: 'performance';
       response: [string, string | number][]; // [stepId, value]
       correct?: [string, string | number][];
+      options?: InteractionOption[]; // the steps
     };
+
+type InteractionOption = string | { id: string; text: string }; // an id, or an id and the text shown
 ```
+
+Give each option its text (`{ id: '0', text: 'Paris' }`) so LRS reports show it. cmi5 and xAPI send the text as the Answered statement's interaction components (`choices`, `scale`, `source`/`target`, `steps`); responses and correct patterns keep the ids. Each list needs distinct ids: Tessera leaves out a list whose ids repeat, with a console warning. SCORM 1.2 and 2004 have no field for option text and record the ids only.
 
 For `choice` / `sequencing` / `matching`, always pass the full option list via `options` (or `optionPairs` for matching), even when the ids are indexes like `'0'`. cmi5, xAPI and SCORM 2004 record the ids (see below); SCORM 1.2 accepts only one-character ids, so it records each id as its position in `options` (`0`-`9`, then `a`-`z`: up to 36 options). On SCORM 1.2:
 
@@ -112,7 +123,12 @@ response: () => ({
   type: 'choice',
   response: selected ? [selected] : [],
   correct: ['speed-limit'],
-  options: ['stop', 'yield', 'speed-limit', 'merge'],
+  options: [
+    { id: 'stop', text: 'Stop' },
+    { id: 'yield', text: 'Yield' },
+    { id: 'speed-limit', text: 'Speed limit' },
+    { id: 'merge', text: 'Merge' },
+  ],
 });
 // SCORM 1.2 → "2"   SCORM 2004 → "speed-limit"   cmi5 → "speed-limit"
 
@@ -182,7 +198,7 @@ const q = useQuestion({
     type: 'choice',
     response: selected !== null ? [String(selected)] : [],
     correct: [String(correct)],
-    options: options.map((_, i) => String(i)),
+    options: options.map((text, i) => ({ id: String(i), text })),
   }),
   restore: ([choice]) => (selected = Number(choice)),
 });

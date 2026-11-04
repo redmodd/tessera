@@ -6,6 +6,7 @@
     MATCH_PAIR_COLORS,
     QUESTION_ID_PREFIX,
     indexIds,
+    indexOptions,
     questionId,
     rovingIndex,
     savedIndex,
@@ -85,7 +86,10 @@
           String(r),
         ]),
         correct: ids.map((id) => [id, id]),
-        optionPairs: { left: ids, right: ids },
+        optionPairs: {
+          left: indexOptions(pairs.map((p) => p.left)),
+          right: indexOptions(pairs.map((p) => p.right)),
+        },
       };
     },
     reset: resetState,

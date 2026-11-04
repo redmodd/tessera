@@ -38,6 +38,19 @@ const QUIZ_TEXT = [
   'Match the numbers with their words.',
 ];
 
+const components = (texts: string[]) =>
+  texts.map((text, i) => ({ id: String(i), description: { 'en-US': text } }));
+
+/** The graded quiz's options as LRS interaction components, per question. */
+const QUIZ_COMPONENTS = [
+  { choices: components(['3', '4', '5', '6']) },
+  {},
+  {
+    source: components(['1', '2', '3']),
+    target: components(['One', 'Two', 'Three']),
+  },
+];
+
 async function expectRestoreToEndSession(page: Page): Promise<void> {
   await expect(page.locator('.tessera-exit-btn')).toBeVisible();
   await bfcacheRoundTrip(page);
@@ -752,6 +765,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(
       answered.map((s) => s.object?.definition?.description?.['en-US']),
     ).toEqual(QUIZ_TEXT);
+    expect(answered.map((s) => s.object?.definition)).toMatchObject(
+      QUIZ_COMPONENTS,
+    );
 
     await finishFreeCourse(page);
 
@@ -1106,6 +1122,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(
       answered.map((s) => s.object?.definition?.description?.['en-US']),
     ).toEqual(QUIZ_TEXT);
+    expect(answered.map((s) => s.object?.definition)).toMatchObject(
+      QUIZ_COMPONENTS,
+    );
 
     await finishFreeCourse(page);
 
