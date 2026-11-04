@@ -10,6 +10,7 @@ import {
   stepRange,
   type Interaction,
   type InteractionOption,
+  type OptionPairs,
 } from './interaction.js';
 
 export interface InteractionFormat {
@@ -282,8 +283,7 @@ function encodeListItem(
 
 function encodePair(
   [l, r]: [string, string],
-  optionPairs:
-    { left: InteractionOption[]; right: InteractionOption[] } | undefined,
+  optionPairs: OptionPairs | undefined,
   fmt: InteractionFormat,
 ): string {
   return `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`;

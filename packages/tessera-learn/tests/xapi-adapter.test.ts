@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { XAPIAdapter } from '../src/runtime/adapters/xapi.js';
-import type { Interaction } from '../src/runtime/interaction.js';
+import type {
+  Interaction,
+  InteractionOption,
+} from '../src/runtime/interaction.js';
 import {
   createConfig,
   flush,
@@ -28,6 +31,16 @@ async function sentActor(actor: unknown) {
   adapter.commit();
   await flush();
   return posted()[0].actor;
+}
+
+/** An adapter past its launch, with the launch requests cleared. */
+async function launchedAdapter() {
+  setXAPILaunch();
+  const adapter = new XAPIAdapter(createConfig());
+  await adapter.init();
+  await flush();
+  fetchMock.mockClear();
+  return adapter;
 }
 
 const ACCOUNT = {
@@ -274,11 +287,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('sends a scored statement when the score changes without a Passed/Failed', async () => {
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
 
     adapter.setScore(50);
     adapter.setSuccessStatus('failed');
@@ -352,11 +361,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('sends no duration while the saved state is unread', async () => {
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
     fetchMock.mockImplementation(async () => respond(200, '[]'));
 
     adapter.setDuration(50, 50);
@@ -376,11 +381,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('does not re-send the resumed score on launch', async () => {
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
     adapter.seedLifecycle('incomplete', 'failed', 60);
 
     adapter.setScore(60);
@@ -392,11 +393,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('percent-encodes the question id in the Answered object id', async () => {
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
 
     adapter.reportInteraction(
       'Question 1#é',
@@ -411,11 +408,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('sends the question text and puts the course in parent on Answered', async () => {
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
 
     adapter.reportInteraction(
       'q1',
@@ -442,6 +435,14 @@ describe('XAPIAdapter', () => {
         options: [{ id: '0', text: '3' }, '1'],
       },
       { choices: [{ id: '0', description: { 'en-US': '3' } }, { id: '1' }] },
+    ],
+    [
+      {
+        type: 'choice',
+        response: ['0'],
+        options: [{ id: '0', text: 4 as never }],
+      },
+      { choices: [{ id: '0', description: { 'en-US': '4' } }] },
     ],
     [
       {
@@ -492,11 +493,7 @@ describe('XAPIAdapter', () => {
   ])(
     'sends %o option text as interaction components',
     async (interaction, lists) => {
-      setXAPILaunch();
-      const adapter = new XAPIAdapter(createConfig());
-      await adapter.init();
-      await flush();
-      fetchMock.mockClear();
+      const adapter = await launchedAdapter();
 
       adapter.reportInteraction('q1', interaction, null);
       await flush();
@@ -505,24 +502,22 @@ describe('XAPIAdapter', () => {
     },
   );
 
-  it('leaves out a component list whose ids repeat', async () => {
+  it.each<[string, InteractionOption[]]>([
+    [
+      'repeat',
+      [
+        { id: 'a', text: 'Yes' },
+        { id: 'a', text: 'No' },
+      ],
+    ],
+    ['are missing', [{ text: 'Yes' } as never]],
+  ])('leaves out a component list whose ids %s', async (_, options) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
 
     adapter.reportInteraction(
       'q1',
-      {
-        type: 'choice',
-        response: ['a'],
-        options: [
-          { id: 'a', text: 'Yes' },
-          { id: 'a', text: 'No' },
-        ],
-      },
+      { type: 'choice', response: ['a'], options },
       null,
     );
     await flush();
@@ -534,11 +529,7 @@ describe('XAPIAdapter', () => {
   });
 
   it('leaves out an empty component list', async () => {
-    setXAPILaunch();
-    const adapter = new XAPIAdapter(createConfig());
-    await adapter.init();
-    await flush();
-    fetchMock.mockClear();
+    const adapter = await launchedAdapter();
 
     adapter.reportInteraction(
       'q1',

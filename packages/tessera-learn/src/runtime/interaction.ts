@@ -30,7 +30,7 @@ export type Interaction =
       type: 'matching';
       response: Array<[string, string]>;
       correct?: Array<[string, string]>;
-      optionPairs?: { left: InteractionOption[]; right: InteractionOption[] };
+      optionPairs?: OptionPairs;
     }
   | {
       type: 'sequencing';
@@ -61,6 +61,11 @@ export type InteractionResponse = Interaction['response'];
 
 /** An option's id, or its id and the text the learner reads. */
 export type InteractionOption = string | { id: string; text: string };
+
+export type OptionPairs = {
+  left: InteractionOption[];
+  right: InteractionOption[];
+};
 
 export function optionId(option: InteractionOption): string {
   return typeof option === 'string' ? option : option.id;

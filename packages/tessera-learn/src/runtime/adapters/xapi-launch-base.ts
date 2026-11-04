@@ -113,11 +113,13 @@ function interactionComponents(
     );
     return null;
   }
-  return options.map((option, k) =>
-    typeof option !== 'string' && option.text
-      ? { id: ids[k], description: { 'en-US': option.text } }
-      : { id: ids[k] },
-  );
+  return options.map((option, k) => {
+    // A number from a custom widget's options would make the LRS reject the batch.
+    const text = typeof option === 'string' ? '' : String(option.text ?? '');
+    return text
+      ? { id: ids[k], description: { 'en-US': text } }
+      : { id: ids[k] };
+  });
 }
 
 /**
@@ -429,8 +431,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (text) definition.description = { 'en-US': text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     for (const [list, options] of Object.entries(optionLists(interaction))) {
-      const components =
-        options?.length && interactionComponents(questionId, list, options);
+      if (!options?.length) continue;
+      const components = interactionComponents(questionId, list, options);
       if (components) definition[list] = components;
     }
     const result: Record<string, unknown> = {};
