@@ -216,6 +216,14 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     text?: string,
   ): void {
     if (!this.canWrite()) return;
+    const description = text
+      ? this.dialect.interactionFields.description?.(text)
+      : undefined;
+    if (description === null) {
+      console.warn(
+        `Tessera: the description of interaction "${questionId}" is left out of the LMS record: ${this.dialect.profile.name} reads a leading "{lang=" as a language tag. Reword the start of the question.`,
+      );
+    }
     const { id, fields } = buildScormInteractionFields(
       questionId,
       interaction,
@@ -227,7 +235,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
         typeValue: this.dialect.interactionFields.typeValue(interaction.type),
         resultLabels: this.dialect.interactionFields.resultLabels,
         format: this.dialect.profile.interactionFormat,
-        description: text && this.dialect.interactionFields.description?.(text),
+        description,
       },
     );
     let n: number | null = null;

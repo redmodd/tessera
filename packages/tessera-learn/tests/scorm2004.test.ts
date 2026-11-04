@@ -346,6 +346,7 @@ describe('SCORM2004Adapter', () => {
       valuesUnder(api.SetValue.mock.calls, 'cmi.interactions.0');
 
     it('writes the question text as the description, cut to 250 characters', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'q1',
         { type: 'true-false', response: true },
@@ -370,6 +371,10 @@ describe('SCORM2004Adapter', () => {
       expect(at(0).description).toBe('Is it?');
       expect(at(1).description).toBe('x'.repeat(250));
       expect(at(2)).not.toHaveProperty('description');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(
+        /description of interaction "q3" is left out/,
+      );
     });
 
     it('writes choice interaction fields', async () => {
