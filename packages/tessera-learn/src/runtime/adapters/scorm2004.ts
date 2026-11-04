@@ -16,6 +16,7 @@ import {
   toScaled,
 } from './format.js';
 import { STANDARDS } from '../standards.js';
+import { cutText } from '../interaction-format.js';
 
 export interface SCORM2004API {
   Initialize(param: string): string;
@@ -43,6 +44,9 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+    // localized_string_type, SPM 250. A leading `{lang=` is read as a language tag or rejected, and no tag can escape it.
+    description: (text) =>
+      text.startsWith('{lang=') ? null : cutText(text, 250),
   },
   initialize: (api) => api.Initialize(''),
   terminate: (api) => api.Terminate(''),

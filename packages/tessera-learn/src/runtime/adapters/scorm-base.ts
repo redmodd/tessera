@@ -43,6 +43,8 @@ export interface ScormDialect<TApi> {
     timestamp(): string;
     typeValue(type: Interaction['type']): string;
     resultLabels: { correct: string; incorrect: string };
+    /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
+    description?(text: string): string | null;
   };
   initialize(api: TApi): string;
   terminate(api: TApi): string;
@@ -211,8 +213,17 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
+    text?: string,
   ): void {
     if (!this.canWrite()) return;
+    const description = text
+      ? this.dialect.interactionFields.description?.(text)
+      : undefined;
+    if (description === null) {
+      console.warn(
+        `Tessera: the description of interaction "${questionId}" is left out of the LMS record: ${this.dialect.profile.name} reads a leading "{lang=" as a language tag. Reword the start of the question.`,
+      );
+    }
     const { id, fields } = buildScormInteractionFields(
       questionId,
       interaction,
@@ -224,6 +235,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
         typeValue: this.dialect.interactionFields.typeValue(interaction.type),
         resultLabels: this.dialect.interactionFields.resultLabels,
         format: this.dialect.profile.interactionFormat,
+        description,
       },
     );
     let n: number | null = null;

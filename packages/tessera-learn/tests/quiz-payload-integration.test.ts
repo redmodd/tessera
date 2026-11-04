@@ -17,6 +17,7 @@ import { setQuizContext } from '../src/runtime/hooks.svelte.js';
 
 interface Registration {
   id: string;
+  text: () => string | undefined;
   checkAnswer: () => boolean;
   interaction: () => Interaction;
   reset?: () => void;
@@ -207,6 +208,12 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     expect(registrations[1].interaction().type).toBe('fill-in');
     expect(registrations[2].interaction().type).toBe('matching');
     expect(registrations[3].interaction().type).toBe('matching');
+    expect(registrations.map((r) => r.text())).toEqual([
+      'Pick',
+      'Fill',
+      'Match',
+      'Sort',
+    ]);
   });
 });
 

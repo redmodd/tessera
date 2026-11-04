@@ -54,10 +54,13 @@ A standalone practice widget written straight into a page. Emits a `matching` in
     ['Lithium', 'Li'],
   ];
 
+  const PROMPT = 'Match each element to its symbol.';
+
   let pairs = $state([]);
 
   const q = useQuestion({
     id: 'drawPairs1',
+    text: PROMPT,
     response: () => ({
       type: 'matching',
       response: pairs,
@@ -81,6 +84,7 @@ A standalone practice widget written straight into a page. Emits a `matching` in
 </script>
 
 <div>
+  <p>{PROMPT}</p>
   <!-- line-drawing UI, keyboard-operable with buttons, calls connect(l, r) -->
   <QuestionReview {q} />
 </div>
@@ -162,6 +166,9 @@ The widget calls `useQuestion()`, registers a render snippet with `setRender`, p
   const q = useQuestion({
     get id() {
       return id;
+    },
+    get text() {
+      return prompt;
     },
     response: () => ({
       type: 'choice',
@@ -259,10 +266,13 @@ A standalone question (no `<Quiz>`) counts toward course success when built with
 <script>
   import { QuestionReview, useQuestion } from 'tessera-learn';
 
+  const PROMPT = 'Why does this matter to your team?';
+
   let answer = $state('');
 
   const q = useQuestion({
     id: 'whyItMatters',
+    text: PROMPT,
     graded: true,
     response: () => ({ type: 'long-fill-in', response: answer }),
     score: () => (answer.trim().length >= 50 ? 100 : 0),
@@ -275,7 +285,7 @@ A standalone question (no `<Quiz>`) counts toward course success when built with
 </script>
 
 <div>
-  <label for="why">Why does this matter to your team?</label>
+  <label for="why">{PROMPT}</label>
   <textarea
     id="why"
     bind:value={() => answer, (v) => q.setAnswer((answer = v))}

@@ -251,7 +251,7 @@ describe('buildXAPIClient — plain xAPI launch integration', () => {
   });
 
   it("fan-outs a useXAPI() sendStatement through the xAPI launch publisher (endpoint: 'lms')", async () => {
-    const adapter = new XAPIAdapter();
+    const adapter = new XAPIAdapter(createConfig());
     await adapter.init();
 
     const config = createConfig({

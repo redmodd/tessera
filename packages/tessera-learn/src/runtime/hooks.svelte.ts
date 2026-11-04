@@ -71,6 +71,8 @@ export interface Question {
 export interface UseQuestionOptions<I extends Interaction = Interaction> {
   /** Stable identifier used for LMS interaction reporting. Must be unique on the page. */
   id: string;
+  /** The question as the learner reads it. Sent to the LMS as the interaction's description. */
+  text?: string;
   /** Whether this question counts toward its page score. Default false. */
   graded?: boolean;
   /**
@@ -159,9 +161,9 @@ function warnRange(id: string, interaction: Interaction): void {
 
 function reporter(): StandaloneQuestionDeps['report'] {
   const adapterCtx = getAdapterContext();
-  return (id, interaction, correct) => {
+  return (id, interaction, correct, text) => {
     if (import.meta.env?.DEV) warnRange(id, interaction);
-    adapterCtx?.adapter.reportInteraction(id, interaction, correct);
+    adapterCtx?.adapter.reportInteraction(id, interaction, correct, text);
   };
 }
 
@@ -207,6 +209,7 @@ export function useQuestion<I extends Interaction = Interaction>(
       reset: opts.reset,
       complete: opts.complete,
       interaction: () => opts.response(),
+      text: () => opts.text,
       restore: opts.restore,
     });
   }
@@ -420,6 +423,8 @@ export interface UseQuizQuestionApi {
   complete?: () => boolean;
   /** Returns the current Interaction payload for LMS reporting. */
   interaction?: () => Interaction | undefined;
+  /** The question text sent with the interaction. */
+  text?: () => string | undefined;
   restore?: (response: InteractionResponse) => unknown;
 }
 

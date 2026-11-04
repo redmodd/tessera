@@ -79,11 +79,13 @@ export abstract class BaseAdapter {
   /**
    * Report a single learner interaction (answered question) to the LMS.
    * Called once per question on quiz submit or standalone useQuestion submit.
+   * `text` is the question as the learner reads it.
    */
   reportInteraction(
     _questionId: string,
     _interaction: Interaction,
     _correct: boolean | null,
+    _text?: string,
   ): void {}
   /**
    * Send what the setters recorded: SCORM 1.2 writes `lesson_status` and

@@ -3,7 +3,7 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import type { Verdict } from '../types.js';
+import type { CourseConfig, Verdict } from '../types.js';
 import type { Interaction } from '../interaction.js';
 import { formatResponse, formatPatterns } from '../interaction-format.js';
 import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
@@ -104,7 +104,7 @@ function linkedController(...signals: AbortSignal[]): AbortController {
 
 type PublisherLaunchOptions = Pick<
   XAPIPublisherOptions,
-  'sessionId' | 'cmi5Mode' | 'contextTemplate'
+  'sessionId' | 'cmi5Mode' | 'contextTemplate' | 'activityDefinition'
 >;
 
 /**
@@ -147,8 +147,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return this.#termination.signal.aborted;
   }
 
-  static connect<T extends BaseXAPILaunchAdapter>(this: new () => T): T | null {
-    const adapter = new this();
+  static connect<T extends BaseXAPILaunchAdapter>(
+    this: new (config: CourseConfig) => T,
+    config: CourseConfig,
+  ): T | null {
+    const adapter = new this(config);
     const params = new URLSearchParams(window.location.search);
     const required = [
       'endpoint',
@@ -367,6 +370,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     questionId: string,
     interaction: Interaction,
     correct: boolean | null,
+    text?: string,
   ): void {
     if (!this.publisher) return;
     const { interactionFormat } = this.profile;
@@ -376,6 +380,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
+    if (text) definition.description = { 'en-US': text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     const result: Record<string, unknown> = {};
     if (response !== null) result.response = response;
@@ -388,6 +393,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         definition,
       },
       ...(Object.keys(result).length > 0 && { result }),
+      context: { contextActivities: { parent: [{ id: this.#activityId }] } },
     });
   }
 

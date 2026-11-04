@@ -40,6 +40,9 @@
     get id() {
       return questionId(id, QUESTION_ID_PREFIX.FillInTheBlank, question);
     },
+    get text() {
+      return question;
+    },
     graded: untrack(() => graded),
     weight: untrack(() => weight),
     maxRetries: untrack(() => maxRetries),

@@ -501,6 +501,7 @@ export interface ScormInteractionSpec {
   typeValue: string;
   resultLabels: { correct: string; incorrect: string };
   format: InteractionFormat;
+  description?: string | null;
 }
 
 /** Ids recorded through `responseId`, grouped so ids in one group must stay distinct. */
@@ -670,7 +671,7 @@ function wholeItems(items: string[], delim: string, max: number): string {
  * Cuts on a character boundary, so an emoji or accented letter stays whole,
  * unless one character runs past max (a letter with hundreds of accents).
  */
-function cutText(value: string, max: number): string {
+export function cutText(value: string, max: number): string {
   for (const { index, segment } of new Intl.Segmenter().segment(value)) {
     if (index + segment.length <= max) continue;
     if (segment.length <= max) return value.slice(0, index);
@@ -821,6 +822,7 @@ export function buildScormInteractionFields(
   spec: ScormInteractionSpec,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
+  if (spec.description) fields.push(['description', spec.description]);
   warnResponseIds(questionId, interaction, spec.format);
   const patterns = formatPatterns(questionId, interaction, spec.format);
   const response = formatResponse(questionId, interaction, spec.format);

@@ -6,6 +6,7 @@ import { RETRY_ATTEMPTS } from '../src/runtime/adapters/retry.js';
 import {
   CMI5_LAUNCH,
   cmi5Fetch,
+  createConfig,
   flush,
   noDeadline,
   postedStatements,
@@ -53,7 +54,7 @@ function pendingUntilAborted(init?: RequestInit): Promise<Response> {
 describe('CMI5Adapter.connect', () => {
   it('connects when all params are present', () => {
     setLaunchParams(CMI5_LAUNCH);
-    expect(CMI5Adapter.connect()).toBeInstanceOf(CMI5Adapter);
+    expect(CMI5Adapter.connect(createConfig())).toBeInstanceOf(CMI5Adapter);
   });
 
   it.each(['fetch', 'endpoint', 'activityId', 'actor'] as const)(
@@ -61,13 +62,13 @@ describe('CMI5Adapter.connect', () => {
     (param) => {
       const { [param]: _, ...rest } = CMI5_LAUNCH;
       setLaunchParams(rest);
-      expect(CMI5Adapter.connect()).toBeNull();
+      expect(CMI5Adapter.connect(createConfig())).toBeNull();
     },
   );
 
   it('returns null with empty search', () => {
     setLaunchParams();
-    expect(CMI5Adapter.connect()).toBeNull();
+    expect(CMI5Adapter.connect(createConfig())).toBeNull();
   });
 });
 
@@ -521,20 +522,25 @@ describe('CMI5Adapter', () => {
       },
     };
 
-    it('starts Answered from the template', async () => {
+    it('starts Answered from the template, with the AU as parent', async () => {
       const adapter = await initAdapter({ launchData });
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['a'], correct: ['a'] },
         true,
+        'Pick a',
       );
       await flush();
 
-      expect(statementFor('answered').context).toEqual({
+      const answered = statementFor('answered');
+      expect(answered.object.definition.description).toEqual({
+        'en-US': 'Pick a',
+      });
+      expect(answered.context).toEqual({
         registration: CMI5_LAUNCH.registration,
         contextActivities: {
           ...launchData.contextTemplate.contextActivities,
-          grouping: [{ id: publisherActivity }, { id: CMI5_LAUNCH.activityId }],
+          parent: [{ id: CMI5_LAUNCH.activityId }],
         },
         extensions: launchData.contextTemplate.extensions,
       });
@@ -629,7 +635,7 @@ describe('CMI5Adapter', () => {
       ]);
     });
 
-    it('keeps the default grouping when the template grouping has no activities', async () => {
+    it('leaves out a template list with no activities', async () => {
       const adapter = await initAdapter({
         launchData: {
           contextTemplate: { contextActivities: { grouping: [{ id: 7 }] } },
@@ -641,8 +647,11 @@ describe('CMI5Adapter', () => {
         true,
       );
       await flush();
+      expect(statementFor('answered').context.contextActivities).toEqual({
+        parent: [{ id: CMI5_LAUNCH.activityId }],
+      });
       expect(
-        statementFor('answered').context.contextActivities.grouping,
+        statementFor('initialized').context.contextActivities.grouping,
       ).toEqual([{ id: CMI5_LAUNCH.activityId }]);
     });
 
