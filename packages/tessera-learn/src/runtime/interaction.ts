@@ -67,7 +67,7 @@ export type OptionPairs = {
   right: InteractionOption[];
 };
 
-export function optionId(option: InteractionOption): string {
+export function optionId(option: InteractionOption): string | undefined {
   // A custom widget's options can hold null; its id is then undefined.
   return typeof option === 'string' ? option : option?.id;
 }

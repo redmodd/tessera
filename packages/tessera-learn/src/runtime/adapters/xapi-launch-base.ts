@@ -103,13 +103,14 @@ function interactionComponents(
   list: string,
   options: InteractionOption[],
 ): Array<Record<string, unknown>> | null {
-  const ids = options.map(optionId);
+  const ids = Array.isArray(options) ? options.map(optionId) : null;
   if (
+    ids === null ||
     ids.some((id) => typeof id !== 'string') ||
     new Set(ids).size !== ids.length
   ) {
     console.warn(
-      `Tessera: interaction "${questionId}" leaves its ${list} list out of the LRS record: xAPI needs a distinct string id for each option.`,
+      `Tessera: interaction "${questionId}" leaves its ${list} list out of the LRS record: xAPI needs an array of options, each with a distinct string id.`,
     );
     return null;
   }
@@ -431,7 +432,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (text) definition.description = { 'en-US': text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     for (const [list, options] of Object.entries(optionLists(interaction))) {
-      if (!options?.length) continue;
+      if (options == null || options.length === 0) continue;
       const components = interactionComponents(questionId, list, options);
       if (components) definition[list] = components;
     }
