@@ -51,6 +51,13 @@ const QUIZ_COMPONENTS = [
   },
 ];
 
+const COMPONENT_LISTS = ['choices', 'scale', 'source', 'target', 'steps'];
+
+const componentLists = (definition: object = {}) =>
+  Object.fromEntries(
+    Object.entries(definition).filter(([key]) => COMPONENT_LISTS.includes(key)),
+  );
+
 async function expectRestoreToEndSession(page: Page): Promise<void> {
   await expect(page.locator('.tessera-exit-btn')).toBeVisible();
   await bfcacheRoundTrip(page);
@@ -765,7 +772,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(
       answered.map((s) => s.object?.definition?.description?.['en-US']),
     ).toEqual(QUIZ_TEXT);
-    expect(answered.map((s) => s.object?.definition)).toMatchObject(
+    expect(answered.map((s) => componentLists(s.object?.definition))).toEqual(
       QUIZ_COMPONENTS,
     );
 
@@ -1122,7 +1129,7 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     expect(
       answered.map((s) => s.object?.definition?.description?.['en-US']),
     ).toEqual(QUIZ_TEXT);
-    expect(answered.map((s) => s.object?.definition)).toMatchObject(
+    expect(answered.map((s) => componentLists(s.object?.definition))).toEqual(
       QUIZ_COMPONENTS,
     );
 

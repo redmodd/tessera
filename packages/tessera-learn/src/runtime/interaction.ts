@@ -68,7 +68,8 @@ export type OptionPairs = {
 };
 
 export function optionId(option: InteractionOption): string {
-  return typeof option === 'string' ? option : option.id;
+  // A custom widget's options can hold null; its id is then undefined.
+  return typeof option === 'string' ? option : option?.id;
 }
 
 type NumericRange = { min?: number; max?: number };
