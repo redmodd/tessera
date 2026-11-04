@@ -432,7 +432,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (text) definition.description = { 'en-US': text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     for (const [list, options] of Object.entries(optionLists(interaction))) {
-      if (options == null || options.length === 0) continue;
+      if (options == null || (Array.isArray(options) && options.length === 0))
+        continue;
       const components = interactionComponents(questionId, list, options);
       if (components) definition[list] = components;
     }

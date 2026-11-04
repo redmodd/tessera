@@ -514,6 +514,7 @@ describe('XAPIAdapter', () => {
     ['include a null option', ['a', null as never]],
     ['are not in an array', 'ab' as never],
     ['are in an object', { a: 'Yes' } as never],
+    ['are an empty string', '' as never],
   ])('leaves out a component list whose ids %s', async (_, options) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const adapter = await launchedAdapter();
