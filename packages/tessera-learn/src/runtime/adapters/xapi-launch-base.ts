@@ -430,7 +430,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     for (const [list, options] of Object.entries(optionLists(interaction))) {
       const components =
-        options && interactionComponents(questionId, list, options);
+        options?.length && interactionComponents(questionId, list, options);
       if (components) definition[list] = components;
     }
     const result: Record<string, unknown> = {};

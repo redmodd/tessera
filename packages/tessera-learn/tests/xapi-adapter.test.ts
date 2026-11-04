@@ -533,6 +533,23 @@ describe('XAPIAdapter', () => {
     );
   });
 
+  it('leaves out an empty component list', async () => {
+    setXAPILaunch();
+    const adapter = new XAPIAdapter(createConfig());
+    await adapter.init();
+    await flush();
+    fetchMock.mockClear();
+
+    adapter.reportInteraction(
+      'q1',
+      { type: 'choice', response: [], options: [] },
+      null,
+    );
+    await flush();
+
+    expect(posted()[0].object.definition).not.toHaveProperty('choices');
+  });
+
   it('sends the course name and description on the course activity', async () => {
     setXAPILaunch();
     const adapter = XAPIAdapter.connect(

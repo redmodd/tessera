@@ -81,6 +81,21 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     expect(reg.id).toMatch(/^mc-/);
   });
 
+  it('MultipleChoice reports numeric options as text', () => {
+    const { quiz, registrations } = makeQuizCtx();
+    mountInQuiz(
+      MultipleChoice,
+      { question: '2 + 2?', options: [0, 4], correct: 1 },
+      quiz,
+    );
+
+    const interaction = registrations[0].interaction();
+    expect(interaction.type === 'choice' && interaction.options).toEqual([
+      { id: '0', text: '0' },
+      { id: '1', text: '4' },
+    ]);
+  });
+
   it('FillInTheBlank → { type: "fill-in", response, correct, caseMatters }', () => {
     const { quiz, registrations } = makeQuizCtx();
     mountInQuiz(

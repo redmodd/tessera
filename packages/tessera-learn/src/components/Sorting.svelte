@@ -4,7 +4,6 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     QUESTION_ID_PREFIX,
-    indexIds,
     indexOptions,
     questionId,
     savedIndex,
@@ -76,16 +75,16 @@
     maxRetries: untrack(() => maxRetries),
     complete: () => placements.size === items.length,
     response: () => {
-      const itemIds = indexIds(items);
+      const left = indexOptions(items);
       return {
         type: 'matching',
         response: [...placements.entries()].map(([i, t]) => [
           String(i),
           String(t),
         ]),
-        correct: itemIds.map((id, i) => [id, String(correct[i])]),
+        correct: left.map(({ id }, i) => [id, String(correct[i])]),
         optionPairs: {
-          left: indexOptions(items),
+          left,
           right: indexOptions(targets),
         },
       };

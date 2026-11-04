@@ -75,16 +75,14 @@ export function fillInAnswers(answers: string | string[]): string[] {
     .filter((a) => a !== '');
 }
 
-/** Index ids for a built-in's `options`, which SCORM 1.2 encodes one character each. */
-export function indexIds(list: readonly unknown[]): string[] {
-  return list.map((_, i) => String(i));
-}
-
-/** {@link indexIds} with the text each option shows, for LRS reports. */
+/**
+ * A built-in's options as index ids (SCORM 1.2 encodes one character each)
+ * with the text each shows. Authors can pass numbers, which render as text.
+ */
 export function indexOptions(
-  texts: readonly string[],
+  texts: readonly unknown[],
 ): Array<{ id: string; text: string }> {
-  return texts.map((text, i) => ({ id: String(i), text }));
+  return texts.map((text, i) => ({ id: String(i), text: String(text ?? '') }));
 }
 
 /**
