@@ -39,7 +39,7 @@ export type {
 } from './runtime/xapi/types.js';
 
 // ---- Types ----
-export type { Interaction } from './runtime/interaction.js';
+export type { Interaction, InteractionOption } from './runtime/interaction.js';
 export { isCorrect } from './runtime/interaction.js';
 export type {
   UseQuestionOptions,

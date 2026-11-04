@@ -4,7 +4,14 @@
  * without its caps.
  */
 
-import { reversedRange, stepRange, type Interaction } from './interaction.js';
+import {
+  optionId,
+  reversedRange,
+  stepRange,
+  type Interaction,
+  type InteractionOption,
+  type OptionPairs,
+} from './interaction.js';
 
 export interface InteractionFormat {
   itemDelim: string;
@@ -258,11 +265,11 @@ function recordsIndex<T extends object>(
  */
 function encodeListItem(
   value: string,
-  options: string[] | undefined,
+  options: InteractionOption[] | undefined,
   fmt: InteractionFormat,
 ): string {
   if (!recordsIndex(options, fmt)) return fmt.responseId(value);
-  const idx = options.indexOf(value);
+  const idx = options.findIndex((option) => optionId(option) === value);
   if (idx < 0) {
     throw new UnrecordableError(`"${value}" is not in its options`);
   }
@@ -276,7 +283,7 @@ function encodeListItem(
 
 function encodePair(
   [l, r]: [string, string],
-  optionPairs: { left: string[]; right: string[] } | undefined,
+  optionPairs: OptionPairs | undefined,
   fmt: InteractionFormat,
 ): string {
   return `${encodeListItem(l, optionPairs?.left, fmt)}${fmt.pairDelim}${encodeListItem(r, optionPairs?.right, fmt)}`;

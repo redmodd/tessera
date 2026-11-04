@@ -647,6 +647,45 @@ describe('SCORM12Adapter', () => {
       });
     });
 
+    it('maps options that carry text by their id', async () => {
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['b'],
+          correct: ['a'],
+          options: [
+            { id: 'a', text: 'Stop' },
+            { id: 'b', text: 'Yield' },
+          ],
+        },
+        false,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({
+        student_response: '1',
+        'correct_responses.0.pattern': '0',
+      });
+    });
+
+    it('skips a null option when mapping ids to indexes', async () => {
+      adapter.reportInteraction(
+        'q1',
+        {
+          type: 'choice',
+          response: ['b'],
+          correct: ['b'],
+          options: ['a', null as never, 'b'],
+        },
+        true,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({
+        student_response: '2',
+        'correct_responses.0.pattern': '2',
+      });
+    });
+
     it('encodes option indexes past 9 as one base-36 character', async () => {
       const options = Array.from({ length: 12 }, (_, i) => `opt${i}`);
       adapter.reportInteraction(

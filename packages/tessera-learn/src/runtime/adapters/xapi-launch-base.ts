@@ -4,7 +4,11 @@ import type {
   SuccessStatus,
 } from '../persistence.js';
 import type { CourseConfig, Verdict } from '../types.js';
-import type { Interaction } from '../interaction.js';
+import {
+  optionId,
+  type Interaction,
+  type InteractionOption,
+} from '../interaction.js';
 import { formatResponse, formatPatterns } from '../interaction-format.js';
 import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
 import { formatISO8601Duration, toScaled } from './format.js';
@@ -73,6 +77,51 @@ function normalizeLaunchActor(parsed: Record<string, unknown>): XAPIAgent {
 
 const CMI_INTERACTION_TYPE =
   'http://adlnet.gov/expapi/activities/cmi.interaction';
+
+/** The xAPI interaction component lists an interaction's options fill. */
+function optionLists(
+  i: Interaction,
+): Record<string, InteractionOption[] | undefined> {
+  switch (i.type) {
+    case 'choice':
+    case 'sequencing':
+      return { choices: i.options };
+    case 'likert':
+      return { scale: i.options };
+    case 'performance':
+      return { steps: i.options };
+    case 'matching':
+      return { source: i.optionPairs?.left, target: i.optionPairs?.right };
+    default:
+      return {};
+  }
+}
+
+/** Interaction components, or null when xAPI can't take the list. */
+function interactionComponents(
+  questionId: string,
+  list: string,
+  options: InteractionOption[],
+): Array<Record<string, unknown>> | null {
+  const ids = Array.isArray(options) ? options.map(optionId) : null;
+  if (
+    ids === null ||
+    ids.some((id) => typeof id !== 'string') ||
+    new Set(ids).size !== ids.length
+  ) {
+    console.warn(
+      `Tessera: interaction "${questionId}" leaves its ${list} list out of the LRS record: xAPI needs an array of options, each with a distinct string id.`,
+    );
+    return null;
+  }
+  return options.map((option, k) => {
+    // A number from a custom widget's options would make the LRS reject the batch.
+    const text = typeof option === 'string' ? '' : String(option.text ?? '');
+    return text
+      ? { id: ids[k], description: { 'en-US': text } }
+      : { id: ids[k] };
+  });
+}
 
 /**
  * Overall budget for the resume GET, retries and backoff included. One deadline
@@ -382,6 +431,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     };
     if (text) definition.description = { 'en-US': text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
+    for (const [list, options] of Object.entries(optionLists(interaction))) {
+      if (options == null || (Array.isArray(options) && options.length === 0))
+        continue;
+      const components = interactionComponents(questionId, list, options);
+      if (components) definition[list] = components;
+    }
     const result: Record<string, unknown> = {};
     if (response !== null) result.response = response;
     if (correct !== null) result.success = correct;

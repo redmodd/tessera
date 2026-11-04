@@ -72,9 +72,28 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       type: 'choice',
       response: [],
       correct: ['1'],
-      options: ['0', '1', '2'],
+      options: [
+        { id: '0', text: 'a' },
+        { id: '1', text: 'b' },
+        { id: '2', text: 'c' },
+      ],
     });
     expect(reg.id).toMatch(/^mc-/);
+  });
+
+  it('MultipleChoice reports numeric options as text', () => {
+    const { quiz, registrations } = makeQuizCtx();
+    mountInQuiz(
+      MultipleChoice,
+      { question: '2 + 2?', options: [0, 4], correct: 1 },
+      quiz,
+    );
+
+    const interaction = registrations[0].interaction();
+    expect(interaction.type === 'choice' && interaction.options).toEqual([
+      { id: '0', text: '0' },
+      { id: '1', text: '4' },
+    ]);
   });
 
   it('FillInTheBlank → { type: "fill-in", response, correct, caseMatters }', () => {
@@ -125,7 +144,16 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ['0', '0'],
         ['1', '1'],
       ],
-      optionPairs: { left: ['0', '1'], right: ['0', '1'] },
+      optionPairs: {
+        left: [
+          { id: '0', text: 'Dog' },
+          { id: '1', text: 'Cat' },
+        ],
+        right: [
+          { id: '0', text: 'Bark' },
+          { id: '1', text: 'Meow' },
+        ],
+      },
     });
     expect(reg.id).toMatch(/^matching-/);
   });
@@ -154,7 +182,16 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ['0', '0'],
         ['1', '1'],
       ],
-      optionPairs: { left: ['0', '1'], right: ['0', '1'] },
+      optionPairs: {
+        left: [
+          { id: '0', text: 'Apple' },
+          { id: '1', text: 'Broccoli' },
+        ],
+        right: [
+          { id: '0', text: 'Fruit' },
+          { id: '1', text: 'Vegetable' },
+        ],
+      },
     });
     expect(reg.id).toMatch(/^sorting-/);
   });

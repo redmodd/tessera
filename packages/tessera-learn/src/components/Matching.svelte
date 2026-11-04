@@ -5,7 +5,7 @@
   import {
     MATCH_PAIR_COLORS,
     QUESTION_ID_PREFIX,
-    indexIds,
+    indexOptions,
     questionId,
     rovingIndex,
     savedIndex,
@@ -77,15 +77,18 @@
     maxRetries: untrack(() => maxRetries),
     complete: () => matches.size === pairs.length,
     response: () => {
-      const ids = indexIds(pairs);
+      const left = indexOptions(pairs.map((p) => p.left));
       return {
         type: 'matching',
         response: [...matches.entries()].map(([l, r]) => [
           String(l),
           String(r),
         ]),
-        correct: ids.map((id) => [id, id]),
-        optionPairs: { left: ids, right: ids },
+        correct: left.map(({ id }) => [id, id]),
+        optionPairs: {
+          left,
+          right: indexOptions(pairs.map((p) => p.right)),
+        },
       };
     },
     reset: resetState,
