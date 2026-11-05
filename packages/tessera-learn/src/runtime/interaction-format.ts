@@ -267,12 +267,41 @@ function recordsIndex<T extends object>(
   return fmt.encodesOptionIndex && options !== undefined;
 }
 
+/** Latin letters NFD does not split into a base letter and an accent. */
+const UNSPLIT_LETTERS: Record<string, string> = {
+  ß: 'ss',
+  ẞ: 'SS',
+  æ: 'ae',
+  Æ: 'AE',
+  œ: 'oe',
+  Œ: 'OE',
+  ø: 'o',
+  Ø: 'O',
+  ł: 'l',
+  Ł: 'L',
+  đ: 'd',
+  Đ: 'D',
+  ð: 'd',
+  Ð: 'D',
+  þ: 'th',
+  Þ: 'Th',
+  ħ: 'h',
+  Ħ: 'H',
+  ı: 'i',
+};
+const UNSPLIT_LETTER = new RegExp(
+  `[${Object.keys(UNSPLIT_LETTERS).join('')}]`,
+  'g',
+);
+
 /**
  * The option's 1-based position and text (`3.Paris_France`), which the
  * format records in place of its id so LMS reports show the answer. Moodle
  * rejects any character but letters, digits, `_` and `.` (406), so the text
- * loses its accents and its other characters become `_`. The position keeps
- * options with the same text apart. Undefined for an option without text.
+ * is spelled in Latin letters without accents and its other characters
+ * become `_`. The position keeps options with the same text apart. Undefined
+ * for an option without text, or whose text has no Latin letter or digit,
+ * since its id says more.
  */
 function optionText(
   value: string,
@@ -284,9 +313,12 @@ function optionText(
   const option = options[idx];
   // A custom widget's text can be a number.
   const text = typeof option === 'object' ? String(option?.text ?? '') : '';
-  if (!text) return;
+  const plain = text
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(UNSPLIT_LETTER, (c) => UNSPLIT_LETTERS[c]);
+  if (!/[A-Za-z0-9]/.test(plain)) return;
   const position = `${idx + 1}.`;
-  const plain = text.normalize('NFD').replace(/\p{M}/gu, '');
   return position + shortIdentifier(plain, 250 - position.length);
 }
 
@@ -545,41 +577,40 @@ export interface ScormInteractionSpec {
 }
 
 /**
- * Ids recorded through `responseId`, grouped so ids in one group must stay
- * distinct. An option recorded with its position and text stays distinct.
+ * Ids recorded through `responseId` or as their option's position and text,
+ * grouped so ids in one group must stay distinct.
  */
-function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
-  const bare = (ids: string[], options: InteractionOption[] | undefined) =>
-    ids.filter((id) => optionText(id, options, fmt) === undefined);
+interface IdGroup {
+  ids: string[];
+  options?: InteractionOption[];
+}
+
+function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
   switch (i.type) {
     case 'choice':
     case 'sequencing':
       return recordsIndex(i.options, fmt)
         ? []
-        : [bare([...i.response, ...(i.correct ?? [])], i.options)];
+        : [{ ids: [...i.response, ...(i.correct ?? [])], options: i.options }];
     case 'matching': {
       const { left, right } = i.optionPairs ?? {};
       if (recordsIndex(i.optionPairs, fmt)) return [];
       const pairs = [...i.response, ...(i.correct ?? [])];
       return [
-        bare(
-          pairs.map(([l]) => l),
-          left,
-        ),
-        bare(
-          pairs.map(([, r]) => r),
-          right,
-        ),
+        { ids: pairs.map(([l]) => l), options: left },
+        { ids: pairs.map(([, r]) => r), options: right },
       ];
     }
     case 'performance':
       return [
-        [...i.response, ...(i.correct ?? [])]
-          .map(([step]) => step)
-          .filter((step) => stepName(step, fmt) !== ''),
+        {
+          ids: [...i.response, ...(i.correct ?? [])]
+            .map(([step]) => step)
+            .filter((step) => stepName(step, fmt) !== ''),
+        },
       ];
     case 'likert':
-      return [[i.response, i.correct ?? i.response]];
+      return [{ ids: [i.response, i.correct ?? i.response] }];
     default:
       return [];
   }
@@ -587,13 +618,13 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
 
 /** Two distinct ids that record as the same id, and that id. */
 function mergedIds(
-  groups: string[][],
+  groups: IdGroup[],
   fmt: InteractionFormat,
 ): [string, string, string] | undefined {
-  for (const ids of groups) {
+  for (const { ids, options } of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
-      const recorded = fmt.responseId(id);
+      const recorded = optionText(id, options, fmt) ?? fmt.responseId(id);
       const first = seen.get(recorded) ?? id;
       if (first !== id) return [first, id, recorded];
       seen.set(recorded, id);
@@ -832,7 +863,9 @@ function warnResponseIds(
   fmt: InteractionFormat,
 ): void {
   const groups = responseIdGroups(i, fmt);
-  const ids = groups.flat();
+  const ids = groups.flatMap(({ ids, options }) =>
+    ids.filter((id) => optionText(id, options, fmt) === undefined),
+  );
   if (fmt.encodesOptionIndex && i.type === 'likert') {
     // Values from different learners can merge too, so this warns on any change
     // and stands in for the merge warning.

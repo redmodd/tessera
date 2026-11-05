@@ -67,16 +67,38 @@ describe('SCORM 2004 option text', () => {
   });
 
   it.each([
-    ['Ça va? Très bien!', 'Ca_va_Tres_bien'],
-    ['日本', '_'],
-    ['  -42 % ', '42'],
-  ])('records the text %s with letters, digits and _ only', (text, slug) => {
+    ['Ça va? Très bien!', '1.Ca_va_Tres_bien'],
+    ['Straße, Łódź, Øresund', '1.Strasse_Lodz_Oresund'],
+    ['  -42 % ', '1.42'],
+    ['日本', 'japan'],
+    ['—', 'japan'],
+  ])('records the text %s as %s', (text, recorded) => {
     const i: Interaction = {
       type: 'choice',
-      options: [{ id: 'a', text }],
-      response: ['a'],
+      options: [{ id: 'japan', text }],
+      response: ['japan'],
     };
-    expect(formatResponse('q1', i, fmt)).toBe(`1.${slug}`);
+    expect(formatResponse('q1', i, fmt)).toBe(recorded);
+  });
+
+  it('warns when a bare id records the same as an option text', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'choice',
+      options: ['2.B', { id: 'x', text: 'B' }],
+      response: ['2.B', 'x'],
+    };
+    buildScormInteractionFields('q1', i, null, {
+      responseField: 'learner_response',
+      timestampField: 'timestamp',
+      timestamp: '',
+      typeValue: 'choice',
+      resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+      format: fmt,
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"2.B" and "x" both as "2.B"'),
+    );
   });
 
   it('keeps ids on xAPI and indexes on SCORM 1.2', () => {
