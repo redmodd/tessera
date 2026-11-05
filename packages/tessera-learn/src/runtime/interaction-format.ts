@@ -267,27 +267,25 @@ function recordsIndex<T extends object>(
   return fmt.optionEncoding === 'index' && options !== undefined;
 }
 
-/** Latin letters NFKD does not split into a base letter and an accent. */
+/**
+ * Latin letters NFKD does not split into a base letter and an accent: the
+ * stroked, hooked and barred letters of Latin-1, Extended-A and -B, with the
+ * lowercase forms IPA holds. Letters with no plain form (ə, ʒ, ɣ) stay out.
+ */
+const STROKED =
+  'ØøŁłĐđÐðĦħıĸŊŋŦŧƀƁɓƂƃƇƈƉɖƊɗƋƌƐɛƑƒƓɠƗɨƘƙƚƝɲƞƟɵƤƥƫƬƭƮʈƲʋƳƴƵƶǤǥȤȥȴȵȶȷȺⱥȻȼȽȾⱦȿɀɃɄɆɇɈɉɊɋɌɍɎɏƆɔ';
+const STROKED_BASE =
+  'OoLlDdDdHhikNnTtbBbBbCcDdDdDdEeFfGgIiKklNnnOoPptTtTtVvYyZzGgZzlntjAaCcLTtszBUEeJjQqRrYyOo';
 const UNSPLIT_LETTERS: Record<string, string> = {
+  ...Object.fromEntries([...STROKED].map((c, k) => [c, STROKED_BASE[k]])),
   ß: 'ss',
   ẞ: 'SS',
   æ: 'ae',
   Æ: 'AE',
   œ: 'oe',
   Œ: 'OE',
-  ø: 'o',
-  Ø: 'O',
-  ł: 'l',
-  Ł: 'L',
-  đ: 'd',
-  Đ: 'D',
-  ð: 'd',
-  Ð: 'D',
   þ: 'th',
   Þ: 'Th',
-  ħ: 'h',
-  Ħ: 'H',
-  ı: 'i',
 };
 
 /**
@@ -296,9 +294,10 @@ const UNSPLIT_LETTERS: Record<string, string> = {
  * rejects any character but letters, digits, `_` and `.` (406), so the text
  * is spelled in Latin letters without accents and its other characters
  * become `_`. The position keeps options with the same text apart. Undefined
- * for an option without text, or whose text has no Latin letter or digit,
- * since its id says more, and for a repeated id, which cannot say which
- * option the learner chose.
+ * for an option without text, or whose text has no Latin letter or digit and
+ * whose id has a letter, since its id says more, and for a repeated id, which
+ * cannot say which option the learner chose. A digit-only id beside
+ * positions would read as one, so it records as `2._`.
  */
 function positionText(
   value: string,
@@ -307,15 +306,22 @@ function positionText(
 ): string | undefined {
   if (fmt.optionEncoding !== 'text' || !Array.isArray(options)) return;
   const idx = options.findIndex((option) => optionId(option) === value);
-  if (options.some((option, k) => k > idx && optionId(option) === value)) {
+  if (
+    idx < 0 ||
+    options.some((option, k) => k > idx && optionId(option) === value)
+  ) {
     return;
   }
-  const plain = optionText(options[idx])
+  const text = optionText(options[idx]);
+  if (!text) return;
+  const plain = text
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
-  if (!/[A-Za-z0-9]/.test(plain)) return;
   const position = `${idx + 1}.`;
+  if (!/[A-Za-z0-9]/.test(plain)) {
+    return /^\d+$/.test(value) ? `${position}_` : undefined;
+  }
   return position + shortIdentifier(plain, 250 - position.length);
 }
 

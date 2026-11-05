@@ -73,8 +73,12 @@ export function optionId(option: InteractionOption): string | undefined {
 }
 
 export function optionText(option: InteractionOption): string {
-  // A custom widget's text can be a number, which an LRS rejects.
-  return typeof option === 'object' ? String(option?.text ?? '') : '';
+  // A custom widget's text can be a number, which an LRS rejects, or an
+  // object, which reads as no text.
+  const text: unknown = typeof option === 'object' ? option?.text : undefined;
+  return typeof text === 'string' || typeof text === 'number'
+    ? String(text)
+    : '';
 }
 
 type NumericRange = { min?: number; max?: number };

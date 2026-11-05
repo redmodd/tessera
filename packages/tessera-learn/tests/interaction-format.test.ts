@@ -70,6 +70,7 @@ describe('SCORM 2004 option text', () => {
     ['Ça va? Très bien!', '1.Ca_va_Tres_bien'],
     ['Straße, Łódź, Øresund', '1.Strasse_Lodz_Oresund'],
     ['ﬁsh x² Ｐａｒｉｓ', '1.fish_x2_Paris'],
+    ['Ŋuoŋŋat, Ŧ ƒ ɓ ɛ ə', '1.Nuonnat_T_f_b_e'],
     ['  -42 % ', '1.42'],
     ['日本', 'japan'],
     ['—', 'japan'],
@@ -80,6 +81,27 @@ describe('SCORM 2004 option text', () => {
       response: ['japan'],
     };
     expect(formatResponse('q1', i, fmt)).toBe(recorded);
+  });
+
+  it('records a digit id whose text has no Latin letter as its position', () => {
+    const i: Interaction = {
+      type: 'choice',
+      options: [
+        { id: '0', text: 'Paris' },
+        { id: '1', text: 'Москва' },
+      ],
+      response: ['0', '1'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe('1.Paris[,]2._');
+  });
+
+  it('records an option whose text is not a string or number as its id', () => {
+    const i = {
+      type: 'choice',
+      options: [{ id: 'paris', text: { en: 'Paris' } }],
+      response: ['paris'],
+    } as unknown as Interaction;
+    expect(formatResponse('q1', i, fmt)).toBe('paris');
   });
 
   it('warns when a bare id records the same as an option text', () => {
