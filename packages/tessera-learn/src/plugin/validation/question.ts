@@ -276,11 +276,12 @@ export function validateQuestionComponents(
     if (standard) {
       const format = standard.interactionFormat;
       for (const [prop, use] of Object.entries(rule.indexedLists ?? {})) {
-        const max = format.encodesOptionIndex
-          ? SCORM12_MAX_OPTIONS
-          : use === 'every'
-            ? (format.rules?.matching?.response?.maxItems ?? Infinity)
-            : Infinity;
+        const max =
+          format.optionEncoding === 'index'
+            ? SCORM12_MAX_OPTIONS
+            : use === 'every'
+              ? (format.rules?.matching?.response?.maxItems ?? Infinity)
+              : Infinity;
         const count = staticArray(props.get(prop))?.length ?? 0;
         if (count > max) {
           const lost =

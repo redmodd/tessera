@@ -27,12 +27,13 @@ export interface InteractionFormat {
    * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
    */
   supportsCasePrefix: boolean;
-  encodesOptionIndex: boolean;
   /**
-   * SCORM 2004 has no field for option text, so it records a choice,
-   * sequencing or matching option that has text as `position.text`.
+   * How a choice, sequencing or matching option records. SCORM 1.2 takes one
+   * character per id, so `index` records its position. SCORM 2004 has no
+   * field for option text, so `text` records an option that has text as
+   * `position.text`, and any other as its id.
    */
-  encodesOptionText: boolean;
+  optionEncoding: 'index' | 'text' | 'id';
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
    * `fill-in` and 1 for `long-fill-in`.
@@ -165,8 +166,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: ':',
   supportsRange: false,
   supportsCasePrefix: false,
-  encodesOptionIndex: true,
-  encodesOptionText: false,
+  optionEncoding: 'index',
   fillInLimit: 10,
   longFillInLimit: 10,
   maxValueLength: () => 255,
@@ -187,8 +187,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsRange: true,
   supportsCasePrefix: true,
-  encodesOptionIndex: false,
-  encodesOptionText: true,
+  optionEncoding: 'text',
   fillInLimit: 10,
   longFillInLimit: 1,
   maxValueLength: (type) =>
@@ -203,7 +202,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   ...SCORM2004_INTERACTION_FORMAT,
-  encodesOptionText: false,
+  optionEncoding: 'id',
   fillInLimit: Infinity,
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
@@ -264,10 +263,10 @@ function recordsIndex<T extends object>(
   options: T | undefined,
   fmt: InteractionFormat,
 ): options is T {
-  return fmt.encodesOptionIndex && options !== undefined;
+  return fmt.optionEncoding === 'index' && options !== undefined;
 }
 
-/** Latin letters NFD does not split into a base letter and an accent. */
+/** Latin letters NFKD does not split into a base letter and an accent. */
 const UNSPLIT_LETTERS: Record<string, string> = {
   ß: 'ss',
   ẞ: 'SS',
@@ -301,20 +300,24 @@ const UNSPLIT_LETTER = new RegExp(
  * is spelled in Latin letters without accents and its other characters
  * become `_`. The position keeps options with the same text apart. Undefined
  * for an option without text, or whose text has no Latin letter or digit,
- * since its id says more.
+ * since its id says more, and for a repeated id, which cannot say which
+ * option the learner chose.
  */
 function optionText(
   value: string,
   options: InteractionOption[] | undefined,
   fmt: InteractionFormat,
 ): string | undefined {
-  if (!fmt.encodesOptionText || !Array.isArray(options)) return;
+  if (fmt.optionEncoding !== 'text' || !Array.isArray(options)) return;
   const idx = options.findIndex((option) => optionId(option) === value);
+  if (options.some((option, k) => k > idx && optionId(option) === value)) {
+    return;
+  }
   const option = options[idx];
   // A custom widget's text can be a number.
   const text = typeof option === 'object' ? String(option?.text ?? '') : '';
   const plain = text
-    .normalize('NFD')
+    .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .replace(UNSPLIT_LETTER, (c) => UNSPLIT_LETTERS[c]);
   if (!/[A-Za-z0-9]/.test(plain)) return;
@@ -616,17 +619,26 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
   }
 }
 
-/** Two distinct ids that record as the same id, and that id. */
+/**
+ * Two distinct ids that record as the same id, that id, and which of the two
+ * records its option's position and text. Two such options never merge, since
+ * their positions differ.
+ */
 function mergedIds(
   groups: IdGroup[],
   fmt: InteractionFormat,
-): [string, string, string] | undefined {
+): { ids: [string, string]; recorded: string; texted?: string } | undefined {
   for (const { ids, options } of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
       const recorded = optionText(id, options, fmt) ?? fmt.responseId(id);
       const first = seen.get(recorded) ?? id;
-      if (first !== id) return [first, id, recorded];
+      if (first !== id) {
+        const texted = [first, id].find(
+          (x) => optionText(x, options, fmt) !== undefined,
+        );
+        return { ids: [first, id], recorded, texted };
+      }
       seen.set(recorded, id);
     }
   }
@@ -866,7 +878,7 @@ function warnResponseIds(
   const ids = groups.flatMap(({ ids, options }) =>
     ids.filter((id) => optionText(id, options, fmt) === undefined),
   );
-  if (fmt.encodesOptionIndex && i.type === 'likert') {
+  if (fmt.optionEncoding === 'index' && i.type === 'likert') {
     // Values from different learners can merge too, so this warns on any change
     // and stands in for the merge warning.
     const changed = ids.find((v) => fmt.responseId(v) !== v);
@@ -877,7 +889,7 @@ function warnResponseIds(
     }
     return;
   }
-  if (fmt.encodesOptionIndex && i.type !== 'performance') {
+  if (fmt.optionEncoding === 'index' && i.type !== 'performance') {
     const invalid = ids.find((id) => !/^[0-9a-z]$/.test(fmt.responseId(id)));
     if (invalid !== undefined) {
       console.warn(
@@ -896,9 +908,17 @@ function warnResponseIds(
   }
   const merged = mergedIds(groups, fmt);
   if (merged) {
-    const [a, b, recorded] = merged;
+    const {
+      ids: [a, b],
+      recorded,
+      texted,
+    } = merged;
+    const fix =
+      texted === undefined
+        ? 'Give them ids that differ in letters or digits.'
+        : `"${texted}" records as its position and text: rename "${texted === a ? b : a}", or change the text of "${texted}".`;
     console.warn(
-      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
+      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. ${fix}`,
     );
   }
 }

@@ -30,7 +30,7 @@ function recordedResponse(i: Interaction, format: InteractionFormat) {
   return fields.find(([key]) => key === 'learner_response')?.[1];
 }
 
-describe('encodesOptionIndex', () => {
+describe('optionEncoding', () => {
   it('encodes SCORM 1.2 choices as option indexes', () => {
     expect(formatResponse('q1', choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
     expect(fitPatterns(choice, SCORM12_INTERACTION_FORMAT).kept).toEqual(['1']);
@@ -41,7 +41,7 @@ describe('encodesOptionIndex', () => {
     expect(formatResponse('q1', choice, copy)).toBe('2');
   });
 
-  it('encodes identifiers when the flag is off', () => {
+  it('encodes identifiers on SCORM 2004 for options without text', () => {
     expect(formatResponse('q1', choice, SCORM2004_INTERACTION_FORMAT)).toBe(
       'Blue',
     );
@@ -69,6 +69,7 @@ describe('SCORM 2004 option text', () => {
   it.each([
     ['Ça va? Très bien!', '1.Ca_va_Tres_bien'],
     ['Straße, Łódź, Øresund', '1.Strasse_Lodz_Oresund'],
+    ['ﬁsh x² Ｐａｒｉｓ', '1.fish_x2_Paris'],
     ['  -42 % ', '1.42'],
     ['日本', 'japan'],
     ['—', 'japan'],
@@ -97,8 +98,23 @@ describe('SCORM 2004 option text', () => {
       format: fmt,
     });
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('"2.B" and "x" both as "2.B"'),
+      expect.stringContaining(
+        '"2.B" and "x" both as "2.B", so the LMS record cannot tell them apart. "x" records as its position and text: rename "2.B", or change the text of "x".',
+      ),
     );
+  });
+
+  it('records a repeated id as the id', () => {
+    const i: Interaction = {
+      type: 'sequencing',
+      options: [
+        { id: 'a', text: 'A' },
+        { id: 'a', text: 'B' },
+        { id: 'c', text: 'C' },
+      ],
+      response: ['a', 'a', 'c'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe('a[,]a[,]3.C');
   });
 
   it('keeps ids on xAPI and indexes on SCORM 1.2', () => {
