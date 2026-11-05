@@ -175,7 +175,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   namelessSteps: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: shortIdentifier,
-  responseId: shortIdentifier,
+  responseId: scormResponseId,
 };
 
 /**
@@ -198,8 +198,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
-  // Moodle rejects (406) a response id holding anything but letters, digits, `_` and `.`.
-  responseId: (v, max) => shortIdentifier(latin(v), max),
+  responseId: scormResponseId,
 };
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
@@ -266,6 +265,24 @@ function latin(text: string): string {
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
+}
+
+/**
+ * A SCORM id inside a response: letters, digits and `_`. Moodle also allows
+ * `.` in SCORM 2004, but it is left to position text (`3.Paris`). An id of
+ * those characters records as written. Any other id drops accents
+ * (`café` → `cafe`), records letters of other scripts as code points
+ * (`東京` → `u6771u4EAC`) so they stay distinct, and slugs the rest to `_`.
+ */
+function scormResponseId(value: string, max = 250): string {
+  if (/^\w+$/.test(value)) return value.slice(0, max);
+  const spelled = value.normalize('NFC').replace(/./gsu, (c) => {
+    const plain = latin(c);
+    if (/^[A-Za-z0-9]+$/.test(plain)) return plain;
+    if (!/[\p{L}\p{N}\p{M}]/u.test(c)) return '_';
+    return `u${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+  });
+  return shortIdentifier(spelled, max);
 }
 
 /**
@@ -618,19 +635,14 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
   }
 }
 
-/**
- * Two distinct ids that record as the same id, and that id. An id recorded as
- * its option's position and text never merges: positions differ, and only
- * position text holds a `.`.
- */
+/** Two distinct ids in one group that record as the same id, and that id. */
 function mergedIds(
-  groups: IdGroup[],
+  groups: string[][],
   fmt: InteractionFormat,
 ): { ids: [string, string]; recorded: string } | undefined {
-  for (const { ids, options } of groups) {
+  for (const ids of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
-      if (positionText(id, options, fmt) !== undefined) continue;
       const recorded = fmt.responseId(id);
       const first = seen.get(recorded) ?? id;
       if (first !== id) return { ids: [first, id], recorded };
@@ -869,22 +881,17 @@ function warnResponseIds(
   i: Interaction,
   fmt: InteractionFormat,
 ): void {
-  const groups = responseIdGroups(i, fmt);
-  const ids = groups.flatMap(({ ids, options }) =>
+  // An id recorded as its option's position and text never merges: positions
+  // differ, and only position text holds a `.`.
+  const groups = responseIdGroups(i, fmt).map(({ ids, options }) =>
     ids.filter((id) => positionText(id, options, fmt) === undefined),
   );
-  if (i.type === 'likert') {
-    // Values from different learners can merge too, so this warns on any change
-    // and stands in for the merge warning.
-    const changed = ids.find((v) => fmt.responseId(v) !== v);
-    if (changed !== undefined) {
-      console.warn(
-        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}", so values that differ only in punctuation record the same. Send values of letters, digits and underscores.`,
-      );
-    }
-    return;
-  }
-  if (fmt.optionEncoding === 'index' && i.type !== 'performance') {
+  const ids = groups.flat();
+  if (
+    fmt.optionEncoding === 'index' &&
+    i.type !== 'performance' &&
+    i.type !== 'likert'
+  ) {
     const invalid = ids.find((id) => !/^[0-9a-z]$/.test(fmt.responseId(id)));
     if (invalid !== undefined) {
       console.warn(
@@ -901,6 +908,17 @@ function warnResponseIds(
       );
     }
   }
+  if (i.type === 'likert') {
+    // Values from different learners can merge too, so this warns on any change
+    // and stands in for the merge warning.
+    const changed = ids.find((v) => fmt.responseId(v, Infinity) !== v);
+    if (changed !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}", so values that differ only in punctuation or accents record the same. Send values of letters, digits and underscores.`,
+      );
+    }
+    return;
+  }
   const merged = mergedIds(groups, fmt);
   if (merged) {
     const {
@@ -908,7 +926,7 @@ function warnResponseIds(
       recorded,
     } = merged;
     console.warn(
-      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
+      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in more than punctuation or accents.`,
     );
   }
 }

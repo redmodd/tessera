@@ -321,16 +321,44 @@ describe('SCORM 2004 ids inside a response', () => {
     ['Ærø-ß', 'AEro_ss'],
     ['urn:course:likert/agree#1', 'urn_course_likert_agree_1'],
     ['v1.2', 'v1_2'],
-    ['東京', '_'],
+    ['_neutral', '_neutral'],
+    ['a__b', 'a__b'],
+    ['東京', 'u6771u4EAC'],
+    ['Мир', 'u041Cu0438u0440'],
     ['-', '_'],
     ['', '_'],
     ['a\uD800', 'a'],
   ])('records %s as %s, which Moodle accepts', (id, recorded) => {
-    expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
+    const likert: Interaction = { type: 'likert', response: id };
+    expect(formatResponse('q1', likert, fmt)).toBe(recorded);
+    expect(formatResponse('q1', likert, SCORM12_INTERACTION_FORMAT)).toBe(
       recorded,
     );
     // Moodle's SCORM 2004 CMIShortIdentifier.
     expect(recorded).toMatch(/^[\w.]{1,250}$/);
+  });
+
+  it('keeps ids in other scripts apart', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'sequencing',
+      response: ['Привет', 'Мир'],
+      correct: ['Привет', 'Мир'],
+    };
+    expect(recordedResponse(i, fmt)).toBe(
+      'u041Fu0440u0438u0432u0435u0442[,]u041Cu0438u0440',
+    );
+    expect(fitPatterns(i, fmt).kept).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns that a long likert value is cut, not changed', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse({ type: 'likert', response: 'a'.repeat(300) }, fmt);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('cut to the 250 characters'),
+    );
   });
 
   it('warns when it changes a likert value', () => {
