@@ -30,7 +30,7 @@ function recordedResponse(i: Interaction, format: InteractionFormat) {
   return fields.find(([key]) => key === 'learner_response')?.[1];
 }
 
-describe('encodesOptionIndex', () => {
+describe('optionEncoding', () => {
   it('encodes SCORM 1.2 choices as option indexes', () => {
     expect(formatResponse('q1', choice, SCORM12_INTERACTION_FORMAT)).toBe('2');
     expect(fitPatterns(choice, SCORM12_INTERACTION_FORMAT).kept).toEqual(['1']);
@@ -41,10 +41,171 @@ describe('encodesOptionIndex', () => {
     expect(formatResponse('q1', choice, copy)).toBe('2');
   });
 
-  it('encodes identifiers when the flag is off', () => {
+  it('encodes identifiers on SCORM 2004 for options without text', () => {
     expect(formatResponse('q1', choice, SCORM2004_INTERACTION_FORMAT)).toBe(
       'Blue',
     );
+  });
+});
+
+describe('SCORM 2004 option text', () => {
+  const fmt = SCORM2004_INTERACTION_FORMAT;
+  const texted: Interaction = {
+    type: 'choice',
+    options: [
+      { id: '0', text: '3' },
+      { id: '1', text: '4' },
+      { id: '2', text: 'Paris, France' },
+    ],
+    response: ['2'],
+    correct: ['1'],
+  };
+
+  it('records an option with text as its 1-based position and text', () => {
+    expect(formatResponse('q1', texted, fmt)).toBe('3.Paris_France');
+    expect(fitPatterns(texted, fmt).kept).toEqual(['2.4']);
+  });
+
+  it.each([
+    ['Ça va? Très bien!', '1.Ca_va_Tres_bien'],
+    ['Straße, Łódź, Øresund', '1.Strasse_Lodz_Oresund'],
+    ['ﬁsh x² Ｐａｒｉｓ', '1.fish_x2_Paris'],
+    ['Ŋuoŋŋat, Ŧ ƒ ɓ ɛ ə', '1.Nuonnat_T_f_b_e'],
+    ['  -42 % ', '1.42'],
+    ['日本', 'japan'],
+    ['—', 'japan'],
+  ])('records the text %s as %s', (text, recorded) => {
+    const i: Interaction = {
+      type: 'choice',
+      options: [{ id: 'japan', text }],
+      response: ['japan'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe(recorded);
+  });
+
+  it('records text with no Latin letter as its position unless the id is a word', () => {
+    const i: Interaction = {
+      type: 'choice',
+      options: [
+        { id: '0', text: 'Paris' },
+        { id: '1', text: 'Москва' },
+        { id: '東京', text: '東京' },
+        { id: 'osaka-fu', text: '大阪' },
+        { id: 'kyoto_2', text: '京都' },
+      ],
+      response: ['0', '1', '東京', 'osaka-fu', 'kyoto_2'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe(
+      '1.Paris[,]2._[,]3._[,]4._[,]kyoto_2',
+    );
+  });
+
+  it('records an option whose text is not a string or number as its id', () => {
+    const i = {
+      type: 'choice',
+      options: [{ id: 'paris', text: { en: 'Paris' } }],
+      response: ['paris'],
+    } as unknown as Interaction;
+    expect(formatResponse('q1', i, fmt)).toBe('paris');
+  });
+
+  it('warns when a bare id records the same as an option text', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'choice',
+      options: ['2.B', { id: 'x', text: 'B' }],
+      response: ['2.B', 'x'],
+    };
+    recordedResponse(i, fmt);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '"2.B" and "x" both as "2.B", so the LMS record cannot tell them apart. "x" records as its position and text: rename "2.B", or change the text of "x".',
+      ),
+    );
+  });
+
+  it('warns when an option the learner did not pick records the same as one they did', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'choice',
+      options: ['2.B', { id: 'x', text: 'B' }],
+      response: ['x'],
+    };
+    recordedResponse(i, fmt);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"2.B" and "x" both as "2.B"'),
+    );
+  });
+
+  it('records a repeated id as the id', () => {
+    const i: Interaction = {
+      type: 'sequencing',
+      options: [
+        { id: 'a', text: 'A' },
+        { id: 'a', text: 'B' },
+        { id: 'c', text: 'C' },
+      ],
+      response: ['a', 'a', 'c'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe('a[,]a[,]3.C');
+  });
+
+  it('keeps ids on xAPI and indexes on SCORM 1.2', () => {
+    expect(formatResponse('q1', texted, XAPI_INTERACTION_FORMAT)).toBe('2');
+    expect(formatResponse('q1', texted, SCORM12_INTERACTION_FORMAT)).toBe('2');
+  });
+
+  it('records matching pairs and sequences by position and text', () => {
+    const matching: Interaction = {
+      type: 'matching',
+      optionPairs: {
+        left: [{ id: 'l0', text: 'Cats' }],
+        right: [
+          { id: 'r0', text: 'Fish' },
+          { id: 'r1', text: 'Mammals' },
+        ],
+      },
+      response: [['l0', 'r1']],
+      correct: [['l0', 'r1']],
+    };
+    expect(formatResponse('q1', matching, fmt)).toBe('1.Cats[.]2.Mammals');
+    expect(fitPatterns(matching, fmt).kept).toEqual(['1.Cats[.]2.Mammals']);
+    const sequencing: Interaction = {
+      type: 'sequencing',
+      options: [
+        { id: 'a', text: 'café' },
+        { id: 'b', text: 'café' },
+      ],
+      response: ['b', 'a'],
+      correct: ['a', 'b'],
+    };
+    expect(formatResponse('q1', sequencing, fmt)).toBe('2.cafe[,]1.cafe');
+    expect(fitPatterns(sequencing, fmt).kept).toEqual(['1.cafe[,]2.cafe']);
+  });
+
+  it('keeps the id of an option without text', () => {
+    const i: Interaction = {
+      type: 'choice',
+      options: ['red', { id: 'green', text: '' }, { id: 'blue', text: 'Blue' }],
+      response: ['red', 'green', 'blue', 'other'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe('red[,]green[,]3.Blue[,]other');
+  });
+
+  it('cuts position and text to 250 characters without a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'choice',
+      options: [
+        { id: 'x'.repeat(300), text: 'a'.repeat(300) },
+        { id: 'x'.repeat(301), text: 'a'.repeat(300) },
+      ],
+      response: ['x'.repeat(300), 'x'.repeat(301)],
+    };
+    expect(recordedResponse(i, fmt)).toBe(
+      `1.${'a'.repeat(248)}[,]2.${'a'.repeat(248)}`,
+    );
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

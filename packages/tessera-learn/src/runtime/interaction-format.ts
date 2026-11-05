@@ -6,6 +6,7 @@
 
 import {
   optionId,
+  optionText,
   reversedRange,
   stepRange,
   type Interaction,
@@ -27,7 +28,13 @@ export interface InteractionFormat {
    * `{case_matters=true}` prefix; SCORM 1.2 has no such syntax.
    */
   supportsCasePrefix: boolean;
-  encodesOptionIndex: boolean;
+  /**
+   * How a choice, sequencing or matching option records. SCORM 1.2 takes one
+   * character per id, so `index` records its position. SCORM 2004 has no
+   * field for option text, so `text` records an option that has text as
+   * `position.text`, and any other as its id.
+   */
+  optionEncoding: 'index' | 'text' | 'id';
   /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
    * `fill-in` and 1 for `long-fill-in`.
@@ -160,7 +167,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: ':',
   supportsRange: false,
   supportsCasePrefix: false,
-  encodesOptionIndex: true,
+  optionEncoding: 'index',
   fillInLimit: 10,
   longFillInLimit: 10,
   maxValueLength: () => 255,
@@ -181,7 +188,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rangeDelim: '[:]',
   supportsRange: true,
   supportsCasePrefix: true,
-  encodesOptionIndex: false,
+  optionEncoding: 'text',
   fillInLimit: 10,
   longFillInLimit: 1,
   maxValueLength: (type) =>
@@ -196,6 +203,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   ...SCORM2004_INTERACTION_FORMAT,
+  optionEncoding: 'id',
   fillInLimit: Infinity,
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
@@ -256,7 +264,66 @@ function recordsIndex<T extends object>(
   options: T | undefined,
   fmt: InteractionFormat,
 ): options is T {
-  return fmt.encodesOptionIndex && options !== undefined;
+  return fmt.optionEncoding === 'index' && options !== undefined;
+}
+
+/**
+ * Latin letters NFKD does not split into a base letter and an accent: the
+ * stroked, hooked and barred letters of Latin-1, Extended-A and -B, with the
+ * lowercase forms IPA holds. Letters with no plain form (ə, ʒ, ɣ) stay out.
+ */
+const STROKED =
+  'ØøŁłĐđÐðĦħıĸŊŋŦŧƀƁɓƂƃƇƈƉɖƊɗƋƌƐɛƑƒƓɠƗɨƘƙƚƝɲƞƟɵƤƥƫƬƭƮʈƲʋƳƴƵƶǤǥȤȥȴȵȶȷȺⱥȻȼȽȾⱦȿɀɃɄɆɇɈɉɊɋɌɍɎɏƆɔ';
+const STROKED_BASE =
+  'OoLlDdDdHhikNnTtbBbBbCcDdDdDdEeFfGgIiKklNnnOoPptTtTtVvYyZzGgZzlntjAaCcLTtszBUEeJjQqRrYyOo';
+const UNSPLIT_LETTERS: Record<string, string> = {
+  ...Object.fromEntries([...STROKED].map((c, k) => [c, STROKED_BASE[k]])),
+  ß: 'ss',
+  ẞ: 'SS',
+  æ: 'ae',
+  Æ: 'AE',
+  œ: 'oe',
+  Œ: 'OE',
+  þ: 'th',
+  Þ: 'Th',
+};
+
+/**
+ * The option's 1-based position and text (`3.Paris_France`), which the
+ * format records in place of its id so LMS reports show the answer. Moodle
+ * rejects any character but letters, digits, `_` and `.` (406), so the text
+ * is spelled in Latin letters without accents and its other characters
+ * become `_`. The position keeps options with the same text apart. Undefined
+ * for an option without text, and for a repeated id, which cannot say which
+ * option the learner chose. Text with no Latin letter or digit records as
+ * `2._`, unless the id is Latin letters, digits and `_` with a letter, which
+ * says more: a digit-only id beside positions reads as one, and Moodle
+ * rejects any other id.
+ */
+function positionText(
+  value: string,
+  options: InteractionOption[] | undefined,
+  fmt: InteractionFormat,
+): string | undefined {
+  if (fmt.optionEncoding !== 'text' || !Array.isArray(options)) return;
+  const idx = options.findIndex((option) => optionId(option) === value);
+  if (
+    idx < 0 ||
+    options.some((option, k) => k > idx && optionId(option) === value)
+  ) {
+    return;
+  }
+  const text = optionText(options[idx]);
+  if (!text) return;
+  const plain = text
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
+  const position = `${idx + 1}.`;
+  if (!/[A-Za-z0-9]/.test(plain)) {
+    return /^\w*[A-Za-z]\w*$/.test(value) ? undefined : `${position}_`;
+  }
+  return position + shortIdentifier(plain, 250 - position.length);
 }
 
 /**
@@ -268,6 +335,8 @@ function encodeListItem(
   options: InteractionOption[] | undefined,
   fmt: InteractionFormat,
 ): string {
+  const text = positionText(value, options, fmt);
+  if (text !== undefined) return text;
   if (!recordsIndex(options, fmt)) return fmt.responseId(value);
   const idx = options.findIndex((option) => optionId(option) === value);
   if (idx < 0) {
@@ -511,43 +580,87 @@ export interface ScormInteractionSpec {
   description?: string | null;
 }
 
-/** Ids recorded through `responseId`, grouped so ids in one group must stay distinct. */
-function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
+/**
+ * Ids recorded through `responseId` or as their option's position and text,
+ * grouped so ids in one group must stay distinct.
+ */
+interface IdGroup {
+  ids: string[];
+  options?: InteractionOption[];
+}
+
+/**
+ * Every option's id: two options can merge in the LMS record even when no
+ * one learner picks both.
+ */
+function optionIds(options: InteractionOption[] | undefined): string[] {
+  if (!Array.isArray(options)) return [];
+  return options
+    .map(optionId)
+    .filter((id): id is string => typeof id === 'string');
+}
+
+function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
   switch (i.type) {
     case 'choice':
-    case 'sequencing':
-      return recordsIndex(i.options, fmt)
-        ? []
-        : [[...i.response, ...(i.correct ?? [])]];
+    case 'sequencing': {
+      if (recordsIndex(i.options, fmt)) return [];
+      const ids = [...i.response, ...(i.correct ?? [])];
+      return [{ ids: [...optionIds(i.options), ...ids], options: i.options }];
+    }
     case 'matching': {
+      const { left, right } = i.optionPairs ?? {};
       if (recordsIndex(i.optionPairs, fmt)) return [];
       const pairs = [...i.response, ...(i.correct ?? [])];
-      return [pairs.map(([l]) => l), pairs.map(([, r]) => r)];
-    }
-    case 'performance':
       return [
-        [...i.response, ...(i.correct ?? [])]
-          .map(([step]) => step)
-          .filter((step) => stepName(step, fmt) !== ''),
+        { ids: [...optionIds(left), ...pairs.map(([l]) => l)], options: left },
+        {
+          ids: [...optionIds(right), ...pairs.map(([, r]) => r)],
+          options: right,
+        },
       ];
+    }
+    case 'performance': {
+      const steps = [...i.response, ...(i.correct ?? [])].map(([s]) => s);
+      return [
+        {
+          ids: [...optionIds(i.options), ...steps].filter(
+            (step) => stepName(step, fmt) !== '',
+          ),
+        },
+      ];
+    }
     case 'likert':
-      return [[i.response, i.correct ?? i.response]];
+      return [
+        {
+          ids: [...optionIds(i.options), i.response, i.correct ?? i.response],
+        },
+      ];
     default:
       return [];
   }
 }
 
-/** Two distinct ids that record as the same id, and that id. */
+/**
+ * Two distinct ids that record as the same id, that id, and which of the two
+ * records its option's position and text. Two such options never merge, since
+ * their positions differ.
+ */
 function mergedIds(
-  groups: string[][],
+  groups: IdGroup[],
   fmt: InteractionFormat,
-): [string, string, string] | undefined {
-  for (const ids of groups) {
+): { ids: [string, string]; recorded: string; texted?: string } | undefined {
+  for (const { ids, options } of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
-      const recorded = fmt.responseId(id);
+      const recorded = positionText(id, options, fmt) ?? fmt.responseId(id);
       const first = seen.get(recorded) ?? id;
-      if (first !== id) return [first, id, recorded];
+      if (first !== id) {
+        const texted = [first, id].find(
+          (x) => positionText(x, options, fmt) !== undefined,
+        );
+        return { ids: [first, id], recorded, texted };
+      }
       seen.set(recorded, id);
     }
   }
@@ -784,8 +897,10 @@ function warnResponseIds(
   fmt: InteractionFormat,
 ): void {
   const groups = responseIdGroups(i, fmt);
-  const ids = groups.flat();
-  if (fmt.encodesOptionIndex && i.type === 'likert') {
+  const ids = groups.flatMap(({ ids, options }) =>
+    ids.filter((id) => positionText(id, options, fmt) === undefined),
+  );
+  if (fmt.optionEncoding === 'index' && i.type === 'likert') {
     // Values from different learners can merge too, so this warns on any change
     // and stands in for the merge warning.
     const changed = ids.find((v) => fmt.responseId(v) !== v);
@@ -796,7 +911,7 @@ function warnResponseIds(
     }
     return;
   }
-  if (fmt.encodesOptionIndex && i.type !== 'performance') {
+  if (fmt.optionEncoding === 'index' && i.type !== 'performance') {
     const invalid = ids.find((id) => !/^[0-9a-z]$/.test(fmt.responseId(id)));
     if (invalid !== undefined) {
       console.warn(
@@ -815,9 +930,17 @@ function warnResponseIds(
   }
   const merged = mergedIds(groups, fmt);
   if (merged) {
-    const [a, b, recorded] = merged;
+    const {
+      ids: [a, b],
+      recorded,
+      texted,
+    } = merged;
+    const fix =
+      texted === undefined
+        ? 'Give them ids that differ in letters or digits.'
+        : `"${texted}" records as its position and text: rename "${texted === a ? b : a}", or change the text of "${texted}".`;
     console.warn(
-      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
+      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. ${fix}`,
     );
   }
 }

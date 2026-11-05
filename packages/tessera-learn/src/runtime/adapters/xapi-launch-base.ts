@@ -6,6 +6,7 @@ import type {
 import type { CourseConfig, Verdict } from '../types.js';
 import {
   optionId,
+  optionText,
   type Interaction,
   type InteractionOption,
 } from '../interaction.js';
@@ -115,8 +116,7 @@ function interactionComponents(
     return null;
   }
   return options.map((option, k) => {
-    // A number from a custom widget's options would make the LRS reject the batch.
-    const text = typeof option === 'string' ? '' : String(option.text ?? '');
+    const text = optionText(option);
     return text
       ? { id: ids[k], description: { 'en-US': text } }
       : { id: ids[k] };

@@ -98,9 +98,9 @@ type Interaction =
 type InteractionOption = string | { id: string; text: string }; // an id, or an id and the text shown
 ```
 
-Give each option its text (`{ id: '0', text: 'Paris' }`) so LRS reports show it. cmi5 and xAPI send the text as the Answered statement's interaction components (`choices`, `scale`, `source`/`target`, `steps`); responses and correct patterns keep the ids. Each list needs distinct ids: Tessera leaves out a list whose ids repeat, with a console warning. SCORM 1.2 and 2004 have no field for option text and record the ids only.
+Give each option its text (`{ id: '0', text: 'Paris' }`) so LMS and LRS reports show it. cmi5 and xAPI send the text as the Answered statement's interaction components (`choices`, `scale`, `source`/`target`, `steps`); responses and correct patterns keep the ids. Each list needs distinct ids: Tessera leaves out a list whose ids repeat, with a console warning. SCORM 2004 records a `choice`, `sequencing` or `matching` option that has text as its 1-based position and text, in place of its id (`3.Paris_France`, `1.Cats[.]2.Mammals`). As Moodle requires, the text keeps only Latin letters and digits: letters lose their accents and strokes (`Très` → `Tres`, `Straße` → `Strasse`, `Ŋ` → `N`), and other characters, including letters with no plain form such as `ə`, become `_`. An option whose id repeats keeps its id. So does an option whose text has no Latin letter or digit, if its id is Latin letters, digits and `_` with at least one letter (`tokyo`). Any other id records as its position and `_` (`2._`): a bare number reads as a position, and Moodle rejects other characters. Rewording an option changes what the LMS records, so answers from before and after the edit report as different answers. SCORM 1.2 has no room for option text. Likert and performance text reaches cmi5 and xAPI reports only.
 
-For `choice` / `sequencing` / `matching`, always pass the full option list via `options` (or `optionPairs` for matching), even when the ids are indexes like `'0'`. cmi5, xAPI and SCORM 2004 record the ids (see below); SCORM 1.2 accepts only one-character ids, so it records each id as its position in `options` (`0`-`9`, then `a`-`z`: up to 36 options). On SCORM 1.2:
+For `choice` / `sequencing` / `matching`, always pass the full option list via `options` (or `optionPairs` for matching), even when the ids are indexes like `'0'`, in the order you wrote it, not a shuffled display order: SCORM 1.2 records each option's position in it, and SCORM 2004 the position of each option with text, so a shuffled list records the same answer differently for each learner. cmi5 and xAPI record the ids, and SCORM 2004 the ids of options without text (see below); SCORM 1.2 accepts only one-character ids, so it records each id as its position in `options` (`0`-`9`, then `a`-`z`: up to 36 options). On SCORM 1.2:
 
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
@@ -130,7 +130,7 @@ response: () => ({
     { id: 'merge', text: 'Merge' },
   ],
 });
-// SCORM 1.2 → "2"   SCORM 2004 → "speed-limit"   cmi5 → "speed-limit"
+// SCORM 1.2 → "2"   SCORM 2004 → "3.Speed_limit"   cmi5 → "speed-limit"
 
 // sequencing: response/correct are ordered id lists; options carries every id
 response: () => ({
