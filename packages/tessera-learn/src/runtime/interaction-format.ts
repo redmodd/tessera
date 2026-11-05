@@ -6,6 +6,7 @@
 
 import {
   optionId,
+  optionText,
   reversedRange,
   stepRange,
   type Interaction,
@@ -288,10 +289,6 @@ const UNSPLIT_LETTERS: Record<string, string> = {
   Ħ: 'H',
   ı: 'i',
 };
-const UNSPLIT_LETTER = new RegExp(
-  `[${Object.keys(UNSPLIT_LETTERS).join('')}]`,
-  'g',
-);
 
 /**
  * The option's 1-based position and text (`3.Paris_France`), which the
@@ -303,7 +300,7 @@ const UNSPLIT_LETTER = new RegExp(
  * since its id says more, and for a repeated id, which cannot say which
  * option the learner chose.
  */
-function optionText(
+function positionText(
   value: string,
   options: InteractionOption[] | undefined,
   fmt: InteractionFormat,
@@ -313,13 +310,10 @@ function optionText(
   if (options.some((option, k) => k > idx && optionId(option) === value)) {
     return;
   }
-  const option = options[idx];
-  // A custom widget's text can be a number.
-  const text = typeof option === 'object' ? String(option?.text ?? '') : '';
-  const plain = text
+  const plain = optionText(options[idx])
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
-    .replace(UNSPLIT_LETTER, (c) => UNSPLIT_LETTERS[c]);
+    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
   if (!/[A-Za-z0-9]/.test(plain)) return;
   const position = `${idx + 1}.`;
   return position + shortIdentifier(plain, 250 - position.length);
@@ -334,7 +328,7 @@ function encodeListItem(
   options: InteractionOption[] | undefined,
   fmt: InteractionFormat,
 ): string {
-  const text = optionText(value, options, fmt);
+  const text = positionText(value, options, fmt);
   if (text !== undefined) return text;
   if (!recordsIndex(options, fmt)) return fmt.responseId(value);
   const idx = options.findIndex((option) => optionId(option) === value);
@@ -631,11 +625,11 @@ function mergedIds(
   for (const { ids, options } of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
-      const recorded = optionText(id, options, fmt) ?? fmt.responseId(id);
+      const recorded = positionText(id, options, fmt) ?? fmt.responseId(id);
       const first = seen.get(recorded) ?? id;
       if (first !== id) {
         const texted = [first, id].find(
-          (x) => optionText(x, options, fmt) !== undefined,
+          (x) => positionText(x, options, fmt) !== undefined,
         );
         return { ids: [first, id], recorded, texted };
       }
@@ -876,7 +870,7 @@ function warnResponseIds(
 ): void {
   const groups = responseIdGroups(i, fmt);
   const ids = groups.flatMap(({ ids, options }) =>
-    ids.filter((id) => optionText(id, options, fmt) === undefined),
+    ids.filter((id) => positionText(id, options, fmt) === undefined),
   );
   if (fmt.optionEncoding === 'index' && i.type === 'likert') {
     // Values from different learners can merge too, so this warns on any change

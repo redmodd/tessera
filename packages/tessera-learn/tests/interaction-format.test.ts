@@ -89,14 +89,7 @@ describe('SCORM 2004 option text', () => {
       options: ['2.B', { id: 'x', text: 'B' }],
       response: ['2.B', 'x'],
     };
-    buildScormInteractionFields('q1', i, null, {
-      responseField: 'learner_response',
-      timestampField: 'timestamp',
-      timestamp: '',
-      typeValue: 'choice',
-      resultLabels: { correct: 'correct', incorrect: 'incorrect' },
-      format: fmt,
-    });
+    recordedResponse(i, fmt);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining(
         '"2.B" and "x" both as "2.B", so the LMS record cannot tell them apart. "x" records as its position and text: rename "2.B", or change the text of "x".',
