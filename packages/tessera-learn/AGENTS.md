@@ -194,7 +194,7 @@ export default { title: 'How to play', pages: ['welcome', 'objectives'] };
 5. **Custom xAPI**: `useXAPI()` emits your own verbs. See [Custom xAPI](docs/xapi.md#custom-xapi-statements).
 6. **Runtime hooks**: `course.runtime.js` at the course root exports `canAccess` and xAPI `auth`/`actor` resolvers. See [Runtime hooks](#runtime-hooks-courseruntimejs).
 
-A custom widget that calls `useQuestion` and emits an `Interaction` is scored, reported, and persisted identically to `<MultipleChoice>`. Pass `text` (the question as shown) so LMS reports show it, and each option's text (`{ id, text }` in `options`, or `optionPairs` for matching) so cmi5 and xAPI reports show it.
+A custom widget that calls `useQuestion` and emits an `Interaction` is scored, reported, and persisted identically to `<MultipleChoice>`. Pass `text` (the question as shown) so LMS reports show it, and each option's text (`{ id, text }` in `options`, or `optionPairs` for matching) so SCORM 2004, cmi5 and xAPI reports show it.
 
 ---
 

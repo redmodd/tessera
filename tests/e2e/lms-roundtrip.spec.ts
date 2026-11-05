@@ -608,6 +608,15 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       'matching',
     ]);
     expect(await interactionField(page, 'description')).toEqual(QUIZ_TEXT);
+    const pairs = '1.1[.]1.One[,]2.2[.]2.Two[,]3.3[.]3.Three';
+    expect(await interactionField(page, 'learner_response')).toEqual([
+      '2.4',
+      'blue',
+      pairs,
+    ]);
+    expect(await interactionField(page, 'correct_responses.0.pattern')).toEqual(
+      ['2.4', 'blue', pairs],
+    );
 
     const idWrites = await interactionField(page, 'id');
     expect(idWrites).toHaveLength(3);

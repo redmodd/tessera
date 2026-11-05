@@ -48,6 +48,96 @@ describe('encodesOptionIndex', () => {
   });
 });
 
+describe('SCORM 2004 option text', () => {
+  const fmt = SCORM2004_INTERACTION_FORMAT;
+  const texted: Interaction = {
+    type: 'choice',
+    options: [
+      { id: '0', text: '3' },
+      { id: '1', text: '4' },
+      { id: '2', text: 'Paris, France' },
+    ],
+    response: ['2'],
+    correct: ['1'],
+  };
+
+  it('records an option with text as its 1-based position and text', () => {
+    expect(formatResponse('q1', texted, fmt)).toBe('3.Paris_France');
+    expect(fitPatterns(texted, fmt).kept).toEqual(['2.4']);
+  });
+
+  it.each([
+    ['Ça va? Très bien!', 'Ca_va_Tres_bien'],
+    ['日本', '_'],
+    ['  -42 % ', '42'],
+  ])('records the text %s with letters, digits and _ only', (text, slug) => {
+    const i: Interaction = {
+      type: 'choice',
+      options: [{ id: 'a', text }],
+      response: ['a'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe(`1.${slug}`);
+  });
+
+  it('keeps ids on xAPI and indexes on SCORM 1.2', () => {
+    expect(formatResponse('q1', texted, XAPI_INTERACTION_FORMAT)).toBe('2');
+    expect(formatResponse('q1', texted, SCORM12_INTERACTION_FORMAT)).toBe('2');
+  });
+
+  it('records matching pairs and sequences by position and text', () => {
+    const matching: Interaction = {
+      type: 'matching',
+      optionPairs: {
+        left: [{ id: 'l0', text: 'Cats' }],
+        right: [
+          { id: 'r0', text: 'Fish' },
+          { id: 'r1', text: 'Mammals' },
+        ],
+      },
+      response: [['l0', 'r1']],
+      correct: [['l0', 'r1']],
+    };
+    expect(formatResponse('q1', matching, fmt)).toBe('1.Cats[.]2.Mammals');
+    expect(fitPatterns(matching, fmt).kept).toEqual(['1.Cats[.]2.Mammals']);
+    const sequencing: Interaction = {
+      type: 'sequencing',
+      options: [
+        { id: 'a', text: 'café' },
+        { id: 'b', text: 'café' },
+      ],
+      response: ['b', 'a'],
+      correct: ['a', 'b'],
+    };
+    expect(formatResponse('q1', sequencing, fmt)).toBe('2.cafe[,]1.cafe');
+    expect(fitPatterns(sequencing, fmt).kept).toEqual(['1.cafe[,]2.cafe']);
+  });
+
+  it('keeps the id of an option without text', () => {
+    const i: Interaction = {
+      type: 'choice',
+      options: ['red', { id: 'green', text: '' }, { id: 'blue', text: 'Blue' }],
+      response: ['red', 'green', 'blue', 'other'],
+    };
+    expect(formatResponse('q1', i, fmt)).toBe('red[,]green[,]3.Blue[,]other');
+  });
+
+  it('cuts position and text to 250 characters without a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'choice',
+      options: [
+        { id: 'x'.repeat(300), text: 'a'.repeat(300) },
+        { id: 'x'.repeat(301), text: 'a'.repeat(300) },
+      ],
+      response: ['x'.repeat(300), 'x'.repeat(301)],
+    };
+    expect(recordedResponse(i, fmt)).toBe(
+      `1.${'a'.repeat(248)}[,]2.${'a'.repeat(248)}`,
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
 describe('performance steps', () => {
   it('slugs performance step names but keeps answers as written on SCORM 1.2', () => {
     const performance: Interaction = {

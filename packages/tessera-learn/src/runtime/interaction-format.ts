@@ -29,6 +29,11 @@ export interface InteractionFormat {
   supportsCasePrefix: boolean;
   encodesOptionIndex: boolean;
   /**
+   * SCORM 2004 has no field for option text, so it records a choice,
+   * sequencing or matching option that has text as `position.text`.
+   */
+  encodesOptionText: boolean;
+  /**
    * SCORM 2004 4E RTE §4.2.7 caps `correct_responses` at 10 patterns for
    * `fill-in` and 1 for `long-fill-in`.
    */
@@ -161,6 +166,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   supportsRange: false,
   supportsCasePrefix: false,
   encodesOptionIndex: true,
+  encodesOptionText: false,
   fillInLimit: 10,
   longFillInLimit: 10,
   maxValueLength: () => 255,
@@ -182,6 +188,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   supportsRange: true,
   supportsCasePrefix: true,
   encodesOptionIndex: false,
+  encodesOptionText: true,
   fillInLimit: 10,
   longFillInLimit: 1,
   maxValueLength: (type) =>
@@ -196,6 +203,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   ...SCORM2004_INTERACTION_FORMAT,
+  encodesOptionText: false,
   fillInLimit: Infinity,
   longFillInLimit: Infinity,
   maxValueLength: () => Infinity,
@@ -260,6 +268,29 @@ function recordsIndex<T extends object>(
 }
 
 /**
+ * The option's 1-based position and text (`3.Paris_France`), which the
+ * format records in place of its id so LMS reports show the answer. Moodle
+ * rejects any character but letters, digits, `_` and `.` (406), so the text
+ * loses its accents and its other characters become `_`. The position keeps
+ * options with the same text apart. Undefined for an option without text.
+ */
+function optionText(
+  value: string,
+  options: InteractionOption[] | undefined,
+  fmt: InteractionFormat,
+): string | undefined {
+  if (!fmt.encodesOptionText || !Array.isArray(options)) return;
+  const idx = options.findIndex((option) => optionId(option) === value);
+  const option = options[idx];
+  // A custom widget's text can be a number.
+  const text = typeof option === 'object' ? String(option?.text ?? '') : '';
+  if (!text) return;
+  const position = `${idx + 1}.`;
+  const plain = text.normalize('NFD').replace(/\p{M}/gu, '');
+  return position + shortIdentifier(plain, 250 - position.length);
+}
+
+/**
  * SCORM 1.2 CMIFeedback takes one character per choice or matching id
  * (0-9, a-z), so an index encodes as one base-36 digit.
  */
@@ -268,6 +299,8 @@ function encodeListItem(
   options: InteractionOption[] | undefined,
   fmt: InteractionFormat,
 ): string {
+  const text = optionText(value, options, fmt);
+  if (text !== undefined) return text;
   if (!recordsIndex(options, fmt)) return fmt.responseId(value);
   const idx = options.findIndex((option) => optionId(option) === value);
   if (idx < 0) {
@@ -511,18 +544,33 @@ export interface ScormInteractionSpec {
   description?: string | null;
 }
 
-/** Ids recorded through `responseId`, grouped so ids in one group must stay distinct. */
+/**
+ * Ids recorded through `responseId`, grouped so ids in one group must stay
+ * distinct. An option recorded with its position and text stays distinct.
+ */
 function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
+  const bare = (ids: string[], options: InteractionOption[] | undefined) =>
+    ids.filter((id) => optionText(id, options, fmt) === undefined);
   switch (i.type) {
     case 'choice':
     case 'sequencing':
       return recordsIndex(i.options, fmt)
         ? []
-        : [[...i.response, ...(i.correct ?? [])]];
+        : [bare([...i.response, ...(i.correct ?? [])], i.options)];
     case 'matching': {
+      const { left, right } = i.optionPairs ?? {};
       if (recordsIndex(i.optionPairs, fmt)) return [];
       const pairs = [...i.response, ...(i.correct ?? [])];
-      return [pairs.map(([l]) => l), pairs.map(([, r]) => r)];
+      return [
+        bare(
+          pairs.map(([l]) => l),
+          left,
+        ),
+        bare(
+          pairs.map(([, r]) => r),
+          right,
+        ),
+      ];
     }
     case 'performance':
       return [
