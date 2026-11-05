@@ -109,31 +109,27 @@ describe('SCORM 2004 option text', () => {
     expect(formatResponse('q1', i, fmt)).toBe('paris');
   });
 
-  it('warns when a bare id records the same as an option text', () => {
+  it('keeps a bare id that looks like position text apart from it', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const i: Interaction = {
       type: 'choice',
       options: ['2.B', { id: 'x', text: 'B' }],
       response: ['2.B', 'x'],
     };
-    recordedResponse(i, fmt);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining(
-        '"2.B" and "x" both as "2.B", so the LMS record cannot tell them apart. "x" records as its position and text: rename "2.B", or change the text of "x".',
-      ),
-    );
+    expect(recordedResponse(i, fmt)).toBe('2_B[,]2.B');
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('warns when an option the learner did not pick records the same as one they did', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const i: Interaction = {
       type: 'choice',
-      options: ['2.B', { id: 'x', text: 'B' }],
-      response: ['x'],
+      options: ['a-b', 'a b'],
+      response: ['a b'],
     };
     recordedResponse(i, fmt);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('"2.B" and "x" both as "2.B"'),
+      expect.stringContaining('"a-b" and "a b" both as "a_b"'),
     );
   });
 
@@ -227,7 +223,7 @@ describe('performance steps', () => {
     ]);
   });
 
-  it('percent-encodes performance step names but keeps answers as written on SCORM 2004', () => {
+  it('folds performance step names but keeps answers as written on SCORM 2004', () => {
     const performance: Interaction = {
       type: 'performance',
       response: [
@@ -237,7 +233,7 @@ describe('performance steps', () => {
     };
     expect(
       formatResponse('q1', performance, SCORM2004_INTERACTION_FORMAT),
-    ).toBe('Step%201[.]turn left[,]angle[.]-3.5');
+    ).toBe('Step_1[.]turn left[,]angle[.]-3.5');
   });
 
   it('keeps performance step names and answers as written on xAPI', () => {
@@ -318,21 +314,32 @@ describe('SCORM 2004 ids inside a response', () => {
   const fmt = SCORM2004_INTERACTION_FORMAT;
 
   it.each([
-    ['Strongly agree', 'Strongly%20agree'],
-    ['step-one_(a)', 'step-one_(a)'],
-    ['a[,]b~c', 'a%5B%2C%5Db%7Ec'],
-    ['café', 'caf%C3%A9'],
-    ['urn:course:likert/agree#1', 'urn:course:likert/agree#1'],
-    ['a%20b', 'a%2520b'],
-    ['a?b&c', 'a%3Fb%26c'],
-    ['-', '%2D'],
-    ['::', '%3A%3A'],
-    ['(*)', '%28%2A%29'],
+    ['Strongly agree', 'Strongly_agree'],
+    ['step-one_(a)', 'step_one_a'],
+    ['a[,]b~c', 'a_b_c'],
+    ['café', 'cafe'],
+    ['Ærø-ß', 'AEro_ss'],
+    ['urn:course:likert/agree#1', 'urn_course_likert_agree_1'],
+    ['v1.2', 'v1_2'],
+    ['東京', '_'],
+    ['-', '_'],
     ['', '_'],
-    ['a\uD800', 'a%EF%BF%BD'],
-  ])('records %s as %s', (id, recorded) => {
+    ['a\uD800', 'a'],
+  ])('records %s as %s, which Moodle accepts', (id, recorded) => {
     expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,
+    );
+    // Moodle's SCORM 2004 CMIShortIdentifier.
+    expect(recorded).toMatch(/^[\w.]{1,250}$/);
+  });
+
+  it('warns when it changes a likert value', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse({ type: 'likert', response: 'Strongly agree' }, fmt);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'records the likert value "Strongly agree" as "Strongly_agree"',
+      ),
     );
   });
 
@@ -425,9 +432,9 @@ describe('SCORM 2004 ids inside a response', () => {
   });
 
   it.each([
-    ['an escape', 'a'.repeat(248) + ' b', 'a'.repeat(248)],
-    ['a character', 'é'.repeat(42), '%C3%A9'.repeat(41)],
-  ])('cuts an id to 250 characters without splitting %s', (_, id, recorded) => {
+    ['an id', 'a'.repeat(300), 'a'.repeat(250)],
+    ['a folded id', 'ß'.repeat(126), 'ss'.repeat(125)],
+  ])('cuts %s to 250 characters', (_, id, recorded) => {
     expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,
     );

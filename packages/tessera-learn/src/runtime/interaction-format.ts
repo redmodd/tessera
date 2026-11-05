@@ -198,7 +198,8 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
-  responseId: uriIdentifier,
+  // Moodle rejects (406) a response id holding anything but letters, digits, `_` and `.`.
+  responseId: (v, max) => shortIdentifier(latin(v), max),
 };
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
@@ -221,35 +222,6 @@ export function shortIdentifier(value: string, max = 250): string {
   const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const trimmed = cleaned.slice(0, max);
   return trimmed || '_';
-}
-
-/** The characters scorm-again's SCORM 2004 `CMIShortIdentifier` takes, less `%`. */
-const URI_ID_CHAR = /[\w\-()+.:=@;$!*'/#]/;
-
-/**
- * SCORM 2004 `short_identifier_type`. Characters outside that set, and `%`,
- * are percent-encoded. scorm-again refuses an id with no letter, digit or
- * underscore, so such an id escapes every character. The 250-character cut
- * keeps each character's escapes whole. The cut, the `_` for an empty id and
- * the U+FFFD for a lone surrogate can record distinct ids as one.
- */
-function uriIdentifier(value: string, max = 250): string {
-  let id = '';
-  for (const c of value.replace(/\p{Cs}/gu, '\uFFFD')) {
-    const encoded = URI_ID_CHAR.test(c)
-      ? c
-      : c === '~'
-        ? '%7E'
-        : encodeURIComponent(c);
-    if (id.length + encoded.length > max) break;
-    id += encoded;
-  }
-  if (/\w/.test(id)) return id;
-  const escaped = id.replace(
-    /./g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-  return escaped.slice(0, Math.floor(max / 3) * 3) || '_';
 }
 
 export const SCORM12_MAX_OPTIONS = 36;
@@ -288,6 +260,14 @@ const UNSPLIT_LETTERS: Record<string, string> = {
   Þ: 'Th',
 };
 
+/** Accented Latin letters spelled without their accents. */
+function latin(text: string): string {
+  return text
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
+}
+
 /**
  * The option's 1-based position and text (`3.Paris_France`), which the
  * format records in place of its id so LMS reports show the answer. Moodle
@@ -297,8 +277,8 @@ const UNSPLIT_LETTERS: Record<string, string> = {
  * for an option without text, and for a repeated id, which cannot say which
  * option the learner chose. Text with no Latin letter or digit records as
  * `2._`, unless the id is Latin letters, digits and `_` with a letter, which
- * says more: a digit-only id beside positions reads as one, and Moodle
- * rejects any other id.
+ * says more: a digit-only id beside positions reads as one, and any other id
+ * records folded, so it can merge with another.
  */
 function positionText(
   value: string,
@@ -315,10 +295,7 @@ function positionText(
   }
   const text = optionText(options[idx]);
   if (!text) return;
-  const plain = text
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
+  const plain = latin(text);
   const position = `${idx + 1}.`;
   if (!/[A-Za-z0-9]/.test(plain)) {
     return /^\w*[A-Za-z]\w*$/.test(value) ? undefined : `${position}_`;
@@ -642,25 +619,21 @@ function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
 }
 
 /**
- * Two distinct ids that record as the same id, that id, and which of the two
- * records its option's position and text. Two such options never merge, since
- * their positions differ.
+ * Two distinct ids that record as the same id, and that id. An id recorded as
+ * its option's position and text never merges: positions differ, and only
+ * position text holds a `.`.
  */
 function mergedIds(
   groups: IdGroup[],
   fmt: InteractionFormat,
-): { ids: [string, string]; recorded: string; texted?: string } | undefined {
+): { ids: [string, string]; recorded: string } | undefined {
   for (const { ids, options } of groups) {
     const seen = new Map<string, string>();
     for (const id of ids) {
-      const recorded = positionText(id, options, fmt) ?? fmt.responseId(id);
+      if (positionText(id, options, fmt) !== undefined) continue;
+      const recorded = fmt.responseId(id);
       const first = seen.get(recorded) ?? id;
-      if (first !== id) {
-        const texted = [first, id].find(
-          (x) => positionText(x, options, fmt) !== undefined,
-        );
-        return { ids: [first, id], recorded, texted };
-      }
+      if (first !== id) return { ids: [first, id], recorded };
       seen.set(recorded, id);
     }
   }
@@ -900,13 +873,13 @@ function warnResponseIds(
   const ids = groups.flatMap(({ ids, options }) =>
     ids.filter((id) => positionText(id, options, fmt) === undefined),
   );
-  if (fmt.optionEncoding === 'index' && i.type === 'likert') {
+  if (i.type === 'likert') {
     // Values from different learners can merge too, so this warns on any change
     // and stands in for the merge warning.
     const changed = ids.find((v) => fmt.responseId(v) !== v);
     if (changed !== undefined) {
       console.warn(
-        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}" on SCORM 1.2, so values that differ only in punctuation record the same. Send values of letters, digits and underscores.`,
+        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}", so values that differ only in punctuation record the same. Send values of letters, digits and underscores.`,
       );
     }
     return;
@@ -933,14 +906,9 @@ function warnResponseIds(
     const {
       ids: [a, b],
       recorded,
-      texted,
     } = merged;
-    const fix =
-      texted === undefined
-        ? 'Give them ids that differ in letters or digits.'
-        : `"${texted}" records as its position and text: rename "${texted === a ? b : a}", or change the text of "${texted}".`;
     console.warn(
-      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. ${fix}`,
+      `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in letters or digits.`,
     );
   }
 }

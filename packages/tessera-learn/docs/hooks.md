@@ -105,7 +105,7 @@ For `choice` / `sequencing` / `matching`, always pass the full option list via `
 - An id missing from `options`, or past option 36, leaves that response or correct pattern out of the LMS record with a console warning. The result is still recorded.
 - Without `options`, ids are slugged as written, and strict LMSs reject any id that is not one character from `0`-`9` or `a`-`z`. Tessera logs a console warning when it sends one.
 
-Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM 2004 percent-encodes other characters (`Strongly agree` → `Strongly%20agree`) and SCORM 1.2 slugs them (`Step 1` → `Step_1`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b` on SCORM 1.2), and when SCORM 1.2 changes a `likert` value (`-1` and `+1` both become `1`). Choice and matching answers record and grade each item once.
+Ids inside a response (list items, matching ids, `performance` step ids, the `likert` value) must be SCORM identifiers. Send short ids (`strongly_agree`), not display text, and show the label in the widget. SCORM slugs other characters to `_` (`Step 1` → `Step_1`), and SCORM 2004 also drops accents (`café` → `cafe`); cmi5 and xAPI send ids as written. Give ids that differ in letters or digits: Tessera warns when two ids in one response record as the same id (`a b` and `a-b` both become `a_b`), and when SCORM changes a `likert` value (`-1` and `+1` both become `1`). Choice and matching answers record and grade each item once.
 
 `performance` step values:
 
