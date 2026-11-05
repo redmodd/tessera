@@ -83,16 +83,21 @@ describe('SCORM 2004 option text', () => {
     expect(formatResponse('q1', i, fmt)).toBe(recorded);
   });
 
-  it('records a digit id whose text has no Latin letter as its position', () => {
+  it('records text with no Latin letter as its position unless the id is a word', () => {
     const i: Interaction = {
       type: 'choice',
       options: [
         { id: '0', text: 'Paris' },
         { id: '1', text: 'Москва' },
+        { id: '東京', text: '東京' },
+        { id: 'osaka-fu', text: '大阪' },
+        { id: 'kyoto_2', text: '京都' },
       ],
-      response: ['0', '1'],
+      response: ['0', '1', '東京', 'osaka-fu', 'kyoto_2'],
     };
-    expect(formatResponse('q1', i, fmt)).toBe('1.Paris[,]2._');
+    expect(formatResponse('q1', i, fmt)).toBe(
+      '1.Paris[,]2._[,]3._[,]4._[,]kyoto_2',
+    );
   });
 
   it('records an option whose text is not a string or number as its id', () => {

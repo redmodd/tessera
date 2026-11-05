@@ -294,10 +294,11 @@ const UNSPLIT_LETTERS: Record<string, string> = {
  * rejects any character but letters, digits, `_` and `.` (406), so the text
  * is spelled in Latin letters without accents and its other characters
  * become `_`. The position keeps options with the same text apart. Undefined
- * for an option without text, or whose text has no Latin letter or digit and
- * whose id has a letter, since its id says more, and for a repeated id, which
- * cannot say which option the learner chose. A digit-only id beside
- * positions would read as one, so it records as `2._`.
+ * for an option without text, and for a repeated id, which cannot say which
+ * option the learner chose. Text with no Latin letter or digit records as
+ * `2._`, unless the id is Latin letters, digits and `_` with a letter, which
+ * says more: a digit-only id beside positions reads as one, and Moodle
+ * rejects any other id.
  */
 function positionText(
   value: string,
@@ -320,7 +321,7 @@ function positionText(
     .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
   const position = `${idx + 1}.`;
   if (!/[A-Za-z0-9]/.test(plain)) {
-    return /^\d+$/.test(value) ? `${position}_` : undefined;
+    return /^\w*[A-Za-z]\w*$/.test(value) ? undefined : `${position}_`;
   }
   return position + shortIdentifier(plain, 250 - position.length);
 }
