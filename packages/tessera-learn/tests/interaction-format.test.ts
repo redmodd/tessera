@@ -124,6 +124,19 @@ describe('SCORM 2004 option text', () => {
     );
   });
 
+  it('warns when an option the learner did not pick records the same as one they did', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'choice',
+      options: ['2.B', { id: 'x', text: 'B' }],
+      response: ['x'],
+    };
+    recordedResponse(i, fmt);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"2.B" and "x" both as "2.B"'),
+    );
+  });
+
   it('records a repeated id as the id', () => {
     const i: Interaction = {
       type: 'sequencing',

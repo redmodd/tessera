@@ -589,32 +589,53 @@ interface IdGroup {
   options?: InteractionOption[];
 }
 
+/**
+ * Every option's id: two options can merge in the LMS record even when no
+ * one learner picks both.
+ */
+function optionIds(options: InteractionOption[] | undefined): string[] {
+  if (!Array.isArray(options)) return [];
+  return options
+    .map(optionId)
+    .filter((id): id is string => typeof id === 'string');
+}
+
 function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
   switch (i.type) {
     case 'choice':
-    case 'sequencing':
-      return recordsIndex(i.options, fmt)
-        ? []
-        : [{ ids: [...i.response, ...(i.correct ?? [])], options: i.options }];
+    case 'sequencing': {
+      if (recordsIndex(i.options, fmt)) return [];
+      const ids = [...i.response, ...(i.correct ?? [])];
+      return [{ ids: [...optionIds(i.options), ...ids], options: i.options }];
+    }
     case 'matching': {
       const { left, right } = i.optionPairs ?? {};
       if (recordsIndex(i.optionPairs, fmt)) return [];
       const pairs = [...i.response, ...(i.correct ?? [])];
       return [
-        { ids: pairs.map(([l]) => l), options: left },
-        { ids: pairs.map(([, r]) => r), options: right },
-      ];
-    }
-    case 'performance':
-      return [
+        { ids: [...optionIds(left), ...pairs.map(([l]) => l)], options: left },
         {
-          ids: [...i.response, ...(i.correct ?? [])]
-            .map(([step]) => step)
-            .filter((step) => stepName(step, fmt) !== ''),
+          ids: [...optionIds(right), ...pairs.map(([, r]) => r)],
+          options: right,
         },
       ];
+    }
+    case 'performance': {
+      const steps = [...i.response, ...(i.correct ?? [])].map(([s]) => s);
+      return [
+        {
+          ids: [...optionIds(i.options), ...steps].filter(
+            (step) => stepName(step, fmt) !== '',
+          ),
+        },
+      ];
+    }
     case 'likert':
-      return [{ ids: [i.response, i.correct ?? i.response] }];
+      return [
+        {
+          ids: [...optionIds(i.options), i.response, i.correct ?? i.response],
+        },
+      ];
     default:
       return [];
   }
