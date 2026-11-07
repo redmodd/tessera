@@ -269,20 +269,34 @@ function latin(text: string): string {
 
 /**
  * A SCORM id inside a response: letters, digits and `_`. Moodle also allows
- * `.` in SCORM 2004, but it is left to position text (`3.Paris`). An id of
- * those characters records as written. Any other id drops accents
- * (`café` → `cafe`), records letters of other scripts as code points
- * (`東京` → `u6771u4EAC`) so they stay distinct, and slugs the rest to `_`.
+ * `.` in SCORM 2004, but it is left to position text (`3.Paris`). Letters,
+ * digits and `_` record as written. Latin letters drop their accents
+ * (`café` → `cafe`). Letters of other scripts record as one `u` and four hex
+ * digits per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they stay
+ * distinct. Each run of other characters records as one `_`, dropped at the
+ * ends. The cut keeps each code whole.
  */
 function scormResponseId(value: string, max = 250): string {
-  if (/^\w+$/.test(value)) return value.slice(0, max);
-  const spelled = value.normalize('NFC').replace(/./gsu, (c) => {
-    const plain = latin(c);
-    if (/^[A-Za-z0-9]+$/.test(plain)) return plain;
-    if (!/[\p{L}\p{N}\p{M}]/u.test(c)) return '_';
-    return `u${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
-  });
-  return shortIdentifier(spelled, max);
+  const spelled = value
+    .normalize('NFC')
+    .replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
+      const plain = latin(c);
+      if (/^\w+$/.test(plain)) return plain;
+      if (!/[\p{L}\p{N}]/u.test(c)) return ' ';
+      return Array.from(
+        { length: c.length },
+        (_, k) =>
+          `u${c.charCodeAt(k).toString(16).toUpperCase().padStart(4, '0')}`,
+      ).join('');
+    })
+    .trim()
+    .replace(/ +/g, '_');
+  let id = '';
+  for (const piece of spelled.match(/u[0-9A-F]{4}|./g) ?? []) {
+    if (id.length + piece.length > max) break;
+    id += piece;
+  }
+  return id || '_';
 }
 
 /**
@@ -295,7 +309,7 @@ function scormResponseId(value: string, max = 250): string {
  * option the learner chose. Text with no Latin letter or digit records as
  * `2._`, unless the id is Latin letters, digits and `_` with a letter, which
  * says more: a digit-only id beside positions reads as one, and any other id
- * records folded, so it can merge with another.
+ * records changed, as code points or merged with another.
  */
 function positionText(
   value: string,
@@ -914,7 +928,7 @@ function warnResponseIds(
     const changed = ids.find((v) => fmt.responseId(v, Infinity) !== v);
     if (changed !== undefined) {
       console.warn(
-        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}", so values that differ only in punctuation or accents record the same. Send values of letters, digits and underscores.`,
+        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}". SCORM records values that differ only in punctuation or accents as the same value, and letters of other scripts as code points. Send values of ASCII letters, digits and underscores.`,
       );
     }
     return;

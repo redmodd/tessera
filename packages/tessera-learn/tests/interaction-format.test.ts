@@ -315,7 +315,7 @@ describe('SCORM 2004 ids inside a response', () => {
 
   it.each([
     ['Strongly agree', 'Strongly_agree'],
-    ['step-one_(a)', 'step_one_a'],
+    ['step-one_(a)', 'step_one__a'],
     ['a[,]b~c', 'a_b_c'],
     ['café', 'cafe'],
     ['Ærø-ß', 'AEro_ss'],
@@ -323,7 +323,12 @@ describe('SCORM 2004 ids inside a response', () => {
     ['v1.2', 'v1_2'],
     ['_neutral', '_neutral'],
     ['a__b', 'a__b'],
+    ['a__b-c', 'a__b_c'],
+    ['_neutral!', '_neutral'],
+    ['x\u0304', 'x'],
     ['東京', 'u6771u4EAC'],
+    ['कि', 'u0915u093F'],
+    ['𰐠', 'uD881uDC20'],
     ['Мир', 'u041Cu0438u0440'],
     ['-', '_'],
     ['', '_'],
@@ -350,6 +355,13 @@ describe('SCORM 2004 ids inside a response', () => {
     );
     expect(fitPatterns(i, fmt).kept).toHaveLength(1);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['あ0', '𰐠'],
+    ['कि', 'का'],
+  ])('keeps %s and %s apart', (a, b) => {
+    expect(fmt.responseId(a)).not.toBe(fmt.responseId(b));
   });
 
   it('warns that a long likert value is cut, not changed', () => {
@@ -462,6 +474,7 @@ describe('SCORM 2004 ids inside a response', () => {
   it.each([
     ['an id', 'a'.repeat(300), 'a'.repeat(250)],
     ['a folded id', 'ß'.repeat(126), 'ss'.repeat(125)],
+    ['a code point', 'a'.repeat(248) + '東', 'a'.repeat(248)],
   ])('cuts %s to 250 characters', (_, id, recorded) => {
     expect(formatResponse('q1', { type: 'likert', response: id }, fmt)).toBe(
       recorded,

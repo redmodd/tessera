@@ -877,7 +877,7 @@ describe('SCORM12Adapter', () => {
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          'interaction "l1" records the likert value "-1" as "1",',
+          'interaction "l1" records the likert value "-1" as "1".',
         ),
       );
     });
