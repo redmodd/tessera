@@ -269,12 +269,12 @@ function latin(text: string): string {
 
 /**
  * A SCORM id inside a response: letters, digits and `_`. Moodle also allows
- * `.` in SCORM 2004, but it is left to position text (`3.Paris`). Letters,
- * digits and `_` record as written. Latin letters drop their accents
- * (`café` → `cafe`). Letters of other scripts record as one `u` and four hex
- * digits per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they stay
- * distinct. Each run of other characters records as one `_`, dropped at the
- * ends. The cut keeps each code whole.
+ * `.` in SCORM 2004, but it is left to position text (`3.Paris`). Latin
+ * letters drop their accents (`café` → `cafe`). Letters of other scripts
+ * record as one `u` and four hex digits per UTF-16 unit (`東京` →
+ * `u6771u4EAC`), a fixed width so they stay distinct from one another. Each
+ * run of other characters records as one `_`, dropped at the ends. The cut
+ * keeps each code whole.
  */
 function scormResponseId(value: string, max = 250): string {
   const spelled = value
@@ -283,11 +283,11 @@ function scormResponseId(value: string, max = 250): string {
       const plain = latin(c);
       if (/^\w+$/.test(plain)) return plain;
       if (!/[\p{L}\p{N}]/u.test(c)) return ' ';
-      return Array.from(
-        { length: c.length },
-        (_, k) =>
-          `u${c.charCodeAt(k).toString(16).toUpperCase().padStart(4, '0')}`,
-      ).join('');
+      return c.replace(
+        /./gs,
+        (u) =>
+          `u${u.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
+      );
     })
     .trim()
     .replace(/ +/g, '_');
@@ -589,15 +589,6 @@ export interface ScormInteractionSpec {
 }
 
 /**
- * Ids recorded through `responseId` or as their option's position and text,
- * grouped so ids in one group must stay distinct.
- */
-interface IdGroup {
-  ids: string[];
-  options?: InteractionOption[];
-}
-
-/**
  * Every option's id: two options can merge in the LMS record even when no
  * one learner picks both.
  */
@@ -608,42 +599,48 @@ function optionIds(options: InteractionOption[] | undefined): string[] {
     .filter((id): id is string => typeof id === 'string');
 }
 
-function responseIdGroups(i: Interaction, fmt: InteractionFormat): IdGroup[] {
+/**
+ * Ids recorded through `responseId`, grouped so ids in one group must stay
+ * distinct.
+ */
+function responseIdGroups(i: Interaction, fmt: InteractionFormat): string[][] {
+  // An id recorded as its option's position and text never merges: positions
+  // differ, and only position text holds a `.`.
+  const unpositioned = (ids: string[], options?: InteractionOption[]) =>
+    [...optionIds(options), ...ids].filter(
+      (id) => positionText(id, options, fmt) === undefined,
+    );
   switch (i.type) {
     case 'choice':
     case 'sequencing': {
       if (recordsIndex(i.options, fmt)) return [];
-      const ids = [...i.response, ...(i.correct ?? [])];
-      return [{ ids: [...optionIds(i.options), ...ids], options: i.options }];
+      return [unpositioned([...i.response, ...(i.correct ?? [])], i.options)];
     }
     case 'matching': {
       const { left, right } = i.optionPairs ?? {};
       if (recordsIndex(i.optionPairs, fmt)) return [];
       const pairs = [...i.response, ...(i.correct ?? [])];
       return [
-        { ids: [...optionIds(left), ...pairs.map(([l]) => l)], options: left },
-        {
-          ids: [...optionIds(right), ...pairs.map(([, r]) => r)],
-          options: right,
-        },
+        unpositioned(
+          pairs.map(([l]) => l),
+          left,
+        ),
+        unpositioned(
+          pairs.map(([, r]) => r),
+          right,
+        ),
       ];
     }
     case 'performance': {
       const steps = [...i.response, ...(i.correct ?? [])].map(([s]) => s);
       return [
-        {
-          ids: [...optionIds(i.options), ...steps].filter(
-            (step) => stepName(step, fmt) !== '',
-          ),
-        },
+        [...optionIds(i.options), ...steps].filter(
+          (step) => stepName(step, fmt) !== '',
+        ),
       ];
     }
     case 'likert':
-      return [
-        {
-          ids: [...optionIds(i.options), i.response, i.correct ?? i.response],
-        },
-      ];
+      return [[...optionIds(i.options), i.response, i.correct ?? i.response]];
     default:
       return [];
   }
@@ -895,11 +892,7 @@ function warnResponseIds(
   i: Interaction,
   fmt: InteractionFormat,
 ): void {
-  // An id recorded as its option's position and text never merges: positions
-  // differ, and only position text holds a `.`.
-  const groups = responseIdGroups(i, fmt).map(({ ids, options }) =>
-    ids.filter((id) => positionText(id, options, fmt) === undefined),
-  );
+  const groups = responseIdGroups(i, fmt);
   const ids = groups.flat();
   if (
     fmt.optionEncoding === 'index' &&

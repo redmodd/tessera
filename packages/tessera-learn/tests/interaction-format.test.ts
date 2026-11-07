@@ -333,15 +333,18 @@ describe('SCORM 2004 ids inside a response', () => {
     ['-', '_'],
     ['', '_'],
     ['a\uD800', 'a'],
-  ])('records %s as %s, which Moodle accepts', (id, recorded) => {
-    const likert: Interaction = { type: 'likert', response: id };
-    expect(formatResponse('q1', likert, fmt)).toBe(recorded);
-    expect(formatResponse('q1', likert, SCORM12_INTERACTION_FORMAT)).toBe(
-      recorded,
-    );
-    // Moodle's SCORM 2004 CMIShortIdentifier.
-    expect(recorded).toMatch(/^[\w.]{1,250}$/);
-  });
+  ])(
+    'records %s as %s on SCORM 1.2 and 2004, which Moodle accepts',
+    (id, recorded) => {
+      const likert: Interaction = { type: 'likert', response: id };
+      expect(formatResponse('q1', likert, fmt)).toBe(recorded);
+      expect(formatResponse('q1', likert, SCORM12_INTERACTION_FORMAT)).toBe(
+        recorded,
+      );
+      // Moodle's SCORM 2004 CMIShortIdentifier.
+      expect(recorded).toMatch(/^[\w.]{1,250}$/);
+    },
+  );
 
   it('keeps ids in other scripts apart', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
