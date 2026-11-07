@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-cmi5 and xAPI Answered statements percent-encode the question id in the activity id, so an id with a space or `#` still sends a valid IRI.
+cmi5 and xAPI Answered statements percent-encode the question id in the activity id, so an id with a space or `#` still sends a valid IRI. An id with accents or other non-ASCII letters gets a new activity id (`é` → `%C3%A9`).
