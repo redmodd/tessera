@@ -571,6 +571,16 @@ describe('SCORM12Adapter', () => {
       });
     });
 
+    it('records the interaction id by the SCORM id rule', async () => {
+      adapter.reportInteraction(
+        'café 東',
+        { type: 'true-false', response: true },
+        null,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({ id: 'cafe_u6771' });
+    });
+
     it('encodes true-false as t/f per SCORM 1.2', async () => {
       adapter.reportInteraction(
         'tf1',
