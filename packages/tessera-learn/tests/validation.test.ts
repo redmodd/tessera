@@ -2102,7 +2102,7 @@ let a = {}; let b = {};</script>
     ['my question', 'my_question', 'scorm12', 'SCORM 1.2'],
     ['café', 'cafe', 'scorm12', 'SCORM 1.2'],
     ['my question', 'my_question', 'scorm2004', 'SCORM 2004'],
-    ['q-1', 'q_1', 'scorm2004', 'SCORM 2004'],
+    ['urn:q1', 'urn_q1', 'scorm2004', 'SCORM 2004'],
   ])(
     'warns when question id %s will be rewritten to %s under %s',
     (id, recorded, standard, name) => {
@@ -2121,37 +2121,42 @@ let a = {}; let b = {};</script>
     },
   );
 
-  it('errors on a SCORM 1.2 sanitized id collision', () => {
+  it.each([
+    ['scorm12', 'SCORM 1.2', 'q-1'],
+    ['scorm2004', 'SCORM 2004', 'q 1'],
+  ])('errors on a %s sanitized id collision', (standard, name, id) => {
     createValidProject(testRoot);
-    writeStandardConfig('scorm12');
+    writeStandardConfig(standard);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice id="q-1" question="A" options={["a", "b"]} correct={0} />
+<MultipleChoice id="${id}" question="A" options={["a", "b"]} correct={0} />
 <MultipleChoice id="q_1" question="B" options={["a", "b"]} correct={1} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'collides with a prior id after SCORM 1.2 sanitization ("q_1")',
+        `collides with a prior id after ${name} sanitization ("q_1")`,
       ),
     );
   });
 
-  it.each(['web', 'cmi5', 'xapi'])(
-    'does not flag id rewrites under %s',
-    (standard) => {
-      createValidProject(testRoot);
-      writeStandardConfig(standard);
-      writePage(
-        `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
-      );
-      const { warnings } = validateProject(testRoot);
-      expect(
-        warnings.filter((w) => w.includes('will be rewritten')),
-      ).toHaveLength(0);
-    },
-  );
+  it.each([
+    ['web', 'my question'],
+    ['cmi5', 'my question'],
+    ['xapi', 'my question'],
+    ['scorm2004', 'q-planet.café'],
+  ])('does not flag id rewrites under %s for %s', (standard, id) => {
+    createValidProject(testRoot);
+    writeStandardConfig(standard);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="${id}" question="Q" options={["a", "b"]} correct={0} />`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(
+      warnings.filter((w) => w.includes('will be rewritten')),
+    ).toHaveLength(0);
+  });
 
   it('warns about more than 36 options, pairs, items or targets under SCORM 1.2, and 36 pairs or items under SCORM 2004', () => {
     const list = (f: (i: number) => unknown) =>

@@ -377,7 +377,7 @@ describe('SCORM2004Adapter', () => {
       );
     });
 
-    it('records the interaction id by the SCORM id rule', async () => {
+    it('replaces whitespace in the interaction id', async () => {
       adapter.reportInteraction(
         'my question',
         { type: 'true-false', response: true },

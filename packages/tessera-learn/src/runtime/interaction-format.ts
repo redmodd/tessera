@@ -197,7 +197,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   namelessSteps: true,
   rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
-  identifier: scormId,
+  identifier: scorm2004Id,
   responseId: scormId,
 };
 
@@ -258,8 +258,8 @@ function latin(text: string): string {
 }
 
 /**
- * A SCORM interaction id, or a SCORM id inside a response: ASCII letters,
- * digits and `_`. Moodle also allows `.` in SCORM 2004, but it is left to
+ * A SCORM 1.2 interaction id, or a SCORM id inside a response: ASCII
+ * letters, digits and `_`. Moodle also allows `.` in SCORM 2004, but it is left to
  * position text (`3.Paris`). Latin letters drop their accents (`café` →
  * `cafe`). Letters of other scripts record as one `u` and four hex digits
  * per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they stay
@@ -287,6 +287,20 @@ function scormId(value: string, max = 250): string {
     id += piece;
   }
   return id || '_';
+}
+
+/**
+ * A SCORM 2004 interaction id, which Moodle checks as a CMILongIdentifier:
+ * up to 4000 characters, no whitespace, and `urn:` only to open a URN. Each
+ * run of whitespace records as `_`, dropped at the ends, and a malformed
+ * `urn:` as `urn_`.
+ */
+function scorm2004Id(value: string): string {
+  let id = value.trim().replace(/\s+/g, '_');
+  if (id.startsWith('urn:') && !/^urn:[A-Za-z0-9-]{1,31}:./.test(id)) {
+    id = `urn_${id.slice(4)}`;
+  }
+  return id.slice(0, 4000).replace(/[\uD800-\uDBFF]$/, '') || '_';
 }
 
 /**

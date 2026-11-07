@@ -342,10 +342,34 @@ describe('SCORM ids', () => {
         recorded,
       );
       expect(SCORM12_INTERACTION_FORMAT.identifier(id)).toBe(recorded);
-      expect(fmt.identifier(id)).toBe(recorded);
-      expect(XAPI_INTERACTION_FORMAT.identifier(id)).toBe(id);
       // Moodle's SCORM 2004 CMIShortIdentifier.
       expect(recorded).toMatch(/^[\w.]{1,250}$/);
+    },
+  );
+
+  it.each([
+    ['q-planet', 'q-planet'],
+    ['module.1/q#2', 'module.1/q#2'],
+    ['東京', '東京'],
+    ['my question', 'my_question'],
+    [' a \t\n b ', 'a_b'],
+    ['urn:course:q1', 'urn:course:q1'],
+    ['urn:q1', 'urn_q1'],
+    ['urn:bad_nid:q1', 'urn_bad_nid:q1'],
+    ['urn:course:', 'urn_course:'],
+    ['', '_'],
+    ['   ', '_'],
+    ['x'.repeat(4001), 'x'.repeat(4000)],
+    [`${'x'.repeat(3999)}𰐠`, 'x'.repeat(3999)],
+  ])(
+    'records the SCORM 2004 interaction id %s as %s, which Moodle accepts',
+    (id, recorded) => {
+      expect(fmt.identifier(id)).toBe(recorded);
+      expect(XAPI_INTERACTION_FORMAT.identifier(id)).toBe(id);
+      // Moodle's SCORM 2004 CMILongIdentifier.
+      expect(recorded).toMatch(
+        /^(?:(?!urn:)\S{1,4000}|urn:[A-Za-z0-9-]{1,31}:\S{1,4000})$/,
+      );
     },
   );
 
