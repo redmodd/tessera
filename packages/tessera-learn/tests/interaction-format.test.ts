@@ -364,9 +364,12 @@ describe('SCORM ids', () => {
     ['urn:q1', 'urn_q1'],
     ['urn:bad_nid:q1', 'urn_bad_nid:q1'],
     ['urn:course:', 'urn_course:'],
+    ['urn:course:🚀', 'urn_course:'],
+    ['urn:course:   ', 'urn_course:'],
     ['', '_'],
     ['   ', '_'],
     ['x'.repeat(4001), 'x'.repeat(4000)],
+    [`urn:course:${'x'.repeat(4000)}`, `urn:course:${'x'.repeat(3989)}`],
     [`${'x'.repeat(3999)}𰐠`, 'x'.repeat(3999)],
   ])(
     'records the SCORM 2004 interaction id %s as %s, which Moodle accepts',
