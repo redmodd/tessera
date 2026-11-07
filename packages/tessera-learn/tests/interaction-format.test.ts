@@ -18,8 +18,12 @@ const choice: Interaction = {
 };
 
 /** The response the format records; undefined when it leaves it out. */
-function recordedResponse(i: Interaction, format: InteractionFormat) {
-  const { fields } = buildScormInteractionFields('q', i, null, {
+function recordedResponse(
+  i: Interaction,
+  format: InteractionFormat,
+  correct: boolean | null = null,
+) {
+  const { fields } = buildScormInteractionFields('q', i, correct, {
     responseField: 'learner_response',
     timestampField: 'timestamp',
     timestamp: '',
@@ -223,7 +227,7 @@ describe('performance steps', () => {
     ]);
   });
 
-  it('folds performance step names but keeps answers as written on SCORM 2004', () => {
+  it('folds performance step names and free-text answers on SCORM 2004', () => {
     const performance: Interaction = {
       type: 'performance',
       response: [
@@ -233,7 +237,261 @@ describe('performance steps', () => {
     };
     expect(
       formatResponse('q1', performance, SCORM2004_INTERACTION_FORMAT),
-    ).toBe('Step_1[.]turn left[,]angle[.]-3.5');
+    ).toBe('Step_1[.]turn_left[,]angle[.]-3.5');
+  });
+
+  it.each([
+    ['turn left', 'turn_left'],
+    ['done!', 'done'],
+    ['a [,] b', 'a_b'],
+    ['a[:]b', 'a_b'],
+    ['café', 'cafe'],
+    ['東京', 'u6771u4EAC'],
+    ['!', '_'],
+    ['-123456', '123456'],
+    ['1e+21', '1e_21'],
+    ['-3.5', '-3.5'],
+    ['-.5', '-0.5'],
+    ['+3', '3'],
+    ['-1.', '-1'],
+    ['-99999.123456789012345678', '-99999.123456789012345678'],
+    ['-0.1234567890123456789', '-0.123456789012345678'],
+    ['-000001', '-1'],
+    ['+123456.5', '123456.5'],
+    ['+.1234567890123456789', '0.123456789012345678'],
+    ['.5', '.5'],
+    ['v1.2.3', 'v1.2.3'],
+    ['snake_case', 'snake_case'],
+    ['', ''],
+  ])(
+    'records the SCORM 2004 step answer %j as %j, which Moodle accepts',
+    (answer, recorded) => {
+      expect(SCORM2004_INTERACTION_FORMAT.stepAnswer(answer, 250)).toBe(
+        recorded,
+      );
+      // Moodle's SCORM 2004 step answer: CMIDecimal, empty or CMIShortIdentifier.
+      expect(recorded).toMatch(
+        /^-?([0-9]{1,5})(\.[0-9]{1,18})?$|^$|^[\w.]{1,250}$/,
+      );
+    },
+  );
+
+  it('cuts a SCORM 2004 step answer that folds past 250 characters', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tokyo = '東'.repeat(100);
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', tokyo]],
+      correct: [['s', tokyo]],
+    };
+    expect(formatResponse('q1', i, SCORM2004_INTERACTION_FORMAT)).toBe(
+      `s[.]${'u6771'.repeat(50)}`,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'has a step answer that, as recorded, is over the 250 characters',
+      ),
+    );
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: null,
+      warnings: [
+        expect.stringContaining(
+          'correct step answer that, as recorded, is over the 250',
+        ),
+      ],
+    });
+  });
+
+  it('folds SCORM 2004 step answers but keeps a correct range', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', '1[:]5']],
+      correct: [['s', '1[:]5']],
+    };
+    expect(formatResponse('q1', i, SCORM2004_INTERACTION_FORMAT)).toBe(
+      's[.]1_5',
+    );
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT).kept).toEqual([
+      's[.]1[:]5',
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns when SCORM 2004 changes a correct step answer', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', 'turn left']],
+      correct: [['s', 'turn left']],
+    };
+    expect(recordedResponse(i, SCORM2004_INTERACTION_FORMAT)).toBe(
+      's[.]turn_left',
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'records the correct step answer "turn left" as "turn_left"',
+      ),
+    );
+    warn.mockClear();
+    recordedResponse(i, XAPI_INTERACTION_FORMAT);
+    recordedResponse(i, SCORM12_INTERACTION_FORMAT);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns when a wrong step answer records the same as the correct one', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [
+          ['s', 'left'],
+          ['t', 'turn-left'],
+        ],
+        correct: [
+          ['s', 'left'],
+          ['t', 'turn_left'],
+        ],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+      false,
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'records the step answer "turn-left" as "turn_left", so the LMS record and the result disagree on whether it matches the correct answer "turn_left"',
+      ),
+    );
+  });
+
+  it('warns when a step answer graded inside a correct range records outside it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['s', '-150000']],
+        correct: [['s', '-200000[:]0']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+      true,
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'records the step answer "-150000" as "150000", so the LMS record and the result disagree on whether it matches the correct answer "-200000[:]0"',
+      ),
+    );
+  });
+
+  it('does not warn of a disagreement when no result is recorded', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['s', 'turn-left']],
+        correct: [['s', 'turn_left']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns once when two step names record as the same name', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['a-b', '+3']],
+        correct: [['a b', '3']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+      false,
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('records the ids "a-b" and "a b" both as "a_b"'),
+    );
+  });
+
+  it('does not warn about step answers when the correct pattern is left out', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [
+          ['s', 'turn_left'],
+          ['s', 'turn_left'],
+        ],
+        correct: [
+          ['s', 'turn left'],
+          ['s', 'turn-left'],
+        ],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('repeating an item'),
+    );
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it.each<[string, Interaction]>([
+    [
+      'a step name differs',
+      {
+        type: 'performance',
+        response: [['b', '+3']],
+        correct: [['a', '3']],
+      },
+    ],
+    [
+      'another step does not match',
+      {
+        type: 'performance',
+        response: [
+          ['s', 'wrong'],
+          ['t', '+3'],
+        ],
+        correct: [
+          ['s', 'right'],
+          ['t', '3'],
+        ],
+      },
+    ],
+    [
+      'the response is left out',
+      {
+        type: 'performance',
+        response: [
+          ['', ''],
+          ['t', '+3'],
+        ],
+        correct: [
+          ['s', 'right'],
+          ['t', '3'],
+        ],
+      },
+    ],
+  ])('does not warn of a disagreement when %s', (_, i) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(i, SCORM2004_INTERACTION_FORMAT, false);
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('disagree on whether it matches'),
+    );
+  });
+
+  it('does not warn about a learner step answer it folds', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['s', 'turn left']],
+        correct: [['s', 'right']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+    );
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('keeps performance step names and answers as written on xAPI', () => {
@@ -444,29 +702,6 @@ describe('SCORM ids', () => {
     ).toBe('_[,]a');
   });
 
-  it('refuses a step answer holding a delimiter, except a correct range', () => {
-    const i: Interaction = {
-      type: 'performance',
-      response: [['s', 'a [,] b']],
-      correct: [['s', '-1.5[:]2']],
-    };
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(recordedResponse(i, fmt)).toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('holds [,], [.] or [:]'),
-    );
-    expect(fitPatterns(i, fmt).kept).toEqual(['s[.]-1.5[:]2']);
-    expect(() => fitPatterns({ ...i, correct: [['s', 'a[:]b']] }, fmt)).toThrow(
-      'holds [,], [.] or [:]',
-    );
-    expect(formatResponse('q1', i, XAPI_INTERACTION_FORMAT)).toBe(
-      's[.]a [,] b',
-    );
-    expect(formatResponse('q1', i, SCORM12_INTERACTION_FORMAT)).toBe(
-      's.a [,] b',
-    );
-  });
-
   it('drops a correct sequence or step list that repeats an item', () => {
     const seq: Interaction = {
       type: 'sequencing',
@@ -608,39 +843,21 @@ describe('fitPatterns', () => {
     },
   );
 
-  it.each<[string, Interaction, string[] | null, string]>([
-    [
-      'fill-in',
-      {
-        type: 'fill-in',
-        response: '',
-        correct: ['Paris ', ' Rome', 'a[,] b', 'Oslo'],
-      },
-      ['Oslo'],
-      '3 correct answer(s) starting or ending in whitespace, or with whitespace beside [,]',
-    ],
-    [
-      'performance',
-      {
-        type: 'performance',
-        response: [],
-        correct: [
-          ['s', 'done '],
-          ['t', 'x'],
-        ],
-      },
-      null,
-      '1 correct answer(s) with an item starting or ending in whitespace',
-    ],
-  ])(
-    'drops a SCORM 2004 %s answer starting or ending in whitespace',
-    (_, i, kept, warning) => {
-      const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
-      expect(fit.kept).toEqual(kept);
-      expect(fit.warnings).toEqual([expect.stringContaining(warning)]);
-      expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
-    },
-  );
+  it('drops a SCORM 2004 fill-in answer starting or ending in whitespace', () => {
+    const i: Interaction = {
+      type: 'fill-in',
+      response: '',
+      correct: ['Paris ', ' Rome', 'a[,] b', 'Oslo'],
+    };
+    const fit = fitPatterns(i, SCORM2004_INTERACTION_FORMAT);
+    expect(fit.kept).toEqual(['Oslo']);
+    expect(fit.warnings).toEqual([
+      expect.stringContaining(
+        '3 correct answer(s) starting or ending in whitespace, or with whitespace beside [,]',
+      ),
+    ]);
+    expect(fitPatterns(i, XAPI_INTERACTION_FORMAT).warnings).toEqual([]);
+  });
 
   it.each([
     '{lang=en}Paris',

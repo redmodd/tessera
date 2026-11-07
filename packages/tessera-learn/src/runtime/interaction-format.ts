@@ -5,9 +5,11 @@
  */
 
 import {
+  DECIMAL,
   optionId,
   optionText,
   reversedRange,
+  stepFits,
   stepRange,
   type Interaction,
   type InteractionOption,
@@ -64,6 +66,8 @@ export interface InteractionFormat {
   identifier(value: string): string;
   /** Ids inside a response: list items, matching ids, step names, likert. */
   responseId(value: string, max?: number): string;
+  /** A performance step answer, except a range in a correct answer. */
+  stepAnswer(value: string, max: number): string;
 }
 
 /**
@@ -74,11 +78,6 @@ interface ItemRule {
   maxItems?: number;
   maxParts?: number;
   nonEmpty?: boolean;
-  /**
-   * Items are steps. Each needs a name or an answer, and an answer can't hold
-   * `[,]`, `[.]` or `[:]` unless `range` lets it be a `min[:]max` range.
-   */
-  steps?: 'text' | 'range';
   /**
    * No item can start with a closed `{lang=}`, `{case_matters=}` or
    * `{order_matters=}`: the LMS strips it from the start of each fill-in
@@ -113,7 +112,7 @@ type ValueRules = Partial<
 >;
 
 const LIST: ItemRule = { maxItems: 36, nonEmpty: true };
-const STEPS: ItemRule = { maxItems: 250, nonEmpty: true, steps: 'text' };
+const STEPS: ItemRule = { maxItems: 250, nonEmpty: true };
 
 /**
  * The SCORM 2004 grammar scorm-again and SCORM Cloud accept. Encoded ids hold
@@ -124,10 +123,7 @@ const SCORM2004_RULES: ValueRules = {
   choice: { response: LIST, correct: { ...LIST, nonEmpty: false } },
   sequencing: { response: LIST, correct: { ...LIST, unique: true } },
   matching: { response: LIST, correct: LIST },
-  performance: {
-    response: STEPS,
-    correct: { ...STEPS, steps: 'range', trimmed: true, unique: true },
-  },
+  performance: { response: STEPS, correct: { ...STEPS, unique: true } },
   'fill-in': {
     response: { maxParts: 10, untagged: true },
     correct: {
@@ -176,6 +172,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   formatBoolean: (v) => (v ? 't' : 'f'),
   identifier: scormId,
   responseId: scormId,
+  stepAnswer: (v) => v,
 };
 
 /**
@@ -199,6 +196,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: scorm2004Id,
   responseId: scormId,
+  stepAnswer: scorm2004StepAnswer,
 };
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
@@ -211,6 +209,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   rules: XAPI_RULES,
   identifier: (v) => v,
   responseId: (v) => v,
+  stepAnswer: (v) => v,
 };
 
 export const SCORM12_MAX_OPTIONS = 36;
@@ -309,6 +308,28 @@ function scorm2004Id(value: string): string {
   return id.slice(0, 4000).replace(/[\uD800-\uDBFF]$/, '') || '_';
 }
 
+const CMI_DECIMAL = /^-?\d{1,5}(?:\.\d{1,18})?$/;
+
+/**
+ * Moodle takes a SCORM 2004 step answer that is empty, a CMIDecimal, or ASCII
+ * letters, digits, `_` and `.` (406 otherwise). A decimal written another way
+ * (`+3`, `-.5`) records in one of those forms when it fits one, and any other
+ * answer as a response id (`turn left` → `turn_left`).
+ */
+function scorm2004StepAnswer(value: string, max: number): string {
+  if (/^[\w.]*$/.test(value)) return value.slice(0, max);
+  const decimal = DECIMAL.test(value) ? plainDecimal(value) : '';
+  if (/^[\w.]+$/.test(decimal)) return decimal.slice(0, max);
+  if (CMI_DECIMAL.test(decimal)) return decimal;
+  return scormId(value, max);
+}
+
+/** `+3` → `3`, `-.5` → `-0.5`, `-007.` → `-7`, at most 18 fraction digits. */
+function plainDecimal(value: string): string {
+  const [, sign, int, fraction] = /^([-+]?)0*(\d*)\.?(\d{0,18})/.exec(value)!;
+  return `${sign === '-' ? '-' : ''}${int || '0'}${fraction ? `.${fraction}` : ''}`;
+}
+
 /**
  * The option's 1-based position and text (`3.Paris_France`), which the
  * format records in place of its id so LMS reports show the answer. Moodle
@@ -381,12 +402,24 @@ function stepName(step: string, fmt: InteractionFormat): string {
   return step === '' && fmt.namelessSteps ? '' : fmt.responseId(step);
 }
 
-/** Step names are identifiers; step answers are free text, kept as written. */
+function stepAnswer(
+  answer: string | number,
+  field: 'response' | 'correct',
+  fmt: InteractionFormat,
+  max = fmt.maxPartLength,
+): string {
+  const text = String(answer);
+  return field === 'correct' && stepRange(text)
+    ? text
+    : fmt.stepAnswer(text, max);
+}
+
 function encodeStep(
   [step, answer]: [string, string | number],
+  field: 'response' | 'correct',
   fmt: InteractionFormat,
 ): string {
-  return `${stepName(step, fmt)}${fmt.pairDelim}${answer}`;
+  return `${stepName(step, fmt)}${fmt.pairDelim}${stepAnswer(answer, field, fmt)}`;
 }
 
 const LIST_TYPES = ['choice', 'sequencing', 'matching', 'performance'] as const;
@@ -406,7 +439,7 @@ function encodeItems(
   fmt: InteractionFormat,
 ): string[] {
   if (i.type === 'performance') {
-    return (i[field] ?? []).map((s) => encodeStep(s, fmt));
+    return (i[field] ?? []).map((s) => encodeStep(s, field, fmt));
   }
   const items =
     i.type === 'matching'
@@ -491,28 +524,6 @@ function startingWith(i: Interaction, start: string): string {
   return `starting with ${start}${parts}`;
 }
 
-const STEP_DELIM = /\[[,.:]\]/;
-
-function checkSteps(
-  steps: Array<[string, string | number]>,
-  mode: NonNullable<ItemRule['steps']>,
-  fmt: InteractionFormat,
-): void {
-  for (const [step, a] of steps) {
-    const answer = String(a);
-    if (stepName(step, fmt) === '' && answer === '') {
-      throw new UnrecordableError(
-        'a step has neither a name nor an answer, which this export standard rejects',
-      );
-    }
-    if (STEP_DELIM.test(answer) && !(mode === 'range' && stepRange(answer))) {
-      throw new UnrecordableError(
-        `the step answer "${answer}" holds [,], [.] or [:], which this export standard reads as a delimiter`,
-      );
-    }
-  }
-}
-
 const DROPS = [
   'undelimited',
   'untagged',
@@ -537,8 +548,13 @@ function checkValue(
 ): DroppedBy | undefined {
   const rule: AnswerRule | undefined = fmt.rules?.[i.type]?.[field];
   if (!rule) return;
-  if (rule.steps && i.type === 'performance') {
-    checkSteps(i[field] ?? [], rule.steps, fmt);
+  if (
+    i.type === 'performance' &&
+    (i[field] ?? []).some(([step, a]) => stepName(step, fmt) === '' && a === '')
+  ) {
+    throw new UnrecordableError(
+      'a step has neither a name nor an answer, which this export standard rejects',
+    );
   }
   if (rule.nonEmpty && items.length === 0) {
     throw new UnrecordableError(
@@ -690,12 +706,12 @@ export function fitPatterns(
   if (
     i.type === 'performance' &&
     i.correct &&
-    hasLongStep(i.correct, fmt.maxPartLength)
+    hasLongStep(i.correct, 'correct', fmt)
   ) {
     return {
       kept: null,
       warnings: [
-        `has a correct step answer over the ${fmt.maxPartLength} characters ${recorder} records; the correct answer is ${lost}`,
+        `has a correct step answer that, as recorded, is over the ${fmt.maxPartLength} characters ${recorder} records; the correct answer is ${lost}`,
       ],
     };
   }
@@ -721,11 +737,9 @@ export function fitPatterns(
         return `starting with ${fmt.rules?.[i.type]?.correct?.unopened?.join(' or ')}, ${rejects}`;
       case 'trimmed':
         return `${
-          isList(i)
-            ? 'with an item starting or ending in whitespace'
-            : i.type === 'fill-in'
-              ? 'starting or ending in whitespace, or with whitespace beside [,]'
-              : 'starting or ending in whitespace'
+          i.type === 'fill-in'
+            ? 'starting or ending in whitespace, or with whitespace beside [,]'
+            : 'starting or ending in whitespace'
         }, ${rejects}`;
       case 'unique':
         return `repeating ${i.type === 'fill-in' ? 'a [,]-separated part' : 'an item'}, ${rejects}`;
@@ -775,9 +789,12 @@ export function fitPatterns(
 
 function hasLongStep(
   steps: Array<[string, string | number]>,
-  max: number,
+  field: 'response' | 'correct',
+  fmt: InteractionFormat,
 ): boolean {
-  return steps.some(([, a]) => String(a).length > max);
+  return steps.some(
+    ([, a]) => stepAnswer(a, field, fmt, Infinity).length > fmt.maxPartLength,
+  );
 }
 
 /**
@@ -822,15 +839,8 @@ function fitResponse(
 ): string | null {
   const partMax = fmt.maxPartLength;
   let longPart = '';
-  if (i.type === 'performance' && hasLongStep(i.response, partMax)) {
-    longPart = 'a step answer';
-    i = {
-      ...i,
-      response: i.response.map(([step, a]): [string, string | number] => [
-        step,
-        typeof a === 'string' ? cutText(a, partMax) : a,
-      ]),
-    };
+  if (i.type === 'performance' && hasLongStep(i.response, 'response', fmt)) {
+    longPart = 'a step answer that, as recorded, is';
   }
   let items = responseItems(i, fmt);
   if (i.type === 'fill-in' && items.some((part) => part.length > partMax)) {
@@ -946,6 +956,56 @@ function warnResponseIds(
   }
 }
 
+/**
+ * A learner's step answer can't be changed, so this warns only about a
+ * recorded correct answer the format changes, and a recorded response that,
+ * as recorded, matches the pattern when the recorded result says it doesn't,
+ * or the other way round.
+ */
+function warnStepAnswers(
+  questionId: string,
+  i: Interaction,
+  fmt: InteractionFormat,
+  recorded: { pattern: boolean; response: boolean; result: boolean },
+): void {
+  if (i.type !== 'performance' || !i.correct || !recorded.pattern) return;
+  const correct = i.correct.map(([, a]) => ({
+    written: String(a),
+    recorded: stepAnswer(a, 'correct', fmt),
+  }));
+  const changed = correct.find(({ written, recorded }) => written !== recorded);
+  if (changed) {
+    console.warn(
+      `Tessera: interaction "${questionId}" records the correct step answer "${changed.written}" as "${changed.recorded}". To record a correct step answer as written, use only ASCII letters, digits, _ and ., or a negative decimal with 1 to 5 digits before the point and at most 18 after.`,
+    );
+  }
+  const steps = i.correct.map(([step]) => step);
+  if (
+    !recorded.response ||
+    !recorded.result ||
+    i.response.length !== steps.length ||
+    i.response.some(([step], k) => step !== steps[k])
+  ) {
+    return;
+  }
+  const response = i.response.map(([, a]) => ({
+    written: String(a),
+    recorded: stepAnswer(a, 'response', fmt),
+  }));
+  const fits = (as: 'written' | 'recorded', k: number) =>
+    stepFits(response[k][as], correct[k][as]);
+  const graded = response.every((_, k) => fits('written', k));
+  const lms = response.every((_, k) => fits('recorded', k));
+  if (graded !== lms) {
+    const k = response.findIndex(
+      (_, k) => fits('written', k) !== fits('recorded', k),
+    );
+    console.warn(
+      `Tessera: interaction "${questionId}" records the step answer "${response[k].written}" as "${response[k].recorded}", so the LMS record and the result disagree on whether it matches the correct answer "${correct[k].written}".`,
+    );
+  }
+}
+
 export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
@@ -957,6 +1017,11 @@ export function buildScormInteractionFields(
   warnResponseIds(questionId, interaction, spec.format);
   const patterns = formatPatterns(questionId, interaction, spec.format);
   const response = formatResponse(questionId, interaction, spec.format);
+  warnStepAnswers(questionId, interaction, spec.format, {
+    pattern: patterns !== null,
+    response: response !== null,
+    result: correct !== null,
+  });
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });
