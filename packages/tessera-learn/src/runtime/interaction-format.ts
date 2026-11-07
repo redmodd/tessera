@@ -174,8 +174,8 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   maxPartLength: Infinity,
   namelessSteps: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
-  identifier: scormResponseId,
-  responseId: scormResponseId,
+  identifier: scormId,
+  responseId: scormId,
 };
 
 /**
@@ -198,7 +198,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
   identifier: (v) => v,
-  responseId: scormResponseId,
+  responseId: scormId,
 };
 
 export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
@@ -265,7 +265,7 @@ function latin(text: string): string {
  * distinct from one another. Each run of other characters records as one
  * `_`, dropped at the ends. The cut keeps each code whole.
  */
-function scormResponseId(value: string, max = 250): string {
+function scormId(value: string, max = 250): string {
   const spelled = value
     .normalize('NFC')
     .replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
@@ -317,11 +317,11 @@ function positionText(
   if (!text) return;
   const plain = latin(text);
   const position = `${idx + 1}.`;
-  if (!/[A-Za-z0-9]/.test(plain)) {
+  const words = plain.match(/[A-Za-z0-9]+/g);
+  if (!words) {
     return /^\w*[A-Za-z]\w*$/.test(value) ? undefined : `${position}_`;
   }
-  const spelled = plain.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  return (position + spelled).slice(0, 250);
+  return (position + words.join('_')).slice(0, 250);
 }
 
 /**

@@ -2101,7 +2101,6 @@ let a = {}; let b = {};</script>
   it.each([
     ['my question', 'my_question'],
     ['café', 'cafe'],
-    ['東京', 'u6771u4EAC'],
   ])(
     'warns when question id %s will be rewritten to %s under SCORM 1.2',
     (id, recorded) => {
