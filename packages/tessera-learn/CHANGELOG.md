@@ -1,5 +1,50 @@
 # tessera-learn
 
+## 0.13.0
+
+### Minor Changes
+
+- b3cfa17: Questions report their option text to the LRS: an `Interaction` option can be `{ id, text }`, which built-in questions fill in. xAPI and cmi5 send it as the Answered statement's interaction components (`choices`, `scale`, `source`/`target`, `steps`); responses keep the ids.
+- c794319: Questions report their text to the LMS: `useQuestion` takes an optional `text`, which built-in questions fill from `question`. It goes out as the Answered statement's `definition.description` in xAPI and cmi5, and as `cmi.interactions.n.description` in SCORM 2004. Plain xAPI also sends the course title and description on the course activity.
+  
+  **Behavior change:** Answered statements in xAPI and cmi5 name the launch activity as `parent` instead of `grouping`, so an LRS query that finds them by the course in `grouping` needs to look in `parent`. A `useXAPI()` statement that names the activity as `parent` gets no default `grouping`.
+- 5519830: **Behavior change:** a quiz question with no `correct` answer no longer counts as wrong: it is left out of the quiz score and reported to the LMS with no result. A quiz holding one scores higher than before for the same answers, so a learner can pass where they failed. Check the pass mark of any quiz with a survey or reflection question.
+  
+  A quiz with nothing to score shows no score in the built-in `<Quiz>` and reports `scored: false` on `useQuiz()`, in the `tessera-quiz-complete` detail and through `useProgress().quizUnscored()`.
+- ae28d5a: **Breaking:** `MultipleChoice`, `FillInTheBlank`, `Matching` and `Sorting` require a string `id`; it is no longer derived from the prompt. A missing id, or a literal one that is blank or not a string, fails the build, and `useQuestion()` throws on one set at runtime, which shows the error page. To upgrade, give each question a unique `id`.
+  
+  **Saved progress reset:** a question's id keys its saved answer and its LMS record. A question without an id used `mc-`, `fitb-`, `matching-` or `sorting-` plus its prompt, lowercased, with each run of characters other than `a-z` and `0-9` turned into `-`, trimmed and cut to 40 characters (`What is 2 + 2?` → `mc-what-is-2-2`). Set that id to keep learners' saved answers and the question's LMS history. Any other id loses them for a course already in use.
+  
+  A page that throws while rendering shows the error page instead of breaking the course.
+  
+  A graded question with a spread before `graded` and `id` (`<MultipleChoice {...q} id="q1" graded />`) counts toward its page score before it renders, like other graded questions.
+- 70fecc0: **Behavior change:** SCORM ids and step answers record in a form every LMS accepts, Moodle included, so an LMS report that spans the upgrade can show one question or answer under two values. Nothing in the course needs to change.
+  
+  - Response ids (options without text, likert values, performance step names) record as letters, digits and `_`, where SCORM 2004 percent-encoded them (`Strongly agree` → `Strongly_agree`, `speed-limit` → `speed_limit`). On SCORM 1.2 and 2004 they drop accents (`café` → `cafe`) and record letters of other scripts as code points (`東京` → `u6771u4EAC`), so they stay distinct.
+  - SCORM 1.2 interaction ids follow the same rule and keep underscores as written (`_q1` stays `_q1`, was `q1`).
+  - SCORM 2004 interaction ids replace whitespace and emoji with `_` (`my question` → `my_question`) and a malformed `urn:` prefix with `urn_`, and keep everything else. `tessera validate` warns when a 2004 id will be rewritten, and SCORM courses warn in the console when two question ids record as the same id.
+  - SCORM 2004 performance step answers record in a form the LMS accepts (`-.5` → `-0.5`, `turn left` → `turn_left`). Grading still reads them as written. Tessera warns when this changes a correct answer, or makes the LMS record and the result disagree on whether an answer matches.
+- b000697: **Behavior change:** SCORM 2004 reports show answer text: a choice, sequencing or matching option with text records as its position and text (`3.Paris_France`) in `learner_response` and `correct_responses`, in place of its id. Built-in questions always pass option text, so an LMS report that spans the upgrade shows the same answer under two values. Rewording an option also changes its recorded value.
+- 61fa5ad: **Behavior change:** a standalone question with no `correct` answer and no `score()` is left out of the page score, as in a quiz, and no longer offers Try again. It used to score 0, so a graded page holding one scores higher than before (a right answer beside a survey question: 50 → 100). A graded page of only such questions scores 100 and logs a dev warning, as a graded quiz does. To keep a question in the score, give it a `correct` or a `score()`.
+  
+  The new `useProgress().pageUnscored()` is `true` for such a page, so a course can show no score.
+
+### Patch Changes
+
+- 3ef7dd7: cmi5 Answered statements and `useXAPI()` statements to `endpoint: 'lms'` start from the LMS's context template, so they keep its publisher grouping and extensions. Other cmi5 statements also keep the launch activity in their grouping, unless the author sets a grouping or names the activity as `parent`.
+- 9e36dc3: - `@types/node` 26.6.5 → 26.6.6
+  - `scorm-again` 3.4.7 → 3.5.0
+  - `svelte` 5.57.2 → 5.57.3
+  - `tsdown` 0.23.2 → 0.23.4
+- 226a6ac: SCORM 2004, cmi5 and xAPI leave out, with a warning, a fill-in or long-fill-in answer or response the LMS would read as a delimiter or reject: one starting with `{lang=`, `{case_matters=` or `{order_matters=`, or with a `[,]` part that does. Grading still uses it.
+  
+  cmi5 and xAPI leave out a reversed correct range, with a warning, as SCORM 2004 does.
+- 7352a27: SCORM 2004 caps each `[,]`-separated part of a fill-in answer or response at 250 characters, not the whole value, so a multi-part answer within the cap is no longer left out of the LMS record or cut.
+- 982d4f0: NVDA in Firefox reliably reads a question's result after Submit, and the first control after Try again: focus now moves once the browser has updated what it tells the screen reader.
+- 42e4f1a: cmi5 and xAPI Answered statements percent-encode the question id in the activity id, so an id with a space or `#` still sends a valid IRI. An id with accents or other non-ASCII letters gets a new activity id (`é` → `%C3%A9`).
+- b95ceae: SCORM 2004 packages declare that the course sets its own completion and success, so an LMS cannot mark an attempt completed or passed that the course left unreported.
+- fa79cd3: The export zip name keeps accented Latin letters of the course title without their accents (`Café` → `cafe-1.0.0.zip`, was `caf-1.0.0.zip`).
+
 ## 0.12.1
 
 ### Patch Changes
