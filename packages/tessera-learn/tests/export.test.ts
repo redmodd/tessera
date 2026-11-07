@@ -558,6 +558,18 @@ describe('runExport', () => {
     );
   });
 
+  it('spells accented letters of the title without accents in the zip filename', async () => {
+    await runExport(
+      testRoot,
+      createDistDir(testRoot),
+      mergeCourseConfig({ title: 'Café Straße', version: '1.0.0' }),
+      STANDARDS.scorm12,
+      true,
+    );
+
+    expect(existsSync(resolve(testRoot, 'cafe-strasse-1.0.0.zip'))).toBe(true);
+  });
+
   it('writes the manifest into a custom outDir and zips it', async () => {
     const outDir = resolve(testRoot, 'build');
     mkdirSync(outDir);

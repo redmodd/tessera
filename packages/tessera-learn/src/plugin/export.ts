@@ -20,6 +20,7 @@ import {
   type StandardProfile,
 } from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
+import { latin } from '../components/util.js';
 
 function slugify(text: string): string {
   return text
@@ -366,7 +367,7 @@ export async function runExport(
   profile: StandardProfile,
   hasRequiredGradedPage: boolean,
 ): Promise<void> {
-  const slug = slugify(config.title) || 'tessera-course';
+  const slug = slugify(latin(config.title)) || 'tessera-course';
   const version = config.version || '1.0.0';
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);
