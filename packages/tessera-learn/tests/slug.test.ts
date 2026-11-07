@@ -23,7 +23,7 @@ describe('slugFromQuestion', () => {
 
   it('spells Latin letters without accents, then adds a hash of the prompt', () => {
     expect(slugFromQuestion('Café?')).toBe('cafe-1htl0nt');
-    expect(slugFromQuestion('Café?')).toBe('cafe-1htl0nt');
+    expect(slugFromQuestion('Cafe\u0301?')).toBe('cafe-1htl0nt');
     expect(slugFromQuestion('Résumé')).toBe('resume-vvv8cq');
     expect(slugFromQuestion('Straße')).toBe('strasse-1mfnvn');
     expect(slugFromQuestion('What’s up — “really”?')).toBe(
@@ -49,12 +49,26 @@ describe('slugFromQuestion', () => {
     expect(slugFromQuestion('¿…?')).toBe('ftvqrp');
   });
 
-  it('hashes after the 40-character cut', () => {
+  it('keeps the id through edits past the cut', () => {
     expect(
       slugFromQuestion(
         'Which one of these is the capital of Japan? 東京 or 大阪?',
       ),
-    ).toBe('which-one-of-these-is-the-capital-of-jap-1bhx245');
+    ).toBe('which-one-of-these-is-the-capital-of-jap');
+    const french = 'What’s the capital of France? Pick the best answer.';
+    expect(slugFromQuestion(french)).toBe(
+      'what-s-the-capital-of-france-pick-the-b-1tpv3kf',
+    );
+    expect(slugFromQuestion(french.replace('answer', 'answr'))).toBe(
+      'what-s-the-capital-of-france-pick-the-b-1tpv3kf',
+    );
+    const tokyo = '東京'.repeat(30);
+    expect(slugFromQuestion(`${tokyo}は？`)).toBe('xkzvn9');
+    expect(slugFromQuestion(`${tokyo}か？`)).toBe('xkzvn9');
+  });
+
+  it('leaves characters newer than Unicode 5.2 unfolded', () => {
+    expect(slugFromQuestion('Is \ua7f2 a letter?')).toBe('is-a-letter-xc5et5');
   });
 
   it('handles nullish input without throwing', () => {

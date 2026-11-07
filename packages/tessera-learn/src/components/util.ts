@@ -53,22 +53,42 @@ export function fnv1a(text: string): string {
 }
 
 /**
+ * Latin letters and accents encoded by Unicode 5.2, which every engine's
+ * tables agree on. Newer characters normalize differently in the build and
+ * older browsers, so they stay as they are.
+ */
+const OLD_LATIN =
+  /[A-Za-z][\u0300-\u036f]+|[\u00c0-\u02af\u1e00-\u1eff\u2c60-\u2c7f][\u0300-\u036f]*/g;
+
+/** `text` as lowercase ASCII words, and how many characters it could not spell. */
+function spell(text: string): [slug: string, unspelled: number] {
+  const plain = text.replace(OLD_LATIN, latin);
+  const words = plain.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  return [words.join('-'), plain.match(/[^\0-\x7f]/gu)?.length ?? 0];
+}
+
+/**
  * A question prompt as a slug, the fallback `id` when the author supplies
- * none: its Latin words without accents, cut at 40 characters. A prompt with
- * any character outside ASCII (`pêche`, `東京`, `😀`) also gets a hash of the
- * whole prompt, so prompts differing only in those characters stay distinct.
- * The ASCII check needs no Unicode tables, which differ between the build
- * and older browsers, so both derive the same id.
+ * none: its Latin words without accents, cut at 40 characters, where each
+ * character the slug cannot spell counts as one. When the prompt up to the
+ * cut has a character outside ASCII (`pêche`, `東京`, `’`), the slug also
+ * gets a hash of that part, so prompts differing only in those characters
+ * stay distinct. Edits past the cut keep the id.
  */
 export function slugFromQuestion(text: unknown): string {
-  const prompt = String(text ?? '').normalize('NFC');
-  const words =
-    latin(prompt)
-      .toLowerCase()
-      .match(/[a-z0-9]+/g) ?? [];
-  const slug = words.join('-').slice(0, 40).replace(/-$/, '');
-  if (!/[^\0-\x7f]/.test(prompt)) return slug;
-  const hash = fnv1a(prompt);
+  const prompt = String(text ?? '').replace(OLD_LATIN, (c) =>
+    c.normalize('NFC'),
+  );
+  let head = '';
+  let slug = '';
+  for (const c of prompt) {
+    const [next, unspelled] = spell(head + c);
+    if (next.length + unspelled > 40) break;
+    head += c;
+    slug = next;
+  }
+  if (!/[^\0-\x7f]/.test(head)) return slug;
+  const hash = fnv1a(head);
   return slug ? `${slug}-${hash}` : hash;
 }
 
