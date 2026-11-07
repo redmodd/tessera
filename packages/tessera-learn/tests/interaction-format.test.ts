@@ -386,6 +386,18 @@ describe('SCORM 2004 ids inside a response', () => {
     );
   });
 
+  it('names both likert options that record the same', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      { type: 'likert', options: ['agree_1', 'agree-1'], response: 'agree_1' },
+      fmt,
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('"agree_1" and "agree-1" both as "agree_1"'),
+    );
+  });
+
   it('records a choice id once', () => {
     expect(
       formatResponse(

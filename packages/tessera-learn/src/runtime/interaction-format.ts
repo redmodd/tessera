@@ -915,17 +915,6 @@ function warnResponseIds(
       );
     }
   }
-  if (i.type === 'likert') {
-    // Values from different learners can merge too, so this warns on any change
-    // and stands in for the merge warning.
-    const changed = ids.find((v) => fmt.responseId(v, Infinity) !== v);
-    if (changed !== undefined) {
-      console.warn(
-        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}". SCORM records values that differ only in punctuation or accents as the same value, and letters of other scripts as code points. Send values of ASCII letters, digits and underscores.`,
-      );
-    }
-    return;
-  }
   const merged = mergedIds(groups, fmt);
   if (merged) {
     const {
@@ -935,6 +924,14 @@ function warnResponseIds(
     console.warn(
       `Tessera: interaction "${questionId}" records the ids "${a}" and "${b}" both as "${recorded}", so the LMS record cannot tell them apart. Give them ids that differ in more than punctuation or accents.`,
     );
+  } else if (i.type === 'likert') {
+    // Values from different learners can merge too, so this warns on any change.
+    const changed = ids.find((v) => fmt.responseId(v, Infinity) !== v);
+    if (changed !== undefined) {
+      console.warn(
+        `Tessera: interaction "${questionId}" records the likert value "${changed}" as "${fmt.responseId(changed)}". SCORM records values that differ only in punctuation or accents as the same value, and letters of other scripts as code points. Send values of ASCII letters, digits and underscores.`,
+      );
+    }
   }
 }
 
