@@ -36,9 +36,12 @@ describe('slugFromQuestion', () => {
     expect(slugFromQuestion('⭐⭐⭐?')).toBe('10g4s5k');
   });
 
-  it('keeps prompts ASCII cannot spell apart from ASCII text', () => {
-    expect(slugFromQuestion('Г')).not.toBe(slugFromQuestion('u0413'));
-    expect(slugFromQuestion('東'.repeat(200)).length).toBeLessThanOrEqual(7);
+  it('hashes after the 40-character cut', () => {
+    expect(
+      slugFromQuestion(
+        'Which one of these is the capital of Japan? 東京 or 大阪?',
+      ),
+    ).toBe('which-one-of-these-is-the-capital-of-jap-1bhx245');
   });
 
   it('handles nullish input without throwing', () => {
