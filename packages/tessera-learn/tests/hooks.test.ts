@@ -125,6 +125,16 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
+  it('throws when the question has no id', () => {
+    provideNavCtx();
+    const response = () => undefined;
+    for (const id of [undefined, '']) {
+      expect(() =>
+        useQuestion({ id: id as unknown as string, text: 'Pick a', response }),
+      ).toThrow('useQuestion(): the question "Pick a" has no id.');
+    }
+  });
+
   it('warns in dev about a widget with no restore, standalone or in a quiz', () => {
     provideNavCtx();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -387,8 +387,8 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 ### Rules
 
 - **Pass every required prop**, listed under [Question types](#question-types). A missing one is a build error.
-- **Question `id`s are unique within a page, and use only ASCII letters, digits and underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`, `café` → `cafe`) and SCORM 2004 replaces whitespace and emoji (`my question` → `my_question`) and a `urn:` that does not open a URN (`urn:q1` → `urn_q1`); the validator warns on an `id` written in the page, not on a derived one.
-- **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime a quiz renames the second registration (`q1-2`), which changes its `cmi.interactions` key.
+- **Question `id`s are unique within a page, and use only ASCII letters, digits and underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`, `café` → `cafe`) and SCORM 2004 replaces whitespace and emoji (`my question` → `my_question`) and a `urn:` that does not open a URN (`urn:q1` → `urn_q1`). The build warns on each rewrite.
+- **Every question needs an `id`; keep it when you edit the prompt.** The id keys the learner's saved answer and the question's LMS record. A missing one is a build error.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](docs/recipes.md#recipe-2c-inline-layout-prose-between-questions)).
 - **Custom widgets register through `useQuestion`; only `useQuiz().submit()` scores the quiz.** Anything else and the LMS sees nothing.
 
@@ -410,7 +410,7 @@ Per-page weighting, optional pages, pass/fail and manual completion are in [`nod
 
 ### Question types
 
-Props listed before "Optional" are required. Every type also accepts `id`, `weight` (default 1) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
+Props listed before "Optional" are required. Every type also requires `id` and accepts `weight` (default 1) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
 
 **MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`, shown next to each option after submitting; the chosen option's entry replaces `correctFeedback` / `incorrectFeedback`.
 
@@ -420,6 +420,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ```svelte
 <Matching
+  id="capitals"
   question="Match country to capital:"
   pairs={[
     { left: 'France', right: 'Paris' },
@@ -432,6 +433,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 
 ```svelte
 <Sorting
+  id="animals"
   question="Sort each animal:"
   items={['Dog', 'Eagle', 'Salmon', 'Cat']}
   targets={['Mammals', 'Birds', 'Fish']}
@@ -444,7 +446,7 @@ Props listed before "Optional" are required. Every type also accepts `id`, `weig
 All four types work outside `<Quiz>` for inline practice. Each shows a Submit button, disabled until the answer is complete. All offer Try again after an answer that scores under 100, until `maxRetries` is spent. They accept `maxRetries` (`number`, default `Infinity`), `weight` (`number`, default `1`) and `graded` (`boolean`, default `false`). The answer, the retry count and the full-score lock are saved with the page's progress: a learner who returns sees the question submitted with their answer, an answer that scored 100 stays locked, and `maxRetries` counts across visits until the LMS attempt ends. Practice by default; `graded` makes the answer count toward the page score, which a `graded: true` page needs:
 
 ```svelte
-<MultipleChoice graded question="..." options={[...]} correct={0} />
+<MultipleChoice graded id="..." question="..." options={[...]} correct={0} />
 ```
 
 Inside `<Quiz>` the quiz owns grading, so `graded` is ignored there. For a custom widget, build it with `useQuestion` (see [Recipe 3](docs/recipes.md#recipe-3-graded-standalone-question)).

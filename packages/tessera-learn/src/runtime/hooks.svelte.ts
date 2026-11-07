@@ -176,6 +176,12 @@ function reporter(): StandaloneQuestionDeps['report'] {
 export function useQuestion<I extends Interaction = Interaction>(
   opts: UseQuestionOptions<I>,
 ): UseQuestionHandle {
+  if (!opts.id) {
+    throw new Error(
+      `useQuestion(): the question ${JSON.stringify(opts.text ?? '')} has no id. ` +
+        'Give every question an id that is unique on its page, such as id="capital_of_france".',
+    );
+  }
   const quizCtx = getQuizContext();
   const navCtx = getNavContext();
 

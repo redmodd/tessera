@@ -14,11 +14,7 @@ import {
   type CourseConfig,
   type QuizConfig,
 } from '../runtime/types.js';
-import {
-  QUESTION_ID_PREFIX,
-  questionId,
-  type QuestionComponentName,
-} from '../components/util.js';
+import { QUESTION_COMPONENT_NAMES as QUESTION_NAMES } from '../components/util.js';
 import {
   DEFAULT_STANDARD,
   standardProfile,
@@ -220,24 +216,13 @@ export function readMetaFile(metaPath: string): {
 }
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
-  Object.keys(QUESTION_ID_PREFIX),
+  QUESTION_NAMES,
 );
 
 /** The id a built-in question renders with, or null when the source doesn't fix it. */
-export function staticQuestionId({
-  name,
-  props,
-  hasSpread,
-}: ComponentMatch): string | null {
+export function staticQuestionId({ props }: ComponentMatch): string | null {
   const id = props.get('id');
-  if (id?.kind === 'string') return id.value;
-  const question = props.get('question');
-  if (hasSpread || id || question?.kind !== 'string') return null;
-  return questionId(
-    undefined,
-    QUESTION_ID_PREFIX[name as QuestionComponentName],
-    question.value,
-  );
+  return id?.kind === 'string' ? id.value : null;
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {

@@ -13,27 +13,14 @@ export function resolveAsset(src: string): string {
     : src;
 }
 
-/**
- * Build a deterministic slug from a question prompt for use as a fallback
- * `id` when the author hasn't supplied one. Stable across renders so SCORM /
- * cmi5 interaction reporting addresses the same question consistently.
- */
-export function slugFromQuestion(text: unknown): string {
-  return String(text ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40);
-}
+export const QUESTION_COMPONENT_NAMES = [
+  'MultipleChoice',
+  'FillInTheBlank',
+  'Matching',
+  'Sorting',
+] as const;
 
-export const QUESTION_ID_PREFIX = {
-  MultipleChoice: 'mc',
-  FillInTheBlank: 'fitb',
-  Matching: 'matching',
-  Sorting: 'sorting',
-} as const satisfies Record<string, string>;
-
-export type QuestionComponentName = keyof typeof QUESTION_ID_PREFIX;
+export type QuestionComponentName = (typeof QUESTION_COMPONENT_NAMES)[number];
 
 /** Matching pair badge colors, cycled by pair index. Each carries a white number. */
 export const MATCH_PAIR_COLORS = [
@@ -48,15 +35,6 @@ export const MATCH_PAIR_COLORS = [
   '#0369a1',
   '#a16207',
 ] as const;
-
-/** Author-supplied `id`, or a `prefix-<slug>` fallback derived from the prompt. */
-export function questionId(
-  id: string | undefined,
-  prefix: string,
-  question: unknown,
-): string {
-  return id ?? `${prefix}-${slugFromQuestion(question)}`;
-}
 
 /**
  * A saved answer's index into `list`. Throws when the question was edited

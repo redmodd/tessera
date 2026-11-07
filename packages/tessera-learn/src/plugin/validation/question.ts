@@ -85,7 +85,7 @@ const QUESTION_COMPONENTS: Record<
   QuestionComponentRule
 > = {
   MultipleChoice: {
-    required: ['question', 'options', 'correct'],
+    required: ['id', 'question', 'options', 'correct'],
     indexedLists: { options: 'some' },
     check({ props }, { fileRel, d }) {
       const options = staticArray(props.get('options'));
@@ -110,7 +110,7 @@ const QUESTION_COMPONENTS: Record<
     },
   },
   FillInTheBlank: {
-    required: ['question', 'answers'],
+    required: ['id', 'question', 'answers'],
     check(match, { fileRel, d, standard, id }) {
       const answers = staticList(match.props.get('answers'));
       if (answers) {
@@ -147,7 +147,7 @@ const QUESTION_COMPONENTS: Record<
     },
   },
   Matching: {
-    required: ['question', 'pairs'],
+    required: ['id', 'question', 'pairs'],
     indexedLists: { pairs: 'every' },
     check({ props }, { fileRel, d }) {
       const pairs = staticArray(props.get('pairs'));
@@ -167,7 +167,7 @@ const QUESTION_COMPONENTS: Record<
     },
   },
   Sorting: {
-    required: ['question', 'items', 'targets', 'correct'],
+    required: ['id', 'question', 'items', 'targets', 'correct'],
     indexedLists: { items: 'every', targets: 'some' },
     check({ props }, { fileRel, d }) {
       const items = staticArray(props.get('items'));
@@ -228,23 +228,18 @@ export function validateQuestionComponents(
     }
 
     const resolvedId = staticQuestionId(match);
-    // With no `id`, the widget derives one from the prompt text, so two
-    // identically worded questions collide on one page.
-    const derived = resolvedId !== null && !props.has('id');
 
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
         d.error(
-          derived
-            ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
-            : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
+          `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
         );
       } else if (standard) {
         // The standard's identifier rules can rewrite ids, so distinct raw ids
         // can collide after sanitization. Skip raw duplicates (already flagged
         // above) to avoid double-reporting the same id.
         const sane = standard.interactionFormat.identifier(resolvedId);
-        if (!derived && sane !== resolvedId) {
+        if (sane !== resolvedId) {
           d.warn(
             `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only ASCII letters, digits and underscores`,
           );
