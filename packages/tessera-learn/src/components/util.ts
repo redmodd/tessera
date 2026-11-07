@@ -55,20 +55,21 @@ export function fnv1a(text: string): string {
 /**
  * A question prompt as a slug, the fallback `id` when the author supplies
  * none: its Latin words without accents, cut at 40 characters. A prompt with
- * letters, digits or symbols ASCII cannot spell (`東京`, `😀`) also gets a
- * hash of the whole prompt, so such prompts stay distinct.
+ * any character outside ASCII (`pêche`, `東京`, `😀`) also gets a hash of the
+ * whole prompt, so prompts differing only in those characters stay distinct.
+ * The ASCII check needs no Unicode tables, which differ between the build
+ * and older browsers, so both derive the same id.
  */
 export function slugFromQuestion(text: unknown): string {
   const prompt = String(text ?? '').normalize('NFC');
-  const spelled = latin(prompt);
-  const words = spelled
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-/, '')
-    .slice(0, 40)
-    .replace(/-$/, '');
-  if (!/(?=[\p{L}\p{N}\p{S}])[^\0-\x7f]/u.test(spelled)) return words;
-  return [words, fnv1a(prompt)].filter(Boolean).join('-');
+  const words =
+    latin(prompt)
+      .toLowerCase()
+      .match(/[a-z0-9]+/g) ?? [];
+  const slug = words.join('-').slice(0, 40).replace(/-$/, '');
+  if (!/[^\0-\x7f]/.test(prompt)) return slug;
+  const hash = fnv1a(prompt);
+  return slug ? `${slug}-${hash}` : hash;
 }
 
 export const QUESTION_ID_PREFIX = {

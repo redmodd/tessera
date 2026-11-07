@@ -3,6 +3,7 @@ import {
   structureFingerprint,
   shouldRestore,
 } from '../src/runtime/fingerprint.js';
+import { fnv1a } from '../src/components/util.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 
@@ -56,15 +57,7 @@ describe('shouldRestore', () => {
   });
 
   it('discards a blob written by a runtime with the older saved-state layout', () => {
-    const legacyFingerprint = (...slugs: string[]) => {
-      const joined = slugs.join('\0');
-      let h = 0x811c9dc5;
-      for (let i = 0; i < joined.length; i++) {
-        h ^= joined.charCodeAt(i);
-        h = Math.imul(h, 0x01000193);
-      }
-      return (h >>> 0).toString(36);
-    };
+    const legacyFingerprint = (...slugs: string[]) => fnv1a(slugs.join('\0'));
     const legacy = {
       b: 1,
       v: [0, 1],

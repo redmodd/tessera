@@ -21,19 +21,32 @@ describe('slugFromQuestion', () => {
     ).toBe('did-the-attack-succeed-against-the-forti');
   });
 
-  it('drops accents from Latin letters', () => {
-    expect(slugFromQuestion('Café?')).toBe('cafe');
-    expect(slugFromQuestion('Résumé')).toBe('resume');
-    expect(slugFromQuestion('Straße')).toBe('strasse');
-    expect(slugFromQuestion('What’s up — “really”?')).toBe('what-s-up-really');
+  it('spells Latin letters without accents, then adds a hash of the prompt', () => {
+    expect(slugFromQuestion('Café?')).toBe('cafe-1htl0nt');
+    expect(slugFromQuestion('Café?')).toBe('cafe-1htl0nt');
+    expect(slugFromQuestion('Résumé')).toBe('resume-vvv8cq');
+    expect(slugFromQuestion('Straße')).toBe('strasse-1mfnvn');
+    expect(slugFromQuestion('What’s up — “really”?')).toBe(
+      'what-s-up-really-15riyb7',
+    );
   });
 
-  it('adds a hash of the prompt when ASCII cannot spell a letter, digit or symbol', () => {
+  it('keeps prompts that differ only by accents distinct', () => {
+    expect(slugFromQuestion('Que signifie pêche ?')).toBe(
+      'que-signifie-peche-ou08uj',
+    );
+    expect(slugFromQuestion('Que signifie péché ?')).toBe(
+      'que-signifie-peche-nt80ro',
+    );
+  });
+
+  it('hashes prompts ASCII cannot spell', () => {
     expect(slugFromQuestion('東京は？')).toBe('1u6y6gm');
     expect(slugFromQuestion('大阪は？')).toBe('gvmrai');
     expect(slugFromQuestion('What is Г?')).toBe('what-is-1qd7kqh');
     expect(slugFromQuestion('👍 or 👎?')).toBe('or-1w5mneo');
     expect(slugFromQuestion('⭐⭐⭐?')).toBe('10g4s5k');
+    expect(slugFromQuestion('¿…?')).toBe('ftvqrp');
   });
 
   it('hashes after the 40-character cut', () => {
