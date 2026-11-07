@@ -304,7 +304,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: [['step one', 'all done']],
           correct: [['step one', 'all done']],
         },
-        'step_one[.]all done',
+        'step_one[.]all_done',
       ],
       [
         'URN likert',
@@ -322,7 +322,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: [['', 'all done']],
           correct: [['', 'all done']],
         },
-        '[.]all done',
+        '[.]all_done',
       ],
       [
         'punctuation-only likert',
@@ -350,7 +350,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       },
     );
 
-    it('leaves out a step answer holding a delimiter but keeps a correct range', async () => {
+    it('folds a step answer holding a delimiter but keeps a correct range', async () => {
       await start();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
@@ -364,15 +364,13 @@ describe('SCORM2004Adapter against scorm-again', () => {
       );
       await flush();
       expect(lms.errors).toEqual([]);
-      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe('');
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+        's[.]turn_left',
+      );
       expect(
         lms.raw.GetValue('cmi.interactions.0.correct_responses.0.pattern'),
       ).toBe('s[.]1[:]5');
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'the response of interaction "q1" is left out of the LMS record: the step answer "turn [.] left" holds [,], [.] or [:]',
-        ),
-      );
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('leaves out a reversed numeric range the data model rejects', async () => {
@@ -403,9 +401,9 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: [['s', 'done ']],
           correct: [['s', 'done ']],
         },
-        's[.]done ',
-        '',
-        'starting or ending in whitespace',
+        's[.]done',
+        's[.]done',
+        'records the correct step answer "done " as "done"',
       ],
       [
         'a case-sensitive answer starting with a space',
@@ -688,7 +686,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       ).toBe('1');
     });
 
-    it('warns only that a long step answer holding a delimiter is left out', async () => {
+    it('cuts a long step answer, then folds it', async () => {
       await start();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
@@ -701,9 +699,12 @@ describe('SCORM2004Adapter against scorm-again', () => {
       );
       await flush();
       expect(lms.errors).toEqual([]);
-      expect(warn).toHaveBeenCalledTimes(1);
+      expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
+        `s[.]a_b${'x'.repeat(243)}`,
+      );
+      expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('is left out of the LMS record'),
+        expect.stringContaining('has a step answer over the 250 characters'),
       );
     });
 
