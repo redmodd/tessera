@@ -250,7 +250,7 @@ const UNSPLIT_LETTERS: Record<string, string> = {
 };
 
 /** Accented Latin letters spelled without their accents. */
-function latin(text: string): string {
+export function latin(text: string): string {
   return text
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')

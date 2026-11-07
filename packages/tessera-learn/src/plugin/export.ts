@@ -20,14 +20,20 @@ import {
   type StandardProfile,
 } from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
+import { latin } from '../runtime/interaction-format.js';
 
 function slugify(text: string): string {
   return text
+    .normalize('NFC')
+    .replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
+      if (/^\p{S}/u.test(c)) return '';
+      const plain = latin(c);
+      // ŀ spells as l· and ŉ as ʼn: keep the Latin letter, drop the rest.
+      if (/^\p{L}/u.test(c)) return plain.replace(/\W/g, '');
+      return /^[\w\s-]*$/.test(plain) ? plain : '';
+    })
     .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
+    .replace(/[\s_-]+/g, '-')
     .replace(/^-|-$/g, '');
 }
 
