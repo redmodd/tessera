@@ -34,13 +34,14 @@ export function propMayBeTruthy(
   return value === undefined || Boolean(value);
 }
 
-/** The source sets the id to a blank string or another falsy value. */
-function hasBlankId(match: ComponentMatch): boolean {
-  const prop = match.props.get('id');
-  if (!prop) return false;
-  if (!propMayBeTruthy(match, 'id')) return true;
-  const value = prop.kind === 'string' ? prop.value : staticValue(prop);
-  return typeof value === 'string' && value.trim() === '';
+/** The source sets an id that `useQuestion()` rejects: blank, null or undefined. */
+function hasBlankId({ props }: ComponentMatch): boolean {
+  const prop = props.get('id');
+  if (prop?.kind === 'string') return !prop.value.trim();
+  if (prop?.kind !== 'expr') return false;
+  if (prop.raw === 'undefined') return true;
+  const value = staticValue(prop);
+  return value === null || (typeof value === 'string' && !value.trim());
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {

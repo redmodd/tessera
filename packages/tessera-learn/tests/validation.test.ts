@@ -1924,6 +1924,16 @@ describe('question component validation', () => {
     expect(errors.filter((e) => e.includes('duplicate'))).toHaveLength(0);
   });
 
+  it('accepts a falsy id that useQuestion() accepts', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id={0} question="What is water?" options={["a", "b"]} correct={0} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('empty id'))).toHaveLength(0);
+  });
+
   it('skips the id check when a spread may supply one', () => {
     createValidProject(testRoot);
     writePage(
