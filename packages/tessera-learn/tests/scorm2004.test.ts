@@ -377,6 +377,34 @@ describe('SCORM2004Adapter', () => {
       );
     });
 
+    it('replaces whitespace in the interaction id', async () => {
+      adapter.reportInteraction(
+        'my question',
+        { type: 'true-false', response: true },
+        null,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({ id: 'my_question' });
+    });
+
+    it('warns when two question ids record as the same interaction id', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const report = (id: string) =>
+        adapter.reportInteraction(
+          id,
+          { type: 'true-false', response: true },
+          null,
+        );
+      report('q_1');
+      report('q_1');
+      expect(warn).not.toHaveBeenCalled();
+      report('q 1');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(
+        /interactions "q_1" and "q 1" both record as "q_1" under SCORM 2004/,
+      );
+    });
+
     it('writes choice interaction fields', async () => {
       adapter.reportInteraction(
         'q1',
