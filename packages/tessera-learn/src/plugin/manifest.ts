@@ -9,6 +9,7 @@ import {
   type ComponentMatch,
 } from './ast.js';
 import {
+  isQuestionId,
   isRecord,
   isStringArray,
   type CourseConfig,
@@ -230,7 +231,7 @@ export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
 /** The id a built-in question renders with, or null when the source doesn't fix it. */
 export function staticQuestionId({ props }: ComponentMatch): string | null {
   const id = props.get('id');
-  return id?.kind === 'string' && id.value.trim() !== '' ? id.value : null;
+  return id?.kind === 'string' && isQuestionId(id.value) ? id.value : null;
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {

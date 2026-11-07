@@ -175,19 +175,13 @@
   }
 
   // The page boundary's onerror runs before tick() resolves, so a page that
-  // threw is already showing ErrorPage here. ErrorPage announces itself as an
-  // alert, and the first load keeps the browser's initial focus.
+  // threw is already showing ErrorPage here, and its unregistered saved
+  // questions are kept. ErrorPage announces itself as an alert, and the first
+  // load keeps the browser's initial focus.
   function pageRendered(index, focusBefore, gen) {
     if (gen !== loadGeneration || pageError) return;
     if (gen > 1) focusPageHeading(focusBefore);
-    progress.markVisited(index);
     progress.pageMounted(index);
-    if (
-      manifest.pages[index].completesOn === 'view' &&
-      config.completion.mode === 'manual'
-    ) {
-      progress.markCompleteManually();
-    }
   }
 
   function loadPage(index) {
@@ -222,6 +216,13 @@
         };
         PageComponent = mod.default;
         showPage(index);
+        progress.markVisited(index);
+        if (
+          page.completesOn === 'view' &&
+          config.completion.mode === 'manual'
+        ) {
+          progress.markCompleteManually();
+        }
         tick().then(() => pageRendered(index, focusBefore, gen));
         onIdle(() => nav.prefetch(index + 1));
       })

@@ -125,16 +125,16 @@ describe('useQuestion — standalone mode', () => {
     expect(q.correct).toBe(true);
   });
 
-  it('throws when the question has no id', () => {
+  it('throws when the question has no string id', () => {
     provideNavCtx();
     const response = () => undefined;
-    for (const id of [undefined, '', '  ']) {
+    for (const id of [undefined, null, '', '  ', 0, 1, true]) {
       expect(() =>
         useQuestion({ id: id as unknown as string, text: 'Pick a', response }),
-      ).toThrow('useQuestion(): the question "Pick a" has no id.');
+      ).toThrow('useQuestion(): the question "Pick a" needs an id:');
     }
     expect(() => useQuestion({ id: '', response })).toThrow(
-      'useQuestion(): a question has no id.',
+      'useQuestion(): a question needs an id:',
     );
   });
 

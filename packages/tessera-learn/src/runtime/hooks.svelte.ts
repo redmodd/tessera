@@ -6,7 +6,7 @@ import {
   type Interaction,
   type InteractionResponse,
 } from './interaction.js';
-import type { QuizConfig } from './types.js';
+import { isQuestionId, type QuizConfig } from './types.js';
 import type { CompletionStatus } from './persistence.js';
 import {
   requireNavContext,
@@ -176,10 +176,10 @@ function reporter(): StandaloneQuestionDeps['report'] {
 export function useQuestion<I extends Interaction = Interaction>(
   opts: UseQuestionOptions<I>,
 ): UseQuestionHandle {
-  if (!String(opts.id ?? '').trim()) {
+  if (!isQuestionId(opts.id)) {
     throw new Error(
-      `useQuestion(): ${opts.text ? `the question ${JSON.stringify(opts.text)}` : 'a question'} has no id. ` +
-        'Give every question an id that is unique on its page, such as "capital_of_france".',
+      `useQuestion(): ${opts.text ? `the question ${JSON.stringify(opts.text)}` : 'a question'} needs an id: ` +
+        'a string that is unique on its page, such as "capital_of_france".',
     );
   }
   const quizCtx = getQuizContext();

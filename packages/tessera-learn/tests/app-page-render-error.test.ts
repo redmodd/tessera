@@ -24,11 +24,11 @@ describe('a page that throws while rendering', () => {
     });
 
     await showsErrorPage();
-    expect(document.body.textContent).toContain('has no id');
+    expect(document.body.textContent).toContain('needs an id');
     expect(document.querySelector('.tessera-nav, nav')).not.toBeNull();
   });
 
-  it('records no visit or completion and leaves focus alone', async () => {
+  it('still records the visit and completion, and leaves focus alone', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     let broken = false;
     await mountApp({
@@ -54,8 +54,38 @@ describe('a page that throws while rendering', () => {
     await showsErrorPage();
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(progress.visitedPages.has(1)).toBe(false);
-    expect(progress.toSaved().m).toBeUndefined();
+    expect(progress.visitedPages.has(1)).toBe(true);
+    expect(progress.toSaved().m).toBe(1);
     expect(document.querySelector('[data-tessera-page-focus]')).toBeNull();
+  });
+});
+
+describe('page bookkeeping under sequential navigation', () => {
+  it('counts the page as visited by the time it mounts', async () => {
+    await mountApp({
+      config: createConfig({ navigation: { mode: 'sequential' } }),
+      manifest: createManifest(2),
+      adapter: stubAdapter(),
+      loadPage: () => import('./fixtures/next-on-mount-page.svelte'),
+      loadLayout: () => import('./fixtures/mastery-layout.svelte'),
+    });
+    await vi.waitFor(() =>
+      expect((globalThis as any).__tesseraCanGoNextAtMount).toBeDefined(),
+    );
+    expect((globalThis as any).__tesseraCanGoNextAtMount).toBe(true);
+  });
+
+  it('lets the learner move past a page that fails to render', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await mountApp({
+      config: createConfig({ navigation: { mode: 'sequential' } }),
+      manifest: createManifest(2),
+      adapter: stubAdapter(),
+      loadPage: () => import('./fixtures/question-no-id-page.svelte'),
+      loadLayout: () => import('./fixtures/mastery-layout.svelte'),
+    });
+    await showsErrorPage();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(navCtx().nav.canGoNext).toBe(true);
   });
 });

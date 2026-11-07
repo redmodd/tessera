@@ -1906,7 +1906,7 @@ describe('question component validation', () => {
     );
   });
 
-  it('errors when a question has an empty id', () => {
+  it('errors when a question has a blank or non-string id', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
@@ -1915,23 +1915,32 @@ describe('question component validation', () => {
 <MultipleChoice id=" " question="What is snow?" options={["a", "b"]} correct={0} />
 <MultipleChoice id={''} question="What is fog?" options={["a", "b"]} correct={0} />
 <MultipleChoice id={undefined} question="What is rain?" options={["a", "b"]} correct={0} />
-<MultipleChoice id={null} question="What is hail?" options={["a", "b"]} correct={0} />`,
+<MultipleChoice id={null} question="What is hail?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={0} question="What is mist?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={1} question="What is dew?" options={["a", "b"]} correct={0} />
+<MultipleChoice id question="What is frost?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(
-      errors.filter((e) => e.includes('<MultipleChoice> has an empty id')),
-    ).toHaveLength(6);
+      errors.filter((e) =>
+        e.includes('<MultipleChoice> id must be a string that is not blank'),
+      ),
+    ).toHaveLength(9);
     expect(errors.filter((e) => e.includes('duplicate'))).toHaveLength(0);
   });
 
-  it('accepts a falsy id that useQuestion() accepts', () => {
+  it('accepts a literal string id and leaves a dynamic one to the runtime', () => {
     createValidProject(testRoot);
     writePage(
-      `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice id={0} question="What is water?" options={["a", "b"]} correct={0} />`,
+      `<script>import { MultipleChoice } from 'tessera-learn';
+let a = { id: 'planet' }; let n = 'moon';</script>
+<MultipleChoice id={'water'} question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={n} question="What is ice?" options={["a", "b"]} correct={0} />
+<MultipleChoice id="q-{n}" question="What is snow?" options={["a", "b"]} correct={0} />
+<MultipleChoice id="" {...a} question="What is fog?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors.filter((e) => e.includes('empty id'))).toHaveLength(0);
+    expect(errors.filter((e) => e.includes('id must be'))).toHaveLength(0);
   });
 
   it('skips the id check when a spread may supply one', () => {

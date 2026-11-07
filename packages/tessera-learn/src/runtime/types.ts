@@ -82,6 +82,11 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** A question id `useQuestion()` accepts: a string that is not blank. */
+export function isQuestionId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
 export function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }

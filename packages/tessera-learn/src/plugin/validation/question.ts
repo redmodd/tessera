@@ -6,7 +6,7 @@ import {
   SCORM12_MAX_OPTIONS,
   fitPatterns,
 } from '../../runtime/interaction-format.js';
-import { isRecord, isStringArray } from '../../runtime/types.js';
+import { isQuestionId, isRecord, isStringArray } from '../../runtime/types.js';
 import { fillInAnswers } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
@@ -34,14 +34,14 @@ export function propMayBeTruthy(
   return value === undefined || Boolean(value);
 }
 
-/** The source sets an id that `useQuestion()` rejects: blank, null or undefined. */
-function hasBlankId({ props }: ComponentMatch): boolean {
+/** The source fixes an id that `useQuestion()` rejects. A spread may override it. */
+function hasInvalidId({ props, hasSpread }: ComponentMatch): boolean {
   const prop = props.get('id');
-  if (prop?.kind === 'string') return !prop.value.trim();
-  if (prop?.kind !== 'expr') return false;
-  if (prop.raw === 'undefined') return true;
+  if (!prop || hasSpread || prop.kind === 'template') return false;
+  if (prop.kind === 'string') return !isQuestionId(prop.value);
+  if (prop.kind === 'bool' || prop.raw === 'undefined') return true;
   const value = staticValue(prop);
-  return value === null || (typeof value === 'string' && !value.trim());
+  return value !== undefined && !isQuestionId(value);
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
@@ -234,7 +234,9 @@ export function validateQuestionComponents(
       );
     }
 
-    if (hasBlankId(match)) d.error(`${fileRel}: <${name}> has an empty id`);
+    if (hasInvalidId(match)) {
+      d.error(`${fileRel}: <${name}> id must be a string that is not blank`);
+    }
     const resolvedId = staticQuestionId(match);
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
