@@ -23,12 +23,10 @@ import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 import { latin } from '../runtime/interaction-format.js';
 
 function slugify(text: string): string {
-  return text
+  return latin(text)
     .toLowerCase()
-    .trim()
     .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
+    .replace(/[\s_-]+/g, '-')
     .replace(/^-|-$/g, '');
 }
 
@@ -367,7 +365,7 @@ export async function runExport(
   profile: StandardProfile,
   hasRequiredGradedPage: boolean,
 ): Promise<void> {
-  const slug = slugify(latin(config.title)) || 'tessera-course';
+  const slug = slugify(config.title) || 'tessera-course';
   const version = config.version || '1.0.0';
   const zipName = `${slug}-${version}.zip`;
   const zipPath = resolve(projectRoot, zipName);

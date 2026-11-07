@@ -541,33 +541,19 @@ describe('runExport', () => {
     expect(xml).toContain('masteryScore="0.8"');
   });
 
-  it('uses slugified title and version for zip filename', async () => {
+  it.each([
+    ['My Amazing Course!', '3.2.1', 'my-amazing-course-3.2.1.zip'],
+    ['Café Straße', '1.0.0', 'cafe-strasse-1.0.0.zip'],
+  ])('names the zip %s %s as %s', async (title, version, zip) => {
     await runExport(
       testRoot,
       createDistDir(testRoot),
-      mergeCourseConfig({
-        title: 'My Amazing Course!',
-        version: '3.2.1',
-      }),
+      mergeCourseConfig({ title, version }),
       STANDARDS.scorm12,
       true,
     );
 
-    expect(existsSync(resolve(testRoot, 'my-amazing-course-3.2.1.zip'))).toBe(
-      true,
-    );
-  });
-
-  it('spells accented letters of the title without accents in the zip filename', async () => {
-    await runExport(
-      testRoot,
-      createDistDir(testRoot),
-      mergeCourseConfig({ title: 'Café Straße', version: '1.0.0' }),
-      STANDARDS.scorm12,
-      true,
-    );
-
-    expect(existsSync(resolve(testRoot, 'cafe-strasse-1.0.0.zip'))).toBe(true);
+    expect(existsSync(resolve(testRoot, zip))).toBe(true);
   });
 
   it('writes the manifest into a custom outDir and zips it', async () => {
