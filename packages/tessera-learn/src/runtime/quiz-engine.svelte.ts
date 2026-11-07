@@ -202,11 +202,11 @@ export class QuizEngine implements UseQuizHandle {
         this.#rewrittenIds.has(api.id)
           ? `[tessera] useQuiz: question id "${api.id}" is already taken by an earlier question whose ` +
               `duplicate id was rewritten to it — registered as "${id}" instead. ` +
-              'Give the earlier duplicates explicit ids, because the rewritten one is the key ' +
+              'Give the earlier duplicates unique ids, because the rewritten one is the key ' +
               "this question's LMS interaction is recorded under."
           : `[tessera] useQuiz: duplicate question id "${api.id}" — registered as "${id}" instead. ` +
-              'Each question id must be unique within a quiz; give this question an explicit id, ' +
-              'because the rewritten one is the key its LMS interaction is recorded under.',
+              'Give each question in a quiz a unique id, because the rewritten one is the key ' +
+              'its LMS interaction is recorded under.',
       );
       this.#rewrittenIds.add(id);
     }

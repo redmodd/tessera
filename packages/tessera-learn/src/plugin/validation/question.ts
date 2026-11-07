@@ -1,5 +1,5 @@
 import JSON5 from 'json5';
-import { staticQuestionId } from '../manifest.js';
+import { staticQuestionId, type QuestionComponentName } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import {
@@ -7,10 +7,7 @@ import {
   fitPatterns,
 } from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
-import {
-  fillInAnswers,
-  type QuestionComponentName,
-} from '../../components/util.js';
+import { fillInAnswers } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
 

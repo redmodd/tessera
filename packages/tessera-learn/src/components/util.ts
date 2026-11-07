@@ -13,15 +13,6 @@ export function resolveAsset(src: string): string {
     : src;
 }
 
-export const QUESTION_COMPONENT_NAMES = [
-  'MultipleChoice',
-  'FillInTheBlank',
-  'Matching',
-  'Sorting',
-] as const;
-
-export type QuestionComponentName = (typeof QUESTION_COMPONENT_NAMES)[number];
-
 /** Matching pair badge colors, cycled by pair index. Each carries a white number. */
 export const MATCH_PAIR_COLORS = [
   '#2563eb',

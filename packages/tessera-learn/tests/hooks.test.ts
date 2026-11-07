@@ -133,6 +133,9 @@ describe('useQuestion — standalone mode', () => {
         useQuestion({ id: id as unknown as string, text: 'Pick a', response }),
       ).toThrow('useQuestion(): the question "Pick a" has no id.');
     }
+    expect(() =>
+      useQuestion({ id: '', response } as Parameters<typeof useQuestion>[0]),
+    ).toThrow('useQuestion(): a question has no id.');
   });
 
   it('warns in dev about a widget with no restore, standalone or in a quiz', () => {

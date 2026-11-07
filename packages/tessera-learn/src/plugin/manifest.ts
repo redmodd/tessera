@@ -14,7 +14,6 @@ import {
   type CourseConfig,
   type QuizConfig,
 } from '../runtime/types.js';
-import { QUESTION_COMPONENT_NAMES as QUESTION_NAMES } from '../components/util.js';
 import {
   DEFAULT_STANDARD,
   standardProfile,
@@ -214,6 +213,15 @@ export function readMetaFile(metaPath: string): {
   else if (pages != null) rejected.pages = pages;
   return { meta, rejected };
 }
+
+const QUESTION_NAMES = [
+  'MultipleChoice',
+  'FillInTheBlank',
+  'Matching',
+  'Sorting',
+] as const;
+
+export type QuestionComponentName = (typeof QUESTION_NAMES)[number];
 
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
   QUESTION_NAMES,
