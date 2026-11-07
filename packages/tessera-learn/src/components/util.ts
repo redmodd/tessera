@@ -42,39 +42,33 @@ export function latin(text: string): string {
     .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
 }
 
-/**
- * `value` in ASCII letters, digits, `_` and spaces. Latin letters drop their
- * accents (`café` → `cafe`). Letters of other scripts become one `u` and four
- * hex digits per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they
- * stay distinct from one another. Other characters become spaces.
- */
-export function asciiSpelling(value: string): string {
-  return value.normalize('NFC').replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
-    const plain = latin(c);
-    if (/^\w+$/.test(plain)) return plain;
-    if (!/[\p{L}\p{N}]/u.test(c)) return ' ';
-    return c.replace(
-      /./gs,
-      (u) => `u${u.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
-    );
-  });
+/** 32-bit FNV-1a over `text`'s UTF-16 units, in base 36. */
+export function fnv1a(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }
 
 /**
- * A question prompt's ASCII spelling as a slug, the fallback `id` when the
- * author supplies none. Runs of other characters become one `-`. The cut
- * keeps 40 characters, each code of another script counting as one, so the
- * slug is at most 200 characters.
+ * A question prompt as a slug, the fallback `id` when the author supplies
+ * none: its Latin words without accents, cut at 40 characters. A prompt with
+ * letters, digits or symbols ASCII cannot spell (`東京`, `😀`) also gets a
+ * hash of the whole prompt, so such prompts stay distinct.
  */
 export function slugFromQuestion(text: unknown): string {
-  const slug = asciiSpelling(String(text ?? ''))
+  const prompt = String(text ?? '').normalize('NFC');
+  const spelled = latin(prompt);
+  const words = spelled
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-/, '');
-  return (slug.match(/u[0-9a-f]{4}|./g) ?? [])
+    .replace(/^-/, '')
     .slice(0, 40)
-    .join('')
     .replace(/-$/, '');
+  if (!/(?=[\p{L}\p{N}\p{S}])[^\0-\x7f]/u.test(spelled)) return words;
+  return [words, fnv1a(prompt)].filter(Boolean).join('-');
 }
 
 export const QUESTION_ID_PREFIX = {

@@ -13,25 +13,32 @@ describe('slugFromQuestion', () => {
     expect(slugFromQuestion('  Hello, World!! ')).toBe('hello-world');
   });
 
-  it('cuts at 40 characters, each code of another script counting as one', () => {
+  it('cuts at 40 characters without a trailing dash', () => {
     expect(slugFromQuestion('a'.repeat(100))).toBe('a'.repeat(40));
-    expect(slugFromQuestion('東'.repeat(50))).toBe('u6771'.repeat(40));
-    expect(slugFromQuestion('😀'.repeat(50))).toBe('');
     expect(slugFromQuestion(`${'a'.repeat(39)} b`)).toBe('a'.repeat(39));
+    expect(
+      slugFromQuestion('Did the attack succeed against the fortified wall?'),
+    ).toBe('did-the-attack-succeed-against-the-forti');
   });
 
   it('drops accents from Latin letters', () => {
     expect(slugFromQuestion('Café?')).toBe('cafe');
     expect(slugFromQuestion('Résumé')).toBe('resume');
     expect(slugFromQuestion('Straße')).toBe('strasse');
+    expect(slugFromQuestion('What’s up — “really”?')).toBe('what-s-up-really');
   });
 
-  it('spells letters of other scripts as code points', () => {
-    expect(slugFromQuestion('東京は？')).toBe('u6771u4eacu306f');
-    expect(slugFromQuestion('大阪は？')).toBe('u5927u962au306f');
-    expect(slugFromQuestion('Где Москва?')).toBe(
-      'u0413u0434u0435-u041cu043eu0441u043au0432u0430',
-    );
+  it('adds a hash of the prompt when ASCII cannot spell a letter, digit or symbol', () => {
+    expect(slugFromQuestion('東京は？')).toBe('1u6y6gm');
+    expect(slugFromQuestion('大阪は？')).toBe('gvmrai');
+    expect(slugFromQuestion('What is Г?')).toBe('what-is-1qd7kqh');
+    expect(slugFromQuestion('👍 or 👎?')).toBe('or-1w5mneo');
+    expect(slugFromQuestion('⭐⭐⭐?')).toBe('10g4s5k');
+  });
+
+  it('keeps prompts ASCII cannot spell apart from ASCII text', () => {
+    expect(slugFromQuestion('Г')).not.toBe(slugFromQuestion('u0413'));
+    expect(slugFromQuestion('東'.repeat(200)).length).toBeLessThanOrEqual(7);
   });
 
   it('handles nullish input without throwing', () => {
