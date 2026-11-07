@@ -343,7 +343,25 @@ describe('performance steps', () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining(
-        'records the step answer "turn-left" as "turn_left", the same as the correct answer "turn_left"',
+        'records the step answer "turn-left" as "turn_left", so the LMS record and the result disagree on whether it matches the correct answer "turn_left"',
+      ),
+    );
+  });
+
+  it('warns when a step answer graded inside a correct range records outside it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['s', '-150000']],
+        correct: [['s', '-200000[:]0']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'records the step answer "-150000" as "150000", so the LMS record and the result disagree on whether it matches the correct answer "-200000[:]0"',
       ),
     );
   });
@@ -368,7 +386,7 @@ describe('performance steps', () => {
       expect.stringContaining('repeating an item'),
     );
     expect(warn).not.toHaveBeenCalledWith(
-      expect.stringContaining('shows a match'),
+      expect.stringContaining('disagree on whether it matches'),
     );
   });
 

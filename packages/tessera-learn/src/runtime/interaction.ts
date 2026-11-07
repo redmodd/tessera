@@ -232,7 +232,10 @@ export function textRange(i: Interaction): string | null {
  * inside it, ends included, as an LMS grades it (`.5` and `+3` are decimals,
  * `1e-7` is not).
  */
-function stepFits(value: string | number, answer: string | number): boolean {
+export function stepFits(
+  value: string | number,
+  answer: string | number,
+): boolean {
   const text = String(value);
   const range = stepRange(answer);
   if (!range) return text === String(answer);
