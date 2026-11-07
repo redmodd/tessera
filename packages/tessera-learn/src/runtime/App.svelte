@@ -5,7 +5,7 @@
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
   import courseRuntime from 'virtual:tessera-course-runtime';
-  import { onMount, onDestroy, tick, untrack } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import SessionEnded from './SessionEnded.svelte';
@@ -174,13 +174,14 @@
     renderedPageIndex = index;
   }
 
-  // The page boundary's onerror runs before tick() resolves, so a page that
-  // threw is already showing ErrorPage here, and its unregistered saved
-  // questions are kept. ErrorPage announces itself as an alert, and the first
-  // load keeps the browser's initial focus.
-  function pageRendered(index, focusBefore, gen) {
-    if (gen !== loadGeneration || pageError) return;
-    if (gen > 1) focusPageHeading(focusBefore);
+  // PageHost mounts only once its page rendered, so a page that threw keeps
+  // its unregistered saved questions and leaves focus to ErrorPage, which
+  // announces itself as an alert. The first load keeps the browser's initial
+  // focus.
+  let mounting;
+  function pageRendered() {
+    const { index, focusBefore, gen } = mounting;
+    if (gen > 1 && gen === loadGeneration) focusPageHeading(focusBefore);
     progress.pageMounted(index);
   }
 
@@ -214,6 +215,7 @@
           unscored: progress.quizUnscored(index),
           responses: progress.quizResponses(index),
         };
+        mounting = { index, focusBefore, gen };
         PageComponent = mod.default;
         showPage(index);
         progress.markVisited(index);
@@ -223,7 +225,6 @@
         ) {
           progress.markCompleteManually();
         }
-        tick().then(() => pageRendered(index, focusBefore, gen));
         onIdle(() => nav.prefetch(index + 1));
       })
       .catch((err) => {
@@ -289,19 +290,20 @@
     {#if pageError}
       <ErrorPage error={pageError} onretry={retryPage} />
     {:else if PageComponent}
-      <svelte:boundary onerror={showRenderError}>
-        <PageHost>
-          {#if pageContext.quiz}
-            {#key renderedPageIndex}
+      <!-- One boundary per page, so the last page's teardown can't fail this one. -->
+      {#key renderedPageIndex}
+        <svelte:boundary onerror={showRenderError}>
+          <PageHost onmount={pageRendered}>
+            {#if pageContext.quiz}
               <Quiz>
                 <PageComponent />
               </Quiz>
-            {/key}
-          {:else}
-            <PageComponent />
-          {/if}
-        </PageHost>
-      </svelte:boundary>
+            {:else}
+              <PageComponent />
+            {/if}
+          </PageHost>
+        </svelte:boundary>
+      {/key}
     {/if}
   </div>
 {/snippet}

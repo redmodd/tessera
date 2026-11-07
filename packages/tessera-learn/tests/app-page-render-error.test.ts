@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, onTestFinished } from 'vitest';
 import {
   createConfig,
   createManifest,
@@ -57,6 +57,40 @@ describe('a page that throws while rendering', () => {
     expect(progress.visitedPages.has(1)).toBe(true);
     expect(progress.toSaved().m).toBe(1);
     expect(document.querySelector('[data-tessera-page-focus]')).toBeNull();
+  });
+  it('leaves the next page alone when the last one throws while tearing down', async () => {
+    // A second listener tells Vitest the error is handled. Svelte's flush
+    // surfaces it as either event.
+    const escaped: unknown[] = [];
+    const onEscape = (err: unknown) => escaped.push(err);
+    const events = ['uncaughtException', 'unhandledRejection'] as const;
+    for (const event of events) process.on(event, onEscape);
+    onTestFinished(() => {
+      for (const event of events) process.off(event, onEscape);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let next = false;
+    await mountApp({
+      config: createConfig({}),
+      manifest: createManifest(2),
+      adapter: stubAdapter(),
+      loadPage: () =>
+        next
+          ? import('./fixtures/app-page.svelte')
+          : import('./fixtures/throw-on-destroy-page.svelte'),
+      loadLayout: () => import('./fixtures/mastery-layout.svelte'),
+    });
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Leaving page'),
+    );
+
+    next = true;
+    navCtx().nav.goToPage(1);
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Test page'),
+    );
+    await vi.waitFor(() => expect(escaped).toHaveLength(1));
+    expect(document.body.textContent).not.toContain('failed to load');
   });
 });
 
