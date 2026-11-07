@@ -212,17 +212,6 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   responseId: (v) => v,
 };
 
-/**
- * SCORM `short_identifier_type` / `CMIIdentifier`: alphanumerics +
- * underscore, max 250 chars. Strict validators (SCORM Cloud) reject raw
- * option labels with spaces or punctuation with error 405/406.
- */
-function shortIdentifier(value: string, max = 250): string {
-  const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const trimmed = cleaned.slice(0, max);
-  return trimmed || '_';
-}
-
 export const SCORM12_MAX_OPTIONS = 36;
 
 const CASE_PREFIX = '{case_matters=true}';
@@ -268,13 +257,13 @@ function latin(text: string): string {
 }
 
 /**
- * A SCORM id inside a response: letters, digits and `_`. Moodle also allows
- * `.` in SCORM 2004, but it is left to position text (`3.Paris`). Latin
- * letters drop their accents (`café` → `cafe`). Letters of other scripts
- * record as one `u` and four hex digits per UTF-16 unit (`東京` →
- * `u6771u4EAC`), a fixed width so they stay distinct from one another. Each
- * run of other characters records as one `_`, dropped at the ends. The cut
- * keeps each code whole.
+ * A SCORM 1.2 interaction id, or a SCORM id inside a response: letters,
+ * digits and `_`. Moodle also allows `.` in SCORM 2004, but it is left to
+ * position text (`3.Paris`). Latin letters drop their accents (`café` →
+ * `cafe`). Letters of other scripts record as one `u` and four hex digits
+ * per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they stay
+ * distinct from one another. Each run of other characters records as one
+ * `_`, dropped at the ends. The cut keeps each code whole.
  */
 function scormResponseId(value: string, max = 250): string {
   const spelled = value
@@ -331,7 +320,8 @@ function positionText(
   if (!/[A-Za-z0-9]/.test(plain)) {
     return /^\w*[A-Za-z]\w*$/.test(value) ? undefined : `${position}_`;
   }
-  return position + shortIdentifier(plain, 250 - position.length);
+  const spelled = plain.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return (position + spelled).slice(0, 250);
 }
 
 /**

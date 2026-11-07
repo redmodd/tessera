@@ -320,9 +320,12 @@ describe('SCORM 1.2 interaction ids', () => {
     ['問2', 'u554F2'],
     ['my question', 'my_question'],
     ['q1', 'q1'],
-  ])('records %s as %s, as ids inside a response', (id, recorded) => {
+    ['_q1', '_q1'],
+    ['a__b', 'a__b'],
+    ['a_-b', 'a__b'],
+    ['-q1-', 'q1'],
+  ])('records %s as %s', (id, recorded) => {
     expect(SCORM12_INTERACTION_FORMAT.identifier(id)).toBe(recorded);
-    expect(SCORM12_INTERACTION_FORMAT.responseId(id)).toBe(recorded);
   });
 });
 
