@@ -1,5 +1,32 @@
 # tessera-learn
 
+## 0.13.0
+
+### Minor Changes
+
+- b3cfa17: Questions report their option text to the LRS: an `Interaction` option can be `{ id, text }`, which built-in questions fill in. xAPI and cmi5 send it as the Answered statement's interaction components (`choices`, `scale`, `source`/`target`, `steps`); responses keep the ids.
+- c794319: Questions report their text to the LMS: `useQuestion` takes an optional `text`, which built-in questions fill from `question`. It goes out as the Answered statement's `definition.description` in xAPI and cmi5, and as `cmi.interactions.n.description` in SCORM 2004.
+  
+  Answered statements in xAPI and cmi5 name the launch activity as `parent` instead of `grouping`, and a `useXAPI()` statement that names the activity as `parent` gets no default `grouping`. Plain xAPI also sends the course title and description on the course activity.
+- b000697: SCORM 2004 reports show answer text: a choice, sequencing or matching option with text records as its position and text (`3.Paris_France`) in `learner_response` and `correct_responses`, in place of its id.
+
+### Patch Changes
+
+- 3ef7dd7: cmi5 Answered statements and `useXAPI()` statements to `endpoint: 'lms'` start from the LMS's context template, so they keep its publisher grouping and extensions. cmi5 statements also keep the launch activity in their grouping, unless they name it as `parent` or the author sets a grouping.
+- 9e36dc3: - `@types/node` 26.6.5 → 26.6.6
+  - `scorm-again` 3.4.7 → 3.5.0
+  - `svelte` 5.57.2 → 5.57.3
+  - `tsdown` 0.23.2 → 0.23.4
+- 226a6ac: A fill-in or long-fill-in answer or response the LMS would misread as a delimiter or reject, such as one starting with `{lang=`, `{case_matters=` or `{order_matters=` or with a `[,]` part that does, is left out of the SCORM 2004, cmi5 and xAPI record with a warning. Grading still uses it.
+  
+  cmi5 and xAPI leave out a reversed correct range, with a warning, as SCORM 2004 does.
+- 7352a27: SCORM 2004 caps each `[,]`-separated part of a fill-in answer or response at 250 characters, not the whole value, so a multi-part answer within the cap is no longer left out of the LMS record or cut. A response cut to its SCORM length cap keeps the start of a character longer than the cap (a letter with hundreds of accents) instead of dropping it.
+- 982d4f0: NVDA in Firefox reliably reads a question's result after Submit, and the first control after Try again: focus now moves once the browser has updated what it tells the screen reader.
+- 42e4f1a: cmi5 and xAPI Answered statements percent-encode the question id in the activity id, so an id with a space or `#` still sends a valid IRI.
+- 5519830: A quiz question with no `correct` answer no longer counts as wrong: it is left out of the quiz score and reported to the LMS with no result. A quiz with nothing to score shows no score in the built-in `<Quiz>` and reports `scored: false` on `useQuiz()`, in the `tessera-quiz-complete` detail and through `useProgress().quizUnscored()`.
+- b95ceae: SCORM 2004 packages declare that the course sets its own completion and success, so an LMS cannot mark an attempt completed or passed that the course left unreported.
+- 61fa5ad: A standalone question with no `correct` answer and no `score()` is left out of the page score, as in a quiz, and no longer offers Try again. A graded page of only such questions scores 100 and logs a dev warning, as a graded quiz does. The new `useProgress().pageUnscored()` is `true` for such a page, so a course can show no score.
+
 ## 0.12.1
 
 ### Patch Changes
