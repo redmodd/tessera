@@ -17,6 +17,7 @@
 <p>This is a practice quiz — it won't count toward your grade.</p>
 
 <MultipleChoice
+  id="closest_planet"
   question="Which planet is closest to the Sun?"
   options={['Venus', 'Mercury', 'Earth', 'Mars']}
   correct={1}
@@ -25,6 +26,7 @@
 />
 
 <FillInTheBlank
+  id="water_symbol"
   question="What is the chemical symbol for water?"
   answers={['H2O', 'h2o']}
   correctFeedback="Correct! Water is H2O."

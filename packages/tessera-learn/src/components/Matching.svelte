@@ -4,9 +4,7 @@
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     MATCH_PAIR_COLORS,
-    QUESTION_ID_PREFIX,
     indexOptions,
-    questionId,
     rovingIndex,
     savedIndex,
     shuffle,
@@ -16,7 +14,7 @@
 
   /**
    * @type {{
-   *   id?: string;
+   *   id: string;
    *   question: string;
    *   pairs: { left: string; right: string }[];
    *   correctFeedback?: string;
@@ -67,7 +65,7 @@
 
   const q = useQuestion({
     get id() {
-      return questionId(id, QUESTION_ID_PREFIX.Matching, question);
+      return id;
     },
     get text() {
       return question;

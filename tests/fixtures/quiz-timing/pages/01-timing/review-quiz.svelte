@@ -17,6 +17,7 @@
 <p>Graded, review feedback. Nothing reaches the LMS until Submit.</p>
 
 <MultipleChoice
+  id="closest_planet"
   question="Which planet is closest to the Sun?"
   options={['Venus', 'Mercury', 'Mars', 'Earth']}
   correct={1}
@@ -25,6 +26,7 @@
 />
 
 <FillInTheBlank
+  id="water_formula"
   question="What is the chemical formula for water?"
   answers={['H2O']}
   correctFeedback="Correct!"
@@ -32,6 +34,7 @@
 />
 
 <Matching
+  id="number_words"
   question="Match the numbers with their words."
   pairs={[
     { left: '1', right: 'One' },

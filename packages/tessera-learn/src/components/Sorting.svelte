@@ -2,19 +2,13 @@
   import { onMount, tick, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import {
-    QUESTION_ID_PREFIX,
-    indexOptions,
-    questionId,
-    savedIndex,
-    shuffle,
-  } from './util.js';
+  import { indexOptions, savedIndex, shuffle } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
-   *   id?: string;
+   *   id: string;
    *   question: string;
    *   items: string[];
    *   targets: string[];
@@ -65,7 +59,7 @@
   // pairs as stringified ids.
   const q = useQuestion({
     get id() {
-      return questionId(id, QUESTION_ID_PREFIX.Sorting, question);
+      return id;
     },
     get text() {
       return question;

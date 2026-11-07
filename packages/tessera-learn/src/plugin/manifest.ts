@@ -7,18 +7,15 @@ import {
   isLiteralTrue,
   pageConfigLiteral,
   type ComponentMatch,
+  type PropValue,
 } from './ast.js';
 import {
+  isQuestionId,
   isRecord,
   isStringArray,
   type CourseConfig,
   type QuizConfig,
 } from '../runtime/types.js';
-import {
-  QUESTION_ID_PREFIX,
-  questionId,
-  type QuestionComponentName,
-} from '../components/util.js';
 import {
   DEFAULT_STANDARD,
   standardProfile,
@@ -219,25 +216,39 @@ export function readMetaFile(metaPath: string): {
   return { meta, rejected };
 }
 
+const QUESTION_NAMES = [
+  'MultipleChoice',
+  'FillInTheBlank',
+  'Matching',
+  'Sorting',
+] as const;
+
+export type QuestionComponentName = (typeof QUESTION_NAMES)[number];
+
 export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
-  Object.keys(QUESTION_ID_PREFIX),
+  QUESTION_NAMES,
 );
 
+/** The value the source fixes for a prop, or undefined when it's absent or dynamic. */
+export function literalValue(
+  prop: PropValue | undefined,
+): { value: unknown } | undefined {
+  if (prop?.kind === 'string') return { value: prop.value };
+  if (prop?.kind === 'bool') return { value: true };
+  if (prop?.kind !== 'expr') return undefined;
+  // JSON5 has no `undefined` literal.
+  if (prop.raw === 'undefined') return { value: undefined };
+  try {
+    return { value: JSON5.parse(prop.raw) };
+  } catch {
+    return undefined;
+  }
+}
+
 /** The id a built-in question renders with, or null when the source doesn't fix it. */
-export function staticQuestionId({
-  name,
-  props,
-  hasSpread,
-}: ComponentMatch): string | null {
-  const id = props.get('id');
-  if (id?.kind === 'string') return id.value;
-  const question = props.get('question');
-  if (hasSpread || id || question?.kind !== 'string') return null;
-  return questionId(
-    undefined,
-    QUESTION_ID_PREFIX[name as QuestionComponentName],
-    question.value,
-  );
+export function staticQuestionId({ props }: ComponentMatch): string | null {
+  const id = literalValue(props.get('id'))?.value;
+  return isQuestionId(id) ? id : null;
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
@@ -250,7 +261,7 @@ export function listedGradedQuestions(
 ): (ComponentMatch & { id: string })[] {
   const listed = new Map<string, ComponentMatch & { id: string }>();
   for (const match of components) {
-    if (match.hasSpread || !isLiterallyGradedQuestion(match)) continue;
+    if (!isLiterallyGradedQuestion(match)) continue;
     const id = staticQuestionId(match);
     if (id !== null && !listed.has(id)) listed.set(id, { ...match, id });
   }

@@ -1,13 +1,13 @@
 <script>
   import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { QUESTION_ID_PREFIX, fillInAnswers, questionId } from './util.js';
+  import { fillInAnswers } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
    * @type {{
-   *   id?: string;
+   *   id: string;
    *   question: string;
    *   answers: string | string[];
    *   caseSensitive?: boolean;
@@ -38,7 +38,7 @@
 
   const q = useQuestion({
     get id() {
-      return questionId(id, QUESTION_ID_PREFIX.FillInTheBlank, question);
+      return id;
     },
     get text() {
       return question;

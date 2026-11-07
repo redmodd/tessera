@@ -1837,7 +1837,7 @@ describe('question component validation', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="Q" options={["a", "b", "c"]} correct={2} />`,
+<MultipleChoice id="q1" question="Q" options={["a", "b", "c"]} correct={2} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('MultipleChoice'))).toHaveLength(0);
@@ -1851,7 +1851,7 @@ describe('question component validation', () => {
   let opts = ["a", "b"];
   let answer = 9;
 </script>
-<MultipleChoice question="Q" options={opts} correct={answer} />`,
+<MultipleChoice id="q1" question="Q" options={opts} correct={answer} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('MultipleChoice'))).toHaveLength(0);
@@ -1894,40 +1894,83 @@ describe('question component validation', () => {
     );
   });
 
-  it('errors when two un-idded questions derive the same id from their prompt', () => {
+  it('errors when a question has no id', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} />
-<MultipleChoice question="What is water?" options={["c", "d"]} correct={1} />`,
+<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
-      expect.stringContaining('falls back to "mc-what-is-water"'),
+      expect.stringContaining('<MultipleChoice> is missing required prop "id"'),
     );
   });
 
-  it('does not derive an id when a spread may supply one', () => {
+  it('errors when a question has a blank or non-string id', () => {
     createValidProject(testRoot);
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';
-let a = {}; let b = {};</script>
-<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} {...a} />
-<MultipleChoice question="What is water?" options={["c", "d"]} correct={1} {...b} />`,
+let a = {};</script>
+<MultipleChoice id="" question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice id="" question="What is ice?" options={["a", "b"]} correct={0} />
+<MultipleChoice id=" " question="What is snow?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={''} question="What is fog?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={undefined} question="What is rain?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={null} question="What is hail?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={0} question="What is mist?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={1} question="What is dew?" options={["a", "b"]} correct={0} />
+<MultipleChoice id question="What is frost?" options={["a", "b"]} correct={0} />
+<MultipleChoice {...a} id="" question="What is sleet?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors.filter((e) => e.includes('falls back to'))).toHaveLength(0);
+    expect(
+      errors.filter((e) =>
+        e.includes('<MultipleChoice> id must be a string that is not blank'),
+      ),
+    ).toHaveLength(10);
+    expect(errors.filter((e) => e.includes('duplicate'))).toHaveLength(0);
   });
 
-  it('accepts un-idded questions with different prompts', () => {
+  it('accepts a literal string id and leaves a dynamic one to the runtime', () => {
     createValidProject(testRoot);
     writePage(
-      `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} />
-<MultipleChoice question="What is air?" options={["c", "d"]} correct={1} />`,
+      `<script>import { MultipleChoice } from 'tessera-learn';
+let a = { id: 'planet' }; let n = 'moon';</script>
+<MultipleChoice id={'water'} question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={n} question="What is ice?" options={["a", "b"]} correct={0} />
+<MultipleChoice id="q-{n}" question="What is snow?" options={["a", "b"]} correct={0} />
+<MultipleChoice id="" {...a} question="What is fog?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors.filter((e) => e.includes('falls back to'))).toHaveLength(0);
+    expect(errors.filter((e) => e.includes('id must be'))).toHaveLength(0);
+  });
+
+  it('checks an id written as a literal in braces', () => {
+    createValidProject(testRoot);
+    writeStandardConfig('scorm12');
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id={'a-b'} question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={"a-b"} question="What is ice?" options={["a", "b"]} correct={0} />`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('duplicate question id "a-b"'),
+    );
+    expect(warnings).toContainEqual(
+      expect.stringContaining('question id "a-b" will be rewritten'),
+    );
+  });
+
+  it('skips the id check when a spread may supply one', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';
+let a = {};</script>
+<MultipleChoice question="What is water?" options={["a", "b"]} correct={0} {...a} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors.filter((e) => e.includes('"id"'))).toHaveLength(0);
   });
 
   it('errors when Matching is missing pairs', () => {
@@ -1960,7 +2003,7 @@ let a = {}; let b = {};</script>
     createValidProject(testRoot);
     writePage(
       `<script>import { Matching } from 'tessera-learn';</script>
-<Matching question="Q" pairs={[{ left: "France", right: "Paris" }]} />`,
+<Matching id="q1" question="Q" pairs={[{ left: "France", right: "Paris" }]} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('Matching'))).toHaveLength(0);
@@ -2008,8 +2051,8 @@ let a = {}; let b = {};</script>
     createValidProject(testRoot);
     writePage(
       `<script>import { FillInTheBlank } from 'tessera-learn';</script>
-<FillInTheBlank question="Q" answers="Oxygen" />
-<FillInTheBlank question="R" answers={'Oxygen'} />`,
+<FillInTheBlank id="q1" question="Q" answers="Oxygen" />
+<FillInTheBlank id="q2" question="R" answers={'Oxygen'} />`,
     );
     const { errors, warnings } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('FillInTheBlank'))).toHaveLength(0);

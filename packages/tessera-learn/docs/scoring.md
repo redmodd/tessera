@@ -34,7 +34,7 @@ Course score = `Σ(weight × pageScore) / Σ(weight)` over the graded pages, whi
 
 - **Required graded pages count as 0 until answered**, so a skipped exam sinks the course score. The LMS gets no score until every required graded page is answered or the course is complete.
 - **A page of standalone questions is answered once every graded question on it is**, including ones behind a reveal or `{#if}`. Until then, visiting it doesn't complete it under `completion.mode: "percentage"`.
-- **Give every graded built-in question a literal `id="…"` and a bare `graded`.** A question the build can't read (a custom component, spread props, `graded={expr}`, `id={expr}`) counts only once it renders.
+- **Give every graded built-in question a literal `id="…"` and a bare `graded`.** A question the build can't read (a custom component, `graded={expr}`, `id={expr}`, or a spread after `graded` or `id`) counts only once it renders.
 - **Don't split graded questions across the branches of an `{#if}`, `{#each}`/`{:else}` or `{#await}`.** A learner shown only one branch can never finish the page. `tessera validate` warns.
 - **A graded question on a page without `graded: true` never reaches the course score or passed/failed.** `tessera validate` errors when it can see one, and `tessera dev` throws when one renders. `weight` on an undeclared page is ignored.
 

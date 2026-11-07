@@ -61,7 +61,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     const { quiz, registrations } = makeQuizCtx();
     mountInQuiz(
       MultipleChoice,
-      { question: 'Pick one', options: ['a', 'b', 'c'], correct: 1 },
+      { id: 'q1', question: 'Pick one', options: ['a', 'b', 'c'], correct: 1 },
       quiz,
     );
 
@@ -78,14 +78,14 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         { id: '2', text: 'c' },
       ],
     });
-    expect(reg.id).toMatch(/^mc-/);
+    expect(reg.id).toBe('q1');
   });
 
   it('MultipleChoice reports numeric options as text', () => {
     const { quiz, registrations } = makeQuizCtx();
     mountInQuiz(
       MultipleChoice,
-      { question: '2 + 2?', options: [0, 4], correct: 1 },
+      { id: 'q2', question: '2 + 2?', options: [0, 4], correct: 1 },
       quiz,
     );
 
@@ -101,6 +101,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     mountInQuiz(
       FillInTheBlank,
       {
+        id: 'q3',
         question: 'Capital of France',
         answers: ['Paris'],
         caseSensitive: false,
@@ -116,7 +117,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       correct: ['Paris'],
       caseMatters: false,
     });
-    expect(reg.id).toMatch(/^fitb-/);
+    expect(reg.id).toBe('q3');
   });
 
   it('Matching → { type: "matching", response: pairs, correct: pairs }', () => {
@@ -124,6 +125,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     mountInQuiz(
       Matching,
       {
+        id: 'q4',
         question: 'Match these',
         pairs: [
           { left: 'Dog', right: 'Bark' },
@@ -155,7 +157,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ],
       },
     });
-    expect(reg.id).toMatch(/^matching-/);
+    expect(reg.id).toBe('q4');
   });
 
   it('Sorting → { type: "matching", response: [item,target] pairs, correct: pairs }', () => {
@@ -163,6 +165,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     mountInQuiz(
       Sorting,
       {
+        id: 'q5',
         question: 'Sort these',
         items: ['Apple', 'Broccoli'],
         targets: ['Fruit', 'Vegetable'],
@@ -193,7 +196,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ],
       },
     });
-    expect(reg.id).toMatch(/^sorting-/);
+    expect(reg.id).toBe('q5');
   });
 
   it('Sorting maps each item to its own target, not to its own index', () => {
@@ -201,6 +204,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     mountInQuiz(
       Sorting,
       {
+        id: 'q6',
         question: 'Sort these',
         items: ['Dog', 'Cat', 'Eagle', 'Salmon'],
         targets: ['Mammal', 'Bird', 'Fish'],
@@ -225,18 +229,28 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
     const { quiz, registrations } = makeQuizCtx();
     mountInQuiz(
       MultipleChoice,
-      { question: 'Pick', options: ['a'], correct: 0 },
+      { id: 'q7', question: 'Pick', options: ['a'], correct: 0 },
       quiz,
     );
-    mountInQuiz(FillInTheBlank, { question: 'Fill', answers: ['x'] }, quiz);
+    mountInQuiz(
+      FillInTheBlank,
+      { id: 'q8', question: 'Fill', answers: ['x'] },
+      quiz,
+    );
     mountInQuiz(
       Matching,
-      { question: 'Match', pairs: [{ left: 'a', right: 'A' }] },
+      { id: 'q9', question: 'Match', pairs: [{ left: 'a', right: 'A' }] },
       quiz,
     );
     mountInQuiz(
       Sorting,
-      { question: 'Sort', items: ['x'], targets: ['T'], correct: [0] },
+      {
+        id: 'q10',
+        question: 'Sort',
+        items: ['x'],
+        targets: ['T'],
+        correct: [0],
+      },
       quiz,
     );
 
@@ -262,7 +276,7 @@ describe('FillInTheBlank normalizes the response at the boundary', () => {
         reports.push([id, i, c]),
     };
     const { target } = mountInBody(FillInTheBlank, {
-      props: { question: 'Q', answers },
+      props: { id: 'q11', question: 'Q', answers },
       setup: () => setAdapterContext({ adapter } as any),
     });
 

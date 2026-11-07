@@ -1,9 +1,11 @@
 <script>
+  import { onMount } from 'svelte';
   import { setInPage } from './contexts.js';
 
-  let { children } = $props();
+  let { onmount, children } = $props();
 
   setInPage(true);
+  onMount(() => onmount());
 </script>
 
 {@render children()}

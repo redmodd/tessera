@@ -19,6 +19,7 @@
 <p>This quiz is graded and gates progress. You must pass to continue.</p>
 
 <MultipleChoice
+  id="two_plus_two"
   question="What is 2 + 2?"
   options={['3', '4', '5', '6']}
   correct={1}
@@ -33,6 +34,7 @@
 />
 
 <FillInTheBlank
+  id="sky_color"
   question="What color is the sky on a clear day?"
   answers="blue"
   correctFeedback="That's right! The sky is blue."
@@ -40,6 +42,7 @@
 />
 
 <Matching
+  id="number_words"
   question="Match the numbers with their words."
   pairs={[
     { left: '1', right: 'One' },

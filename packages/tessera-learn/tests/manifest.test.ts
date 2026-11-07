@@ -569,11 +569,15 @@ export const pageConfig = { graded: true }
 </script>
 <MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />
 {#if shown}
-  <FillInTheBlank graded={true} question="Name it?" answers={['z']} />
+  <FillInTheBlank graded={true} id="name_it" question="Name it?" answers={['z']} />
 {/if}
 <MultipleChoice id="practice" question="B?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded id={dynamicId} question="C?" options={['x', 'y']} correct={0} />
-<MultipleChoice graded {...props} id="spread" />`,
+<MultipleChoice graded id="" question="D?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded id=" " question="E?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded {...props} id="spread" />
+<MultipleChoice {...props} graded id="after_spread" />
+<MultipleChoice {...props} graded />`,
     );
     createFile(
       '01-s/01-l/quiz.svelte',
@@ -588,12 +592,16 @@ export const pageConfig = { graded: true, quiz: { graded: true } }
     );
     const manifest = generateManifest(root);
 
-    expect(manifest.pages[0].questions).toEqual(['q1', 'fitb-name-it']);
+    expect(manifest.pages[0].questions).toEqual([
+      'q1',
+      'name_it',
+      'after_spread',
+    ]);
     expect(manifest.pages[1].questions).toBeUndefined();
     expect(manifest.pages[2].questions).toBeUndefined();
   });
 
-  it('lists a question by the id it renders with, and skips a local component of the same name', () => {
+  it('lists a question by its literal id, and skips a local component of the same name', () => {
     createFile('01-s/01-l/_meta.js', 'export default { title: "L" };');
     createFile(
       '01-s/01-l/check.svelte',
@@ -607,16 +615,12 @@ export const pageConfig = { graded: true }
 {#each items as item, i}
   <MultipleChoice graded id="q-{i}" question="A?" options={['x', 'y']} correct={0} />
 {/each}
-<MultipleChoice graded question="What is {term}?" options={['x', 'y']} correct={0} />
-<MultipleChoice graded question="Tom &amp; Jerry?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded question="No id?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded="{true}" id="quoted" question="B?" options={['x', 'y']} correct={0} />
 <Sorting graded id="custom" question="C?" />`,
     );
 
-    expect(generateManifest(root).pages[0].questions).toEqual([
-      'mc-tom-jerry',
-      'quoted',
-    ]);
+    expect(generateManifest(root).pages[0].questions).toEqual(['quoted']);
   });
 
   it('carries a non-positive weight through verbatim (the runtime treats it as 1)', () => {

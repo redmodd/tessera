@@ -19,9 +19,14 @@
 </p>
 
 <MultipleChoice
+  id="continents"
   question="How many continents are there?"
   options={['5', '6', '7', '8']}
   correct={2}
 />
 
-<FillInTheBlank question="What is the capital of Japan?" answers={['Tokyo']} />
+<FillInTheBlank
+  id="japan_capital"
+  question="What is the capital of Japan?"
+  answers={['Tokyo']}
+/>

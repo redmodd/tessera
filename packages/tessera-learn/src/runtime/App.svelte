@@ -5,7 +5,7 @@
   import UserLayout from 'virtual:tessera-layout';
   import Quiz from 'virtual:tessera-quiz';
   import courseRuntime from 'virtual:tessera-course-runtime';
-  import { onMount, onDestroy, tick, untrack } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import LoadingBar from './LoadingBar.svelte';
   import ErrorPage from './ErrorPage.svelte';
   import SessionEnded from './SessionEnded.svelte';
@@ -169,14 +169,20 @@
     target.focus();
   }
 
-  // The first load keeps the browser's initial focus, and ErrorPage announces
-  // itself as an alert.
-  function showPage(index, focusBefore, gen) {
+  function showPage(index) {
     pageLoading = false;
     renderedPageIndex = index;
-    if (gen > 1 && !pageError) {
-      tick().then(() => focusPageHeading(focusBefore));
-    }
+  }
+
+  // PageHost mounts only once its page rendered, so a page that threw keeps
+  // its unregistered saved questions and leaves focus to ErrorPage, which
+  // announces itself as an alert. The first load keeps the browser's initial
+  // focus.
+  let mounting;
+  function pageRendered() {
+    const { index, focusBefore, gen } = mounting;
+    if (gen > 1 && gen === loadGeneration) focusPageHeading(focusBefore);
+    progress.pageMounted(index);
   }
 
   function loadPage(index) {
@@ -194,14 +200,14 @@
       );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
-      showPage(index, focusBefore, gen);
+      showPage(index);
       return;
     }
 
     loader()
       .then((mod) => {
         if (gen !== loadGeneration || session.exitPhase) return; // stale
-        pageError = null;
+        pageError = renderError = null;
         pageContext.quiz = page.quiz;
         pageContext.quizState = {
           attempts: progress.quizAttempts(index),
@@ -209,12 +215,12 @@
           unscored: progress.quizUnscored(index),
           responses: progress.quizResponses(index),
         };
+        mounting = { index, focusBefore, gen };
         PageComponent = mod.default;
-        showPage(index, focusBefore, gen);
+        showPage(index);
         progress.markVisited(index);
-        tick().then(() => progress.pageMounted(index));
         if (
-          manifest.pages[index].completesOn === 'view' &&
+          page.completesOn === 'view' &&
           config.completion.mode === 'manual'
         ) {
           progress.markCompleteManually();
@@ -225,7 +231,7 @@
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
-        showPage(index, focusBefore, gen);
+        showPage(index);
       });
   }
 
@@ -236,6 +242,22 @@
     const _retry = retryKey;
     if (!session.persistenceReady) return;
     untrack(() => loadPage(index));
+  });
+
+  let renderError = null;
+  function showRenderError(err) {
+    console.error(`Tessera: Page ${renderedPageIndex} failed to render`, err);
+    pageError = renderError = err;
+  }
+
+  // A hot update swaps the page component in place, which a page showing
+  // ErrorPage never renders.
+  function retryRenderError() {
+    if (renderError && pageError === renderError) retryPage();
+  }
+  onMount(() => {
+    import.meta.hot?.on('vite:afterUpdate', retryRenderError);
+    return () => import.meta.hot?.off('vite:afterUpdate', retryRenderError);
   });
 
   // ---- Retry ----
@@ -270,17 +292,20 @@
     {#if pageError}
       <ErrorPage error={pageError} onretry={retryPage} />
     {:else if PageComponent}
-      <PageHost>
-        {#if pageContext.quiz}
-          {#key renderedPageIndex}
-            <Quiz>
+      <!-- One boundary per page, so the last page's teardown can't fail this one. -->
+      {#key renderedPageIndex}
+        <svelte:boundary onerror={showRenderError}>
+          <PageHost onmount={pageRendered}>
+            {#if pageContext.quiz}
+              <Quiz>
+                <PageComponent />
+              </Quiz>
+            {:else}
               <PageComponent />
-            </Quiz>
-          {/key}
-        {:else}
-          <PageComponent />
-        {/if}
-      </PageHost>
+            {/if}
+          </PageHost>
+        </svelte:boundary>
+      {/key}
     {/if}
   </div>
 {/snippet}

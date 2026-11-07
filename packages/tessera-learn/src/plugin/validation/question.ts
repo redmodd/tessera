@@ -1,5 +1,8 @@
-import JSON5 from 'json5';
-import { staticQuestionId } from '../manifest.js';
+import {
+  literalValue,
+  staticQuestionId,
+  type QuestionComponentName,
+} from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import {
@@ -7,21 +10,9 @@ import {
   fitPatterns,
 } from '../../runtime/interaction-format.js';
 import { isRecord, isStringArray } from '../../runtime/types.js';
-import {
-  fillInAnswers,
-  type QuestionComponentName,
-} from '../../components/util.js';
+import { fillInAnswers } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
-
-function staticValue(prop: PropValue | undefined): unknown {
-  if (prop?.kind !== 'expr') return undefined;
-  try {
-    return JSON5.parse(prop.raw);
-  } catch {
-    return undefined;
-  }
-}
 
 /** False only when the prop is statically falsy, or absent with no spread to set it. */
 export function propMayBeTruthy(
@@ -30,30 +21,23 @@ export function propMayBeTruthy(
 ): boolean {
   const prop = props.get(name);
   if (prop === undefined) return hasSpread;
-  if (prop.kind === 'string') return prop.value !== '';
-  if (prop.kind !== 'expr') return true;
-  if (prop.raw === 'undefined') return false;
-  const value = staticValue(prop);
-  return value === undefined || Boolean(value);
+  const literal = literalValue(prop);
+  return !literal || Boolean(literal.value);
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
-  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
-  const value = staticValue(prop);
+  const value = literalValue(prop)?.value;
   return Array.isArray(value) ? value : null;
 }
 
 function staticList(prop: PropValue | undefined): unknown[] | null {
-  if (prop?.kind === 'string') return [prop.value];
-  if (prop?.kind === 'bool') return [true];
-  if (prop?.kind === 'expr' && prop.raw === 'undefined') return [undefined];
-  const value = staticValue(prop);
-  if (value === undefined) return null;
-  return Array.isArray(value) ? value : [value];
+  const literal = literalValue(prop);
+  if (!literal) return null;
+  return Array.isArray(literal.value) ? literal.value : [literal.value];
 }
 
 function staticNumber(prop: PropValue | undefined): number | null {
-  const value = staticValue(prop);
+  const value = literalValue(prop)?.value;
   return typeof value === 'number' ? value : null;
 }
 
@@ -85,7 +69,7 @@ const QUESTION_COMPONENTS: Record<
   QuestionComponentRule
 > = {
   MultipleChoice: {
-    required: ['question', 'options', 'correct'],
+    required: ['id', 'question', 'options', 'correct'],
     indexedLists: { options: 'some' },
     check({ props }, { fileRel, d }) {
       const options = staticArray(props.get('options'));
@@ -110,7 +94,7 @@ const QUESTION_COMPONENTS: Record<
     },
   },
   FillInTheBlank: {
-    required: ['question', 'answers'],
+    required: ['id', 'question', 'answers'],
     check(match, { fileRel, d, standard, id }) {
       const answers = staticList(match.props.get('answers'));
       if (answers) {
@@ -147,7 +131,7 @@ const QUESTION_COMPONENTS: Record<
     },
   },
   Matching: {
-    required: ['question', 'pairs'],
+    required: ['id', 'question', 'pairs'],
     indexedLists: { pairs: 'every' },
     check({ props }, { fileRel, d }) {
       const pairs = staticArray(props.get('pairs'));
@@ -167,7 +151,7 @@ const QUESTION_COMPONENTS: Record<
     },
   },
   Sorting: {
-    required: ['question', 'items', 'targets', 'correct'],
+    required: ['id', 'question', 'items', 'targets', 'correct'],
     indexedLists: { items: 'every', targets: 'some' },
     check({ props }, { fileRel, d }) {
       const items = staticArray(props.get('items'));
@@ -228,23 +212,20 @@ export function validateQuestionComponents(
     }
 
     const resolvedId = staticQuestionId(match);
-    // With no `id`, the widget derives one from the prompt text, so two
-    // identically worded questions collide on one page.
-    const derived = resolvedId !== null && !props.has('id');
-
+    if (resolvedId === null && literalValue(props.get('id'))) {
+      d.error(`${fileRel}: <${name}> id must be a string that is not blank`);
+    }
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
         d.error(
-          derived
-            ? `${fileRel}: <${name}> has no id and its question text falls back to "${resolvedId}", which another question on this page already uses — give each an explicit id`
-            : `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
+          `${fileRel}: duplicate question id "${resolvedId}"; each question on a page needs a unique id`,
         );
       } else if (standard) {
         // The standard's identifier rules can rewrite ids, so distinct raw ids
         // can collide after sanitization. Skip raw duplicates (already flagged
         // above) to avoid double-reporting the same id.
         const sane = standard.interactionFormat.identifier(resolvedId);
-        if (!derived && sane !== resolvedId) {
+        if (sane !== resolvedId) {
           d.warn(
             `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only ASCII letters, digits and underscores`,
           );
