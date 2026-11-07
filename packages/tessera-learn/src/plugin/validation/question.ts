@@ -225,11 +225,12 @@ export function validateQuestionComponents(
     }
 
     const resolvedId = staticQuestionId(match);
-
-    if (resolvedId !== null) {
+    if (resolvedId === '') {
+      d.error(`${fileRel}: <${name}> has an empty id`);
+    } else if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
         d.error(
-          `${fileRel}: duplicate question id "${resolvedId}" — each question on a page needs a unique id`,
+          `${fileRel}: duplicate question id "${resolvedId}"; each question on a page needs a unique id`,
         );
       } else if (standard) {
         // The standard's identifier rules can rewrite ids, so distinct raw ids

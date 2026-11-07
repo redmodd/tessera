@@ -179,7 +179,7 @@ export function useQuestion<I extends Interaction = Interaction>(
   if (!opts.id) {
     throw new Error(
       `useQuestion(): ${opts.text ? `the question ${JSON.stringify(opts.text)}` : 'a question'} has no id. ` +
-        'Give every question an id that is unique on its page, such as id="capital_of_france".',
+        'Give every question an id that is unique on its page, such as "capital_of_france".',
     );
   }
   const quizCtx = getQuizContext();

@@ -1906,6 +1906,20 @@ describe('question component validation', () => {
     );
   });
 
+  it('errors when a question has an empty id', () => {
+    createValidProject(testRoot);
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="" question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice id="" question="What is ice?" options={["a", "b"]} correct={0} />`,
+    );
+    const { errors } = validateProject(testRoot);
+    expect(
+      errors.filter((e) => e.includes('<MultipleChoice> has an empty id')),
+    ).toHaveLength(2);
+    expect(errors.filter((e) => e.includes('duplicate'))).toHaveLength(0);
+  });
+
   it('skips the id check when a spread may supply one', () => {
     createValidProject(testRoot);
     writePage(

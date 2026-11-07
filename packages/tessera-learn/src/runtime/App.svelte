@@ -238,6 +238,11 @@
     untrack(() => loadPage(index));
   });
 
+  function showRenderError(err) {
+    console.error(`Tessera: Page ${renderedPageIndex} failed to render`, err);
+    pageError = err;
+  }
+
   // ---- Retry ----
   function retryPage() {
     retryKey++;
@@ -270,17 +275,19 @@
     {#if pageError}
       <ErrorPage error={pageError} onretry={retryPage} />
     {:else if PageComponent}
-      <PageHost>
-        {#if pageContext.quiz}
-          {#key renderedPageIndex}
-            <Quiz>
-              <PageComponent />
-            </Quiz>
-          {/key}
-        {:else}
-          <PageComponent />
-        {/if}
-      </PageHost>
+      <svelte:boundary onerror={showRenderError}>
+        <PageHost>
+          {#if pageContext.quiz}
+            {#key renderedPageIndex}
+              <Quiz>
+                <PageComponent />
+              </Quiz>
+            {/key}
+          {:else}
+            <PageComponent />
+          {/if}
+        </PageHost>
+      </svelte:boundary>
     {/if}
   </div>
 {/snippet}

@@ -569,7 +569,7 @@ export const pageConfig = { graded: true }
 </script>
 <MultipleChoice graded id="q1" question="A?" options={['x', 'y']} correct={0} />
 {#if shown}
-  <FillInTheBlank graded={true} id="name-it" question="Name it?" answers={['z']} />
+  <FillInTheBlank graded={true} id="name_it" question="Name it?" answers={['z']} />
 {/if}
 <MultipleChoice id="practice" question="B?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded id={dynamicId} question="C?" options={['x', 'y']} correct={0} />
@@ -588,7 +588,7 @@ export const pageConfig = { graded: true, quiz: { graded: true } }
     );
     const manifest = generateManifest(root);
 
-    expect(manifest.pages[0].questions).toEqual(['q1', 'name-it']);
+    expect(manifest.pages[0].questions).toEqual(['q1', 'name_it']);
     expect(manifest.pages[1].questions).toBeUndefined();
     expect(manifest.pages[2].questions).toBeUndefined();
   });
