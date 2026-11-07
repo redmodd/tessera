@@ -18,8 +18,12 @@ const choice: Interaction = {
 };
 
 /** The response the format records; undefined when it leaves it out. */
-function recordedResponse(i: Interaction, format: InteractionFormat) {
-  const { fields } = buildScormInteractionFields('q', i, null, {
+function recordedResponse(
+  i: Interaction,
+  format: InteractionFormat,
+  correct: boolean | null = null,
+) {
+  const { fields } = buildScormInteractionFields('q', i, correct, {
     responseField: 'learner_response',
     timestampField: 'timestamp',
     timestamp: '',
@@ -351,6 +355,7 @@ describe('performance steps', () => {
         ],
       },
       SCORM2004_INTERACTION_FORMAT,
+      false,
     );
     expect(warn).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledWith(
@@ -369,12 +374,43 @@ describe('performance steps', () => {
         correct: [['s', '-200000[:]0']],
       },
       SCORM2004_INTERACTION_FORMAT,
+      true,
     );
     expect(warn).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining(
         'records the step answer "-150000" as "150000", so the LMS record and the result disagree on whether it matches the correct answer "-200000[:]0"',
       ),
+    );
+  });
+
+  it('does not warn of a disagreement when no result is recorded', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['s', 'turn-left']],
+        correct: [['s', 'turn_left']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns once when two step names record as the same name', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [['a-b', '+3']],
+        correct: [['a b', '3']],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+      false,
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('records the ids "a-b" and "a b" both as "a_b"'),
     );
   });
 
@@ -439,7 +475,7 @@ describe('performance steps', () => {
     ],
   ])('does not warn of a disagreement when %s', (_, i) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    recordedResponse(i, SCORM2004_INTERACTION_FORMAT);
+    recordedResponse(i, SCORM2004_INTERACTION_FORMAT, false);
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringContaining('disagree on whether it matches'),
     );

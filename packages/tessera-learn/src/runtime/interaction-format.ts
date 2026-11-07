@@ -959,14 +959,14 @@ function warnResponseIds(
 /**
  * A learner's step answer can't be changed, so this warns only about a
  * recorded correct answer the format changes, and a recorded response that,
- * as recorded, matches the pattern when the result says it doesn't, or the
- * other way round.
+ * as recorded, matches the pattern when the recorded result says it doesn't,
+ * or the other way round.
  */
 function warnStepAnswers(
   questionId: string,
   i: Interaction,
   fmt: InteractionFormat,
-  recorded: { pattern: boolean; response: boolean },
+  recorded: { pattern: boolean; response: boolean; result: boolean },
 ): void {
   if (i.type !== 'performance' || !i.correct || !recorded.pattern) return;
   const correct = i.correct.map(([, a]) => ({
@@ -982,6 +982,7 @@ function warnStepAnswers(
   const steps = i.correct.map(([step]) => step);
   if (
     !recorded.response ||
+    !recorded.result ||
     i.response.length !== steps.length ||
     i.response.some(([step], k) => step !== steps[k])
   ) {
@@ -1019,6 +1020,7 @@ export function buildScormInteractionFields(
   warnStepAnswers(questionId, interaction, spec.format, {
     pattern: patterns !== null,
     response: response !== null,
+    result: correct !== null,
   });
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
