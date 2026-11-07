@@ -58,6 +58,7 @@ describe('a page that throws while rendering', () => {
     expect(progress.toSaved().m).toBe(1);
     expect(document.querySelector('[data-tessera-page-focus]')).toBeNull();
   });
+
   it('leaves the next page alone when the last one throws while tearing down', async () => {
     // A second listener tells Vitest the error is handled. Svelte's flush
     // surfaces it as either event.
@@ -96,6 +97,9 @@ describe('a page that throws while rendering', () => {
 
 describe('page bookkeeping under sequential navigation', () => {
   it('counts the page as visited by the time it mounts', async () => {
+    onTestFinished(() => {
+      delete (globalThis as any).__tesseraCanGoNextAtMount;
+    });
     await mountApp({
       config: createConfig({ navigation: { mode: 'sequential' } }),
       manifest: createManifest(2),

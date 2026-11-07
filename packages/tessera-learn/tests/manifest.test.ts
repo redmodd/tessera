@@ -575,7 +575,9 @@ export const pageConfig = { graded: true }
 <MultipleChoice graded id={dynamicId} question="C?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded id="" question="D?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded id=" " question="E?" options={['x', 'y']} correct={0} />
-<MultipleChoice graded {...props} id="spread" />`,
+<MultipleChoice graded {...props} id="spread" />
+<MultipleChoice {...props} graded id="after_spread" />
+<MultipleChoice {...props} graded />`,
     );
     createFile(
       '01-s/01-l/quiz.svelte',
@@ -590,7 +592,11 @@ export const pageConfig = { graded: true, quiz: { graded: true } }
     );
     const manifest = generateManifest(root);
 
-    expect(manifest.pages[0].questions).toEqual(['q1', 'name_it']);
+    expect(manifest.pages[0].questions).toEqual([
+      'q1',
+      'name_it',
+      'after_spread',
+    ]);
     expect(manifest.pages[1].questions).toBeUndefined();
     expect(manifest.pages[2].questions).toBeUndefined();
   });

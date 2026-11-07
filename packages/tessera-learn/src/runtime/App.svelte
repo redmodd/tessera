@@ -253,9 +253,12 @@
   // A hot update swaps the page component in place, which a page showing
   // ErrorPage never renders.
   function retryRenderError() {
-    if (pageError && pageError === renderError) retryPage();
+    if (renderError && pageError === renderError) retryPage();
   }
-  import.meta.hot?.on('vite:afterUpdate', retryRenderError);
+  onMount(() => {
+    import.meta.hot?.on('vite:afterUpdate', retryRenderError);
+    return () => import.meta.hot?.off('vite:afterUpdate', retryRenderError);
+  });
 
   // ---- Retry ----
   function retryPage() {
@@ -275,7 +278,6 @@
   });
 
   onDestroy(() => {
-    import.meta.hot?.off('vite:afterUpdate', retryRenderError);
     if (auditMode) delete window.__tesseraAudit;
     session.dispose();
   });

@@ -1,8 +1,4 @@
-import {
-  staticQuestionId,
-  staticValue,
-  type QuestionComponentName,
-} from '../manifest.js';
+import { literalValue, type QuestionComponentName } from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import {
@@ -21,40 +17,23 @@ export function propMayBeTruthy(
 ): boolean {
   const prop = props.get(name);
   if (prop === undefined) return hasSpread;
-  if (prop.kind === 'string') return prop.value !== '';
-  if (prop.kind !== 'expr') return true;
-  if (prop.raw === 'undefined') return false;
-  const value = staticValue(prop);
-  return value === undefined || Boolean(value);
-}
-
-/** The source fixes an id that `useQuestion()` rejects. */
-function hasInvalidId({ props }: ComponentMatch): boolean {
-  const prop = props.get('id');
-  if (!prop || prop.kind === 'template') return false;
-  if (prop.kind === 'string') return !isQuestionId(prop.value);
-  if (prop.kind === 'bool' || prop.raw === 'undefined') return true;
-  const value = staticValue(prop);
-  return value !== undefined && !isQuestionId(value);
+  const literal = literalValue(prop);
+  return !literal || Boolean(literal.value);
 }
 
 function staticArray(prop: PropValue | undefined): unknown[] | null {
-  if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
-  const value = staticValue(prop);
+  const value = literalValue(prop)?.value;
   return Array.isArray(value) ? value : null;
 }
 
 function staticList(prop: PropValue | undefined): unknown[] | null {
-  if (prop?.kind === 'string') return [prop.value];
-  if (prop?.kind === 'bool') return [true];
-  if (prop?.kind === 'expr' && prop.raw === 'undefined') return [undefined];
-  const value = staticValue(prop);
-  if (value === undefined) return null;
-  return Array.isArray(value) ? value : [value];
+  const literal = literalValue(prop);
+  if (!literal) return null;
+  return Array.isArray(literal.value) ? literal.value : [literal.value];
 }
 
 function staticNumber(prop: PropValue | undefined): number | null {
-  const value = staticValue(prop);
+  const value = literalValue(prop)?.value;
   return typeof value === 'number' ? value : null;
 }
 
@@ -228,10 +207,12 @@ export function validateQuestionComponents(
       );
     }
 
-    if (hasInvalidId(match)) {
+    const literalId = literalValue(props.get('id'));
+    const resolvedId =
+      literalId && isQuestionId(literalId.value) ? literalId.value : null;
+    if (literalId && resolvedId === null) {
       d.error(`${fileRel}: <${name}> id must be a string that is not blank`);
     }
-    const resolvedId = staticQuestionId(match);
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
         d.error(

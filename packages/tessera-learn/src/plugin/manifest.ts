@@ -229,10 +229,17 @@ export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
   QUESTION_NAMES,
 );
 
-export function staticValue(prop: PropValue | undefined): unknown {
+/** The value the source fixes for a prop, or undefined when it's absent or dynamic. */
+export function literalValue(
+  prop: PropValue | undefined,
+): { value: unknown } | undefined {
+  if (prop?.kind === 'string') return { value: prop.value };
+  if (prop?.kind === 'bool') return { value: true };
   if (prop?.kind !== 'expr') return undefined;
+  // JSON5 has no `undefined` literal.
+  if (prop.raw === 'undefined') return { value: undefined };
   try {
-    return JSON5.parse(prop.raw);
+    return { value: JSON5.parse(prop.raw) };
   } catch {
     return undefined;
   }
@@ -240,8 +247,7 @@ export function staticValue(prop: PropValue | undefined): unknown {
 
 /** The id a built-in question renders with, or null when the source doesn't fix it. */
 export function staticQuestionId({ props }: ComponentMatch): string | null {
-  const prop = props.get('id');
-  const id = prop?.kind === 'string' ? prop.value : staticValue(prop);
+  const id = literalValue(props.get('id'))?.value;
   return isQuestionId(id) ? id : null;
 }
 
@@ -255,7 +261,7 @@ export function listedGradedQuestions(
 ): (ComponentMatch & { id: string })[] {
   const listed = new Map<string, ComponentMatch & { id: string }>();
   for (const match of components) {
-    if (match.hasSpread || !isLiterallyGradedQuestion(match)) continue;
+    if (!isLiterallyGradedQuestion(match)) continue;
     const id = staticQuestionId(match);
     if (id !== null && !listed.has(id)) listed.set(id, { ...match, id });
   }
