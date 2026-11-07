@@ -1909,7 +1909,8 @@ describe('question component validation', () => {
   it('errors when a question has a blank or non-string id', () => {
     createValidProject(testRoot);
     writePage(
-      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+      `<script>import { MultipleChoice } from 'tessera-learn';
+let a = {};</script>
 <MultipleChoice id="" question="What is water?" options={["a", "b"]} correct={0} />
 <MultipleChoice id="" question="What is ice?" options={["a", "b"]} correct={0} />
 <MultipleChoice id=" " question="What is snow?" options={["a", "b"]} correct={0} />
@@ -1918,14 +1919,15 @@ describe('question component validation', () => {
 <MultipleChoice id={null} question="What is hail?" options={["a", "b"]} correct={0} />
 <MultipleChoice id={0} question="What is mist?" options={["a", "b"]} correct={0} />
 <MultipleChoice id={1} question="What is dew?" options={["a", "b"]} correct={0} />
-<MultipleChoice id question="What is frost?" options={["a", "b"]} correct={0} />`,
+<MultipleChoice id question="What is frost?" options={["a", "b"]} correct={0} />
+<MultipleChoice {...a} id="" question="What is sleet?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(
       errors.filter((e) =>
         e.includes('<MultipleChoice> id must be a string that is not blank'),
       ),
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(errors.filter((e) => e.includes('duplicate'))).toHaveLength(0);
   });
 
@@ -1941,6 +1943,23 @@ let a = { id: 'planet' }; let n = 'moon';</script>
     );
     const { errors } = validateProject(testRoot);
     expect(errors.filter((e) => e.includes('id must be'))).toHaveLength(0);
+  });
+
+  it('checks an id written as a literal in braces', () => {
+    createValidProject(testRoot);
+    writeStandardConfig('scorm12');
+    writePage(
+      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id={'a-b'} question="What is water?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={"a-b"} question="What is ice?" options={["a", "b"]} correct={0} />`,
+    );
+    const { errors, warnings } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining('duplicate question id "a-b"'),
+    );
+    expect(warnings).toContainEqual(
+      expect.stringContaining('question id "a-b" will be rewritten'),
+    );
   });
 
   it('skips the id check when a spread may supply one', () => {

@@ -1,5 +1,8 @@
-import JSON5 from 'json5';
-import { staticQuestionId, type QuestionComponentName } from '../manifest.js';
+import {
+  staticQuestionId,
+  staticValue,
+  type QuestionComponentName,
+} from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import {
@@ -10,15 +13,6 @@ import { isQuestionId, isRecord, isStringArray } from '../../runtime/types.js';
 import { fillInAnswers } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
-
-function staticValue(prop: PropValue | undefined): unknown {
-  if (prop?.kind !== 'expr') return undefined;
-  try {
-    return JSON5.parse(prop.raw);
-  } catch {
-    return undefined;
-  }
-}
 
 /** False only when the prop is statically falsy, or absent with no spread to set it. */
 export function propMayBeTruthy(
@@ -34,10 +28,10 @@ export function propMayBeTruthy(
   return value === undefined || Boolean(value);
 }
 
-/** The source fixes an id that `useQuestion()` rejects. A spread may override it. */
-function hasInvalidId({ props, hasSpread }: ComponentMatch): boolean {
+/** The source fixes an id that `useQuestion()` rejects. */
+function hasInvalidId({ props }: ComponentMatch): boolean {
   const prop = props.get('id');
-  if (!prop || hasSpread || prop.kind === 'template') return false;
+  if (!prop || prop.kind === 'template') return false;
   if (prop.kind === 'string') return !isQuestionId(prop.value);
   if (prop.kind === 'bool' || prop.raw === 'undefined') return true;
   const value = staticValue(prop);

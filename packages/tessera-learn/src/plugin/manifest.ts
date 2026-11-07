@@ -7,6 +7,7 @@ import {
   isLiteralTrue,
   pageConfigLiteral,
   type ComponentMatch,
+  type PropValue,
 } from './ast.js';
 import {
   isQuestionId,
@@ -228,10 +229,20 @@ export const QUESTION_COMPONENT_NAMES: ReadonlySet<string> = new Set(
   QUESTION_NAMES,
 );
 
+export function staticValue(prop: PropValue | undefined): unknown {
+  if (prop?.kind !== 'expr') return undefined;
+  try {
+    return JSON5.parse(prop.raw);
+  } catch {
+    return undefined;
+  }
+}
+
 /** The id a built-in question renders with, or null when the source doesn't fix it. */
 export function staticQuestionId({ props }: ComponentMatch): string | null {
-  const id = props.get('id');
-  return id?.kind === 'string' && isQuestionId(id.value) ? id.value : null;
+  const prop = props.get('id');
+  const id = prop?.kind === 'string' ? prop.value : staticValue(prop);
+  return isQuestionId(id) ? id : null;
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {

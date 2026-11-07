@@ -342,9 +342,11 @@ test.describe.serial('LMS round-trip — SCORM 1.2', () => {
     ]);
     expect(await interactionField(page, 'description')).toEqual([]);
 
-    const idWrites = await interactionField(page, 'id');
-    expect(idWrites).toHaveLength(3);
-    for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
+    expect(await interactionField(page, 'id')).toEqual([
+      'two_plus_two',
+      'sky_color',
+      'number_words',
+    ]);
   });
 
   test('a failing score out of quiz attempts reports failed', async ({
@@ -618,9 +620,11 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       ['2.4', 'blue', pairs],
     );
 
-    const idWrites = await interactionField(page, 'id');
-    expect(idWrites).toHaveLength(3);
-    for (const id of idWrites) expect(id.length).toBeGreaterThan(0);
+    expect(await interactionField(page, 'id')).toEqual([
+      'two_plus_two',
+      'sky_color',
+      'number_words',
+    ]);
   });
 
   test('Exit flushes session_time in ISO 8601 format and calls Terminate', async ({
