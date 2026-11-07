@@ -377,6 +377,16 @@ describe('SCORM2004Adapter', () => {
       );
     });
 
+    it('records the interaction id by the SCORM id rule', async () => {
+      adapter.reportInteraction(
+        'my question',
+        { type: 'true-false', response: true },
+        null,
+      );
+      await flush();
+      expect(interaction0()).toMatchObject({ id: 'my_question' });
+    });
+
     it('writes choice interaction fields', async () => {
       adapter.reportInteraction(
         'q1',

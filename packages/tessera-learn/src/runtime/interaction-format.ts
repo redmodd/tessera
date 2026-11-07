@@ -197,7 +197,7 @@ export const SCORM2004_INTERACTION_FORMAT: InteractionFormat = {
   namelessSteps: true,
   rules: SCORM2004_RULES,
   formatBoolean: (v) => (v ? 'true' : 'false'),
-  identifier: (v) => v,
+  identifier: scormId,
   responseId: scormId,
 };
 
@@ -209,6 +209,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
   maxValueLength: () => Infinity,
   maxPartLength: Infinity,
   rules: XAPI_RULES,
+  identifier: (v) => v,
   responseId: (v) => v,
 };
 
@@ -257,8 +258,8 @@ function latin(text: string): string {
 }
 
 /**
- * A SCORM 1.2 interaction id, or a SCORM id inside a response: ASCII
- * letters, digits and `_`. Moodle also allows `.` in SCORM 2004, but it is left to
+ * A SCORM interaction id, or a SCORM id inside a response: ASCII letters,
+ * digits and `_`. Moodle also allows `.` in SCORM 2004, but it is left to
  * position text (`3.Paris`). Latin letters drop their accents (`café` →
  * `cafe`). Letters of other scripts record as one `u` and four hex digits
  * per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they stay

@@ -342,6 +342,8 @@ describe('SCORM ids', () => {
         recorded,
       );
       expect(SCORM12_INTERACTION_FORMAT.identifier(id)).toBe(recorded);
+      expect(fmt.identifier(id)).toBe(recorded);
+      expect(XAPI_INTERACTION_FORMAT.identifier(id)).toBe(id);
       // Moodle's SCORM 2004 CMIShortIdentifier.
       expect(recorded).toMatch(/^[\w.]{1,250}$/);
     },

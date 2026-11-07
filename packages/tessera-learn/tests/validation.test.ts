@@ -2099,13 +2099,15 @@ let a = {}; let b = {};</script>
   });
 
   it.each([
-    ['my question', 'my_question'],
-    ['café', 'cafe'],
+    ['my question', 'my_question', 'scorm12', 'SCORM 1.2'],
+    ['café', 'cafe', 'scorm12', 'SCORM 1.2'],
+    ['my question', 'my_question', 'scorm2004', 'SCORM 2004'],
+    ['q-1', 'q_1', 'scorm2004', 'SCORM 2004'],
   ])(
-    'warns when question id %s will be rewritten to %s under SCORM 1.2',
-    (id, recorded) => {
+    'warns when question id %s will be rewritten to %s under %s',
+    (id, recorded, standard, name) => {
       createValidProject(testRoot);
-      writeStandardConfig('scorm12');
+      writeStandardConfig(standard);
       writePage(
         `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="${id}" question="Q" options={["a", "b"]} correct={0} />`,
@@ -2113,7 +2115,7 @@ let a = {}; let b = {};</script>
       const { warnings } = validateProject(testRoot);
       expect(warnings).toContainEqual(
         expect.stringContaining(
-          `question id "${id}" will be rewritten to "${recorded}" for SCORM 1.2; use only ASCII letters, digits and underscores`,
+          `question id "${id}" will be rewritten to "${recorded}" for ${name}; use only ASCII letters, digits and underscores`,
         ),
       );
     },
@@ -2135,17 +2137,21 @@ let a = {}; let b = {};</script>
     );
   });
 
-  it('does not flag id rewrites under non-scorm12 export', () => {
-    createValidProject(testRoot);
-    writePage(
-      `<script>import { MultipleChoice } from 'tessera-learn';</script>
+  it.each(['web', 'cmi5', 'xapi'])(
+    'does not flag id rewrites under %s',
+    (standard) => {
+      createValidProject(testRoot);
+      writeStandardConfig(standard);
+      writePage(
+        `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(
-      warnings.filter((w) => w.includes('will be rewritten')),
-    ).toHaveLength(0);
-  });
+      );
+      const { warnings } = validateProject(testRoot);
+      expect(
+        warnings.filter((w) => w.includes('will be rewritten')),
+      ).toHaveLength(0);
+    },
+  );
 
   it('warns about more than 36 options, pairs, items or targets under SCORM 1.2, and 36 pairs or items under SCORM 2004', () => {
     const list = (f: (i: number) => unknown) =>

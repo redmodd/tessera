@@ -227,9 +227,9 @@ test.describe.serial('Custom-quiz LMS roundtrip — SCORM 2004', () => {
       'choice',
     ]);
     expect(await interactionField(page, 'id')).toEqual([
-      'q-planet',
-      'q-water',
-      'q-survey',
+      'q_planet',
+      'q_water',
+      'q_survey',
     ]);
     // The survey question writes no result.
     expect(await interactionField(page, 'result')).toEqual([
