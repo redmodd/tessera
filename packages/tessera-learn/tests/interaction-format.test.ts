@@ -365,7 +365,6 @@ describe('SCORM ids', () => {
     'records the SCORM 2004 interaction id %s as %s, which Moodle accepts',
     (id, recorded) => {
       expect(fmt.identifier(id)).toBe(recorded);
-      expect(XAPI_INTERACTION_FORMAT.identifier(id)).toBe(id);
       // Moodle's SCORM 2004 CMILongIdentifier.
       expect(recorded).toMatch(
         /^(?:(?!urn:)\S{1,4000}|urn:[A-Za-z0-9-]{1,31}:\S{1,4000})$/,

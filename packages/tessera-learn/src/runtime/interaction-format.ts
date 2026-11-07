@@ -296,10 +296,10 @@ function scormId(value: string, max = 250): string {
  * `urn:` as `urn_`.
  */
 function scorm2004Id(value: string): string {
-  let id = value.trim().replace(/\s+/g, '_');
-  if (id.startsWith('urn:') && !/^urn:[A-Za-z0-9-]{1,31}:./.test(id)) {
-    id = `urn_${id.slice(4)}`;
-  }
+  const id = value
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/^urn:(?![A-Za-z0-9-]{1,31}:.)/, 'urn_');
   return id.slice(0, 4000).replace(/[\uD800-\uDBFF]$/, '') || '_';
 }
 
