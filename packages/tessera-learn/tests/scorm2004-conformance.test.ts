@@ -217,7 +217,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
 
     it.each([
       ['an id', 'a'.repeat(300), 'a'.repeat(250)],
-      ['an id with no letter or digit', '-'.repeat(100), '%2D'.repeat(83)],
+      ['a folded id', 'é'.repeat(300), 'e'.repeat(250)],
     ])('warns once when it cuts %s to 250 characters', async (_, id, cut) => {
       await start();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -277,7 +277,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: 'Strongly agree',
           correct: 'Strongly agree',
         },
-        'Strongly%20agree',
+        'Strongly_agree',
       ],
       [
         'matching',
@@ -286,7 +286,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: [['New York', 'USA']],
           correct: [['New York', 'USA']],
         },
-        'New%20York[.]USA',
+        'New_York[.]USA',
       ],
       [
         'sequencing',
@@ -295,7 +295,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: ['step one', 'step two'],
           correct: ['step one', 'step two'],
         },
-        'step%20one[,]step%20two',
+        'step_one[,]step_two',
       ],
       [
         'performance',
@@ -304,7 +304,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: [['step one', 'all done']],
           correct: [['step one', 'all done']],
         },
-        'step%20one[.]all done',
+        'step_one[.]all done',
       ],
       [
         'URN likert',
@@ -313,7 +313,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
           response: 'urn:course:agree',
           correct: 'urn:course:agree',
         },
-        'urn:course:agree',
+        'urn_course_agree',
       ],
       [
         'unnamed performance step',
@@ -327,7 +327,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       [
         'punctuation-only likert',
         { type: 'likert', response: '-', correct: '-' },
-        '%2D',
+        '_',
       ],
       [
         'merged choice',
