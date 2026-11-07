@@ -865,7 +865,7 @@ describe('SCORM12Adapter', () => {
       ]);
     });
 
-    it('warns once when it changes a likert value', async () => {
+    it('warns once when two likert values record the same', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
         'l1',
@@ -877,7 +877,7 @@ describe('SCORM12Adapter', () => {
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          'interaction "l1" records the likert value "-1" as "1" on SCORM 1.2',
+          'interaction "l1" records the ids "-1" and "+1" both as "1"',
         ),
       );
     });
