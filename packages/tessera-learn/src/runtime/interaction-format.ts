@@ -5,6 +5,7 @@
  */
 
 import {
+  DECIMAL,
   optionId,
   optionText,
   reversedRange,
@@ -65,7 +66,7 @@ export interface InteractionFormat {
   /** Ids inside a response: list items, matching ids, step names, likert. */
   responseId(value: string, max?: number): string;
   /** A performance step answer, except a range in a correct answer. */
-  stepAnswer(value: string): string;
+  stepAnswer(value: string, max?: number): string;
 }
 
 /**
@@ -308,15 +309,23 @@ function scorm2004Id(value: string): string {
   return id.slice(0, 4000).replace(/[\uD800-\uDBFF]$/, '') || '_';
 }
 
+const CMI_DECIMAL = /^-?\d{1,5}(?:\.\d{1,18})?$/;
+
 /**
  * Moodle takes a SCORM 2004 step answer that is empty, a CMIDecimal, or ASCII
- * letters, digits, `_` and `.` (406 otherwise), so any other answer records
+ * letters, digits, `_` and `.` (406 otherwise). A decimal written another way
+ * (`+3`, `-.5`) records as a CMIDecimal when it fits one, and any other answer
  * as a response id (`turn left` → `turn_left`).
  */
-function scorm2004StepAnswer(value: string): string {
-  return /^(?:-?\d{1,5}(?:\.\d{1,18})?|[\w.]*)$/.test(value)
+function scorm2004StepAnswer(value: string, max = Infinity): string {
+  if (/^[\w.]*$/.test(value)) return value.slice(0, max);
+  const decimal = DECIMAL.test(value)
     ? value
-    : scormId(value);
+        .replace(/^\+/, '')
+        .replace(/^(-?)\./, '$10.')
+        .replace(/\.$/, '')
+    : '';
+  return CMI_DECIMAL.test(decimal) ? decimal : scormId(value, max);
 }
 
 /**
@@ -698,7 +707,7 @@ export function fitPatterns(
   if (
     i.type === 'performance' &&
     i.correct &&
-    hasLongStep(i.correct, fmt.maxPartLength)
+    hasLongStep(i.correct, 'correct', fmt)
   ) {
     return {
       kept: null,
@@ -781,9 +790,12 @@ export function fitPatterns(
 
 function hasLongStep(
   steps: Array<[string, string | number]>,
-  max: number,
+  field: 'response' | 'correct',
+  fmt: InteractionFormat,
 ): boolean {
-  return steps.some(([, a]) => String(a).length > max);
+  return steps.some(
+    ([, a]) => stepAnswer(a, field, fmt).length > fmt.maxPartLength,
+  );
 }
 
 /**
@@ -828,13 +840,13 @@ function fitResponse(
 ): string | null {
   const partMax = fmt.maxPartLength;
   let longPart = '';
-  if (i.type === 'performance' && hasLongStep(i.response, partMax)) {
+  if (i.type === 'performance' && hasLongStep(i.response, 'response', fmt)) {
     longPart = 'a step answer';
     i = {
       ...i,
-      response: i.response.map(([step, a]): [string, string | number] => [
+      response: i.response.map(([step, a]): [string, string] => [
         step,
-        typeof a === 'string' ? cutText(a, partMax) : a,
+        fmt.stepAnswer(String(a), partMax),
       ]),
     };
   }
@@ -955,21 +967,23 @@ function warnResponseIds(
 /**
  * A learner's step answer can't be changed, so this warns only about a
  * correct answer the format changes, and a response answer that records the
- * same as a different correct answer.
+ * same as a different correct answer in the recorded pattern.
  */
 function warnStepAnswers(
   questionId: string,
   i: Interaction,
   fmt: InteractionFormat,
+  patternRecorded: boolean,
 ): void {
   if (i.type !== 'performance' || !i.correct) return;
   const correct = i.correct.map(([, a]) => String(a));
   const changed = correct.find((a) => stepAnswer(a, 'correct', fmt) !== a);
   if (changed !== undefined) {
     console.warn(
-      `Tessera: interaction "${questionId}" records the correct step answer "${changed}" as "${stepAnswer(changed, 'correct', fmt)}". This export standard records answers that differ only in punctuation or accents as the same answer. Write correct step answers as decimals, or as ASCII letters, digits and underscores.`,
+      `Tessera: interaction "${questionId}" records the correct step answer "${changed}" as "${stepAnswer(changed, 'correct', fmt)}". This export standard records answers that differ only in punctuation or accents as the same answer. Write correct step answers with only ASCII letters, digits, _ and ., or as decimals above -100000.`,
     );
   }
+  if (!patternRecorded) return;
   const merged = i.response.findIndex(([, a], k) => {
     const c = correct[k];
     return (
@@ -995,8 +1009,8 @@ export function buildScormInteractionFields(
   const fields: Array<[string, string]> = [['type', spec.typeValue]];
   if (spec.description) fields.push(['description', spec.description]);
   warnResponseIds(questionId, interaction, spec.format);
-  warnStepAnswers(questionId, interaction, spec.format);
   const patterns = formatPatterns(questionId, interaction, spec.format);
+  warnStepAnswers(questionId, interaction, spec.format, patterns !== null);
   const response = formatResponse(questionId, interaction, spec.format);
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);

@@ -246,8 +246,10 @@ describe('performance steps', () => {
     ['!', '_'],
     ['-123456', '123456'],
     ['1e+21', '1e_21'],
-    [`x ${'y'.repeat(300)}`, `x_${'y'.repeat(248)}`],
     ['-3.5', '-3.5'],
+    ['-.5', '-0.5'],
+    ['+3', '3'],
+    ['-1.', '-1'],
     ['-99999.123456789012345678', '-99999.123456789012345678'],
     ['.5', '.5'],
     ['v1.2.3', 'v1.2.3'],
@@ -263,6 +265,26 @@ describe('performance steps', () => {
       );
     },
   );
+
+  it('cuts a SCORM 2004 step answer that folds past 250 characters', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tokyo = '東'.repeat(100);
+    const i: Interaction = {
+      type: 'performance',
+      response: [['s', tokyo]],
+      correct: [['s', tokyo]],
+    };
+    expect(formatResponse('q1', i, SCORM2004_INTERACTION_FORMAT)).toBe(
+      `s[.]${'u6771'.repeat(50)}`,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('has a step answer over the 250 characters'),
+    );
+    expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
+      kept: null,
+      warnings: [expect.stringContaining('correct step answer over the 250')],
+    });
+  });
 
   it('folds SCORM 2004 step answers but keeps a correct range', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -323,6 +345,30 @@ describe('performance steps', () => {
       expect.stringContaining(
         'records the step answer "turn-left" as "turn_left", the same as the correct answer "turn_left"',
       ),
+    );
+  });
+
+  it('does not warn of a match when the correct pattern is left out', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(
+      {
+        type: 'performance',
+        response: [
+          ['s', 'turn_left'],
+          ['s', 'turn_left'],
+        ],
+        correct: [
+          ['s', 'turn left'],
+          ['s', 'turn-left'],
+        ],
+      },
+      SCORM2004_INTERACTION_FORMAT,
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('repeating an item'),
+    );
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('shows a match'),
     );
   });
 

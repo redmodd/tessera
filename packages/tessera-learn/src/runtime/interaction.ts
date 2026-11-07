@@ -184,7 +184,7 @@ function pairSetEqual(
 }
 
 export const DECIMAL_PATTERN = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)`;
-const DECIMAL = new RegExp(`^${DECIMAL_PATTERN}$`);
+export const DECIMAL = new RegExp(`^${DECIMAL_PATTERN}$`);
 const RANGE_END = String.raw`-?\d+(?:\.\d+)?`;
 const STEP_RANGE = new RegExp(
   String.raw`^(${RANGE_END})?\[:\](${RANGE_END})?$`,

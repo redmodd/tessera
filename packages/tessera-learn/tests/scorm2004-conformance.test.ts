@@ -686,7 +686,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       ).toBe('1');
     });
 
-    it('cuts a long step answer, then folds it', async () => {
+    it('folds a long step answer, then cuts it to 250 characters', async () => {
       await start();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       adapter.reportInteraction(
@@ -700,7 +700,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
       await flush();
       expect(lms.errors).toEqual([]);
       expect(lms.raw.GetValue('cmi.interactions.0.learner_response')).toBe(
-        `s[.]a_b${'x'.repeat(243)}`,
+        `s[.]a_b${'x'.repeat(247)}`,
       );
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
