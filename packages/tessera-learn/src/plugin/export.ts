@@ -23,9 +23,13 @@ import { formatReal107, toScaled } from '../runtime/adapters/format.js';
 import { latin } from '../runtime/interaction-format.js';
 
 function slugify(text: string): string {
-  return latin(text)
+  return text
+    .normalize('NFC')
+    .replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
+      const plain = latin(c);
+      return /^[\w\s-]*$/.test(plain) ? plain : '';
+    })
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-|-$/g, '');
 }
