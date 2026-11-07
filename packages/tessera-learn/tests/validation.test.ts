@@ -2098,20 +2098,26 @@ let a = {}; let b = {};</script>
     );
   });
 
-  it('warns when a question id will be rewritten under SCORM 1.2', () => {
-    createValidProject(testRoot);
-    writeStandardConfig('scorm12');
-    writePage(
-      `<script>import { MultipleChoice } from 'tessera-learn';</script>
-<MultipleChoice id="my question" question="Q" options={["a", "b"]} correct={0} />`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining(
-        'question id "my question" will be rewritten to "my_question" for SCORM 1.2',
-      ),
-    );
-  });
+  it.each([
+    ['my question', 'my_question'],
+    ['café', 'cafe'],
+  ])(
+    'warns when question id %s will be rewritten to %s under SCORM 1.2',
+    (id, recorded) => {
+      createValidProject(testRoot);
+      writeStandardConfig('scorm12');
+      writePage(
+        `<script>import { MultipleChoice } from 'tessera-learn';</script>
+<MultipleChoice id="${id}" question="Q" options={["a", "b"]} correct={0} />`,
+      );
+      const { warnings } = validateProject(testRoot);
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          `question id "${id}" will be rewritten to "${recorded}" for SCORM 1.2; use only ASCII letters, digits and underscores`,
+        ),
+      );
+    },
+  );
 
   it('errors on a SCORM 1.2 sanitized id collision', () => {
     createValidProject(testRoot);

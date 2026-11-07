@@ -246,7 +246,7 @@ export function validateQuestionComponents(
         const sane = standard.interactionFormat.identifier(resolvedId);
         if (!derived && sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only letters and digits (underscores only between them)`,
+            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only ASCII letters, digits and underscores`,
           );
         }
         if (seenSanitized.has(sane)) {

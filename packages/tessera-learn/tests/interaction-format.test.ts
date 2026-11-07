@@ -309,7 +309,7 @@ describe('numeric ranges', () => {
   });
 });
 
-describe('SCORM 2004 ids inside a response', () => {
+describe('SCORM ids', () => {
   const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
   const fmt = SCORM2004_INTERACTION_FORMAT;
 
@@ -341,6 +341,7 @@ describe('SCORM 2004 ids inside a response', () => {
       expect(formatResponse('q1', likert, SCORM12_INTERACTION_FORMAT)).toBe(
         recorded,
       );
+      expect(SCORM12_INTERACTION_FORMAT.identifier(id)).toBe(recorded);
       // Moodle's SCORM 2004 CMIShortIdentifier.
       expect(recorded).toMatch(/^[\w.]{1,250}$/);
     },
