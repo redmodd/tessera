@@ -1,11 +1,15 @@
-import { literalValue, type QuestionComponentName } from '../manifest.js';
+import {
+  literalValue,
+  staticQuestionId,
+  type QuestionComponentName,
+} from '../manifest.js';
 import type { ComponentMatch, PropValue } from '../ast.js';
 import type { StandardProfile } from '../../runtime/standards.js';
 import {
   SCORM12_MAX_OPTIONS,
   fitPatterns,
 } from '../../runtime/interaction-format.js';
-import { isQuestionId, isRecord, isStringArray } from '../../runtime/types.js';
+import { isRecord, isStringArray } from '../../runtime/types.js';
 import { fillInAnswers } from '../../components/util.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import { formatValue, type Diagnostics } from './diagnostics.js';
@@ -207,10 +211,8 @@ export function validateQuestionComponents(
       );
     }
 
-    const literalId = literalValue(props.get('id'));
-    const resolvedId =
-      literalId && isQuestionId(literalId.value) ? literalId.value : null;
-    if (literalId && resolvedId === null) {
+    const resolvedId = staticQuestionId(match);
+    if (resolvedId === null && literalValue(props.get('id'))) {
       d.error(`${fileRel}: <${name}> id must be a string that is not blank`);
     }
     if (resolvedId !== null) {
