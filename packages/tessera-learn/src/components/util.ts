@@ -14,82 +14,16 @@ export function resolveAsset(src: string): string {
 }
 
 /**
- * Latin letters NFKD does not split into a base letter and an accent: the
- * stroked, hooked and barred letters of Latin-1, Extended-A and -B, with the
- * lowercase forms IPA holds. Letters with no plain form (ə, ʒ, ɣ) stay out.
- */
-const STROKED =
-  'ØøŁłĐđÐðĦħıĸŊŋŦŧƀƁɓƂƃƇƈƉɖƊɗƋƌƐɛƑƒƓɠƗɨƘƙƚƝɲƞƟɵƤƥƫƬƭƮʈƲʋƳƴƵƶǤǥȤȥȴȵȶȷȺⱥȻȼȽȾⱦȿɀɃɄɆɇɈɉɊɋɌɍɎɏƆɔ';
-const STROKED_BASE =
-  'OoLlDdDdHhikNnTtbBbBbCcDdDdDdEeFfGgIiKklNnnOoPptTtTtVvYyZzGgZzlntjAaCcLTtszBUEeJjQqRrYyOo';
-const UNSPLIT_LETTERS: Record<string, string> = {
-  ...Object.fromEntries([...STROKED].map((c, k) => [c, STROKED_BASE[k]])),
-  ß: 'ss',
-  ẞ: 'SS',
-  æ: 'ae',
-  Æ: 'AE',
-  œ: 'oe',
-  Œ: 'OE',
-  þ: 'th',
-  Þ: 'Th',
-};
-
-/** Accented Latin letters spelled without their accents. */
-export function latin(text: string): string {
-  return text
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
-}
-
-/** 32-bit FNV-1a over `text`'s UTF-16 units, in base 36. */
-export function fnv1a(text: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(36);
-}
-
-/**
- * Latin letters and accents encoded by Unicode 5.2, which every engine's
- * tables agree on. Newer characters normalize differently in the build and
- * older browsers, so they stay as they are.
- */
-const OLD_LATIN =
-  /[A-Za-z][\u0300-\u036f]+|[\u00c0-\u02af\u1e00-\u1eff\u2c60-\u2c7f][\u0300-\u036f]*/g;
-
-/** `text` as lowercase ASCII words, and how many characters it could not spell. */
-function spell(text: string): [slug: string, unspelled: number] {
-  const plain = text.replace(OLD_LATIN, latin);
-  const words = plain.toLowerCase().match(/[a-z0-9]+/g) ?? [];
-  return [words.join('-'), plain.match(/[^\0-\x7f]/gu)?.length ?? 0];
-}
-
-/**
- * A question prompt as a slug, the fallback `id` when the author supplies
- * none: its Latin words without accents, cut at 40 characters, where each
- * character the slug cannot spell counts as one. When the prompt up to the
- * cut has a character outside ASCII (`pêche`, `東京`, `’`), the slug also
- * gets a hash of that part, so prompts differing only in those characters
- * stay distinct. Edits past the cut keep the id.
+ * Build a deterministic slug from a question prompt for use as a fallback
+ * `id` when the author hasn't supplied one. Stable across renders so SCORM /
+ * cmi5 interaction reporting addresses the same question consistently.
  */
 export function slugFromQuestion(text: unknown): string {
-  const prompt = String(text ?? '').replace(OLD_LATIN, (c) =>
-    c.normalize('NFC'),
-  );
-  let head = '';
-  let slug = '';
-  for (const c of prompt) {
-    const [next, unspelled] = spell(head + c);
-    if (next.length + unspelled > 40) break;
-    head += c;
-    slug = next;
-  }
-  if (!/[^\0-\x7f]/.test(head)) return slug;
-  const hash = fnv1a(head);
-  return slug ? `${slug}-${hash}` : hash;
+  return String(text ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
 }
 
 export const QUESTION_ID_PREFIX = {

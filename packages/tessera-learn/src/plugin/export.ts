@@ -20,7 +20,7 @@ import {
   type StandardProfile,
 } from '../runtime/standards.js';
 import { formatReal107, toScaled } from '../runtime/adapters/format.js';
-import { latin } from '../components/util.js';
+import { latin } from '../runtime/interaction-format.js';
 
 function slugify(text: string): string {
   return text

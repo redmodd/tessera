@@ -13,7 +13,6 @@ import {
   type InteractionOption,
   type OptionPairs,
 } from './interaction.js';
-import { latin } from '../components/util.js';
 
 export interface InteractionFormat {
   itemDelim: string;
@@ -227,6 +226,35 @@ function recordsIndex<T extends object>(
   fmt: InteractionFormat,
 ): options is T {
   return fmt.optionEncoding === 'index' && options !== undefined;
+}
+
+/**
+ * Latin letters NFKD does not split into a base letter and an accent: the
+ * stroked, hooked and barred letters of Latin-1, Extended-A and -B, with the
+ * lowercase forms IPA holds. Letters with no plain form (ə, ʒ, ɣ) stay out.
+ */
+const STROKED =
+  'ØøŁłĐđÐðĦħıĸŊŋŦŧƀƁɓƂƃƇƈƉɖƊɗƋƌƐɛƑƒƓɠƗɨƘƙƚƝɲƞƟɵƤƥƫƬƭƮʈƲʋƳƴƵƶǤǥȤȥȴȵȶȷȺⱥȻȼȽȾⱦȿɀɃɄɆɇɈɉɊɋɌɍɎɏƆɔ';
+const STROKED_BASE =
+  'OoLlDdDdHhikNnTtbBbBbCcDdDdDdEeFfGgIiKklNnnOoPptTtTtVvYyZzGgZzlntjAaCcLTtszBUEeJjQqRrYyOo';
+const UNSPLIT_LETTERS: Record<string, string> = {
+  ...Object.fromEntries([...STROKED].map((c, k) => [c, STROKED_BASE[k]])),
+  ß: 'ss',
+  ẞ: 'SS',
+  æ: 'ae',
+  Æ: 'AE',
+  œ: 'oe',
+  Œ: 'OE',
+  þ: 'th',
+  Þ: 'Th',
+};
+
+/** Accented Latin letters spelled without their accents. */
+export function latin(text: string): string {
+  return text
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
 }
 
 /**
