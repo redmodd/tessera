@@ -207,7 +207,7 @@
     loader()
       .then((mod) => {
         if (gen !== loadGeneration || session.exitPhase) return; // stale
-        pageError = null;
+        pageError = renderError = null;
         pageContext.quiz = page.quiz;
         pageContext.quizState = {
           attempts: progress.quizAttempts(index),
