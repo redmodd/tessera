@@ -545,6 +545,8 @@ describe('runExport', () => {
     ['My Amazing Course!', '3.2.1', 'my-amazing-course-3.2.1.zip'],
     ['Café Straße', '1.0.0', 'cafe-strasse-1.0.0.zip'],
     ['½ Course', '1.0.0', 'course-1.0.0.zip'],
+    ['™ Course', '1.0.0', 'course-1.0.0.zip'],
+    ['Paŀla', '1.0.0', 'palla-1.0.0.zip'],
   ])('names the zip %s %s as %s', async (title, version, zip) => {
     await runExport(
       testRoot,

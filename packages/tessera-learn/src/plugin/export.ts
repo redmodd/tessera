@@ -26,7 +26,10 @@ function slugify(text: string): string {
   return text
     .normalize('NFC')
     .replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
+      if (/^\p{S}/u.test(c)) return '';
       const plain = latin(c);
+      // ŀ spells as l· and ŉ as ʼn: keep the Latin letter, drop the rest.
+      if (/^\p{L}/u.test(c)) return plain.replace(/\W/g, '');
       return /^[\w\s-]*$/.test(plain) ? plain : '';
     })
     .toLowerCase()
