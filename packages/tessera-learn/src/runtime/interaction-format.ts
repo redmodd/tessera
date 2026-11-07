@@ -67,7 +67,7 @@ export interface InteractionFormat {
   /** Ids inside a response: list items, matching ids, step names, likert. */
   responseId(value: string, max?: number): string;
   /** A performance step answer, except a range in a correct answer. */
-  stepAnswer(value: string, max?: number): string;
+  stepAnswer(value: string, max: number): string;
 }
 
 /**
@@ -313,19 +313,21 @@ const CMI_DECIMAL = /^-?\d{1,5}(?:\.\d{1,18})?$/;
 /**
  * Moodle takes a SCORM 2004 step answer that is empty, a CMIDecimal, or ASCII
  * letters, digits, `_` and `.` (406 otherwise). A decimal written another way
- * (`+3`, `-.5`) records as a CMIDecimal when it fits one, and any other answer
- * as a response id (`turn left` → `turn_left`).
+ * (`+3`, `-.5`) records in one of those forms when it fits one, and any other
+ * answer as a response id (`turn left` → `turn_left`).
  */
-function scorm2004StepAnswer(value: string, max = 250): string {
+function scorm2004StepAnswer(value: string, max: number): string {
   if (/^[\w.]*$/.test(value)) return value.slice(0, max);
-  if (DECIMAL.test(value)) {
-    const decimal = value
-      .replace(/^\+/, '')
-      .replace(/^(-?)\./, '$10.')
-      .replace(/\.$/, '');
-    if (CMI_DECIMAL.test(decimal)) return decimal;
-  }
+  const decimal = DECIMAL.test(value) ? plainDecimal(value) : '';
+  if (/^[\w.]+$/.test(decimal)) return decimal.slice(0, max);
+  if (CMI_DECIMAL.test(decimal)) return decimal;
   return scormId(value, max);
+}
+
+/** `+3` → `3`, `-.5` → `-0.5`, `-007.` → `-7`, at most 18 fraction digits. */
+function plainDecimal(value: string): string {
+  const [, sign, int, fraction] = /^([-+]?)0*(\d*)\.?(\d{0,18})/.exec(value)!;
+  return `${sign === '-' ? '-' : ''}${int || '0'}${fraction ? `.${fraction}` : ''}`;
 }
 
 /**
@@ -404,7 +406,7 @@ function stepAnswer(
   answer: string | number,
   field: 'response' | 'correct',
   fmt: InteractionFormat,
-  max?: number,
+  max = fmt.maxPartLength,
 ): string {
   const text = String(answer);
   return field === 'correct' && stepRange(text)
@@ -709,7 +711,7 @@ export function fitPatterns(
     return {
       kept: null,
       warnings: [
-        `has a correct step answer over the ${fmt.maxPartLength} characters ${recorder} records; the correct answer is ${lost}`,
+        `has a correct step answer that, as recorded, is over the ${fmt.maxPartLength} characters ${recorder} records; the correct answer is ${lost}`,
       ],
     };
   }
@@ -838,7 +840,7 @@ function fitResponse(
   const partMax = fmt.maxPartLength;
   let longPart = '';
   if (i.type === 'performance' && hasLongStep(i.response, 'response', fmt)) {
-    longPart = 'a step answer';
+    longPart = 'a step answer that, as recorded, is';
   }
   let items = responseItems(i, fmt);
   if (i.type === 'fill-in' && items.some((part) => part.length > partMax)) {
@@ -956,17 +958,17 @@ function warnResponseIds(
 
 /**
  * A learner's step answer can't be changed, so this warns only about a
- * correct answer the format changes, and a response answer that, as
- * recorded, fits the recorded pattern when the result says it doesn't, or
- * the other way round.
+ * recorded correct answer the format changes, and a recorded response that,
+ * as recorded, matches the pattern when the result says it doesn't, or the
+ * other way round.
  */
 function warnStepAnswers(
   questionId: string,
   i: Interaction,
   fmt: InteractionFormat,
-  patternRecorded: boolean,
+  recorded: { pattern: boolean; response: boolean },
 ): void {
-  if (i.type !== 'performance' || !i.correct) return;
+  if (i.type !== 'performance' || !i.correct || !recorded.pattern) return;
   const correct = i.correct.map(([, a]) => ({
     written: String(a),
     recorded: stepAnswer(a, 'correct', fmt),
@@ -974,21 +976,29 @@ function warnStepAnswers(
   const changed = correct.find(({ written, recorded }) => written !== recorded);
   if (changed) {
     console.warn(
-      `Tessera: interaction "${questionId}" records the correct step answer "${changed.written}" as "${changed.recorded}". This export standard records answers that differ only in punctuation or accents as the same answer. Write correct step answers with only ASCII letters, digits, _ and ., or as decimals above -100000.`,
+      `Tessera: interaction "${questionId}" records the correct step answer "${changed.written}" as "${changed.recorded}". To record a correct step answer as written, use only ASCII letters, digits, _ and ., or a negative decimal with 1 to 5 digits before the point and at most 18 after.`,
     );
   }
-  if (!patternRecorded) return;
+  const steps = i.correct.map(([step]) => step);
+  if (
+    !recorded.response ||
+    i.response.length !== steps.length ||
+    i.response.some(([step], k) => step !== steps[k])
+  ) {
+    return;
+  }
   const response = i.response.map(([, a]) => ({
     written: String(a),
     recorded: stepAnswer(a, 'response', fmt),
   }));
-  const k = response.findIndex(
-    (r, k) =>
-      k < correct.length &&
-      stepFits(r.written, correct[k].written) !==
-        stepFits(r.recorded, correct[k].recorded),
-  );
-  if (k >= 0) {
+  const fits = (as: 'written' | 'recorded', k: number) =>
+    stepFits(response[k][as], correct[k][as]);
+  const graded = response.every((_, k) => fits('written', k));
+  const lms = response.every((_, k) => fits('recorded', k));
+  if (graded !== lms) {
+    const k = response.findIndex(
+      (_, k) => fits('written', k) !== fits('recorded', k),
+    );
     console.warn(
       `Tessera: interaction "${questionId}" records the step answer "${response[k].written}" as "${response[k].recorded}", so the LMS record and the result disagree on whether it matches the correct answer "${correct[k].written}".`,
     );
@@ -1005,8 +1015,11 @@ export function buildScormInteractionFields(
   if (spec.description) fields.push(['description', spec.description]);
   warnResponseIds(questionId, interaction, spec.format);
   const patterns = formatPatterns(questionId, interaction, spec.format);
-  warnStepAnswers(questionId, interaction, spec.format, patterns !== null);
   const response = formatResponse(questionId, interaction, spec.format);
+  warnStepAnswers(questionId, interaction, spec.format, {
+    pattern: patterns !== null,
+    response: response !== null,
+  });
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });

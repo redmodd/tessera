@@ -111,12 +111,12 @@ Ids inside a response (list items, matching ids, `performance` step ids, the `li
 
 - Graded in order: response step N against correct step N, as SCORM 2004 and xAPI read the correct pattern.
 - Graded by their text as written, so `3` and `'3'` match.
-- Sent as written, except on SCORM 2004, where Moodle accepts only ASCII letters, digits, `_` and `.`, or a decimal above -100000: write correct values that way. A decimal written another way records in that form (`+3` → `3`, `-.5` → `-0.5`), and any other value as an id, by the rule for ids above (`turn left` → `turn_left`). Tessera warns when this changes a correct value, or makes the LMS record and the result disagree on whether a value matches.
+- Sent as written, except on SCORM 2004, where some LMSs accept only ASCII letters, digits, `_` and `.`, or a negative decimal with 1 to 5 digits before the point and at most 18 after (`-0.5`, not `-.5`): write correct values that way. A decimal written another way records in one of those forms when it fits (`+3` → `3`, `-.5` → `-0.5`, fraction digits past 18 cut), and any other value as an id, by the rule for ids above (`turn left` → `turn_left`). Tessera warns when this changes a correct value, or makes the LMS record and the result disagree on whether a value matches.
 - A correct step value written `min[:]max` (either end optional, as in `1[:]5` or `[:]10`) matches any decimal step value inside the range, ends included.
 - Write each range end as digits with an optional `-` and fraction (`0.5[:]1`, not `.5[:]1` or `1 [:] 5`). Any other text holding `[:]` matches only that exact text: Tessera warns in dev.
 - Put the smaller end first, here and in a `numeric` `correct`. A range with its minimum above its maximum matches no answer: Tessera warns in dev and leaves it out of the LMS record.
 - SCORM 1.2 has no range syntax, so it leaves a correct answer holding a range out of the LMS record. The result is still recorded.
-- Moodle's SCORM 2004 player rejects a correct answer holding a range, though the standard allows it. The response and result still record.
+- Some SCORM 2004 LMSs reject a correct answer holding a range, though the standard allows it. The response and result still record.
 
 SCORM 2004 records at most 36 list items (250 `performance` steps) and rejects a correct answer that repeats an item or starts or ends in whitespace. Don't start a `fill-in` or `long-fill-in` answer or response, or a `fill-in` `[,]` part, with `{lang=`, `{case_matters=` or `{order_matters=`: SCORM 2004, cmi5 and xAPI can read it as a delimiter or reject it. Tessera leaves out each value the LMS would misread or reject, with a console warning naming the cause. The result is still recorded.
 

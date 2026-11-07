@@ -251,6 +251,10 @@ describe('performance steps', () => {
     ['+3', '3'],
     ['-1.', '-1'],
     ['-99999.123456789012345678', '-99999.123456789012345678'],
+    ['-0.1234567890123456789', '-0.123456789012345678'],
+    ['-000001', '-1'],
+    ['+123456.5', '123456.5'],
+    ['+.1234567890123456789', '0.123456789012345678'],
     ['.5', '.5'],
     ['v1.2.3', 'v1.2.3'],
     ['snake_case', 'snake_case'],
@@ -258,7 +262,9 @@ describe('performance steps', () => {
   ])(
     'records the SCORM 2004 step answer %j as %j, which Moodle accepts',
     (answer, recorded) => {
-      expect(SCORM2004_INTERACTION_FORMAT.stepAnswer(answer)).toBe(recorded);
+      expect(SCORM2004_INTERACTION_FORMAT.stepAnswer(answer, 250)).toBe(
+        recorded,
+      );
       // Moodle's SCORM 2004 step answer: CMIDecimal, empty or CMIShortIdentifier.
       expect(recorded).toMatch(
         /^-?([0-9]{1,5})(\.[0-9]{1,18})?$|^$|^[\w.]{1,250}$/,
@@ -278,11 +284,17 @@ describe('performance steps', () => {
       `s[.]${'u6771'.repeat(50)}`,
     );
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('has a step answer over the 250 characters'),
+      expect.stringContaining(
+        'has a step answer that, as recorded, is over the 250 characters',
+      ),
     );
     expect(fitPatterns(i, SCORM2004_INTERACTION_FORMAT)).toEqual({
       kept: null,
-      warnings: [expect.stringContaining('correct step answer over the 250')],
+      warnings: [
+        expect.stringContaining(
+          'correct step answer that, as recorded, is over the 250',
+        ),
+      ],
     });
   });
 
@@ -366,7 +378,7 @@ describe('performance steps', () => {
     );
   });
 
-  it('does not warn of a match when the correct pattern is left out', () => {
+  it('does not warn about step answers when the correct pattern is left out', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     recordedResponse(
       {
@@ -385,6 +397,49 @@ describe('performance steps', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('repeating an item'),
     );
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it.each<[string, Interaction]>([
+    [
+      'a step name differs',
+      {
+        type: 'performance',
+        response: [['b', '+3']],
+        correct: [['a', '3']],
+      },
+    ],
+    [
+      'another step does not match',
+      {
+        type: 'performance',
+        response: [
+          ['s', 'wrong'],
+          ['t', '+3'],
+        ],
+        correct: [
+          ['s', 'right'],
+          ['t', '3'],
+        ],
+      },
+    ],
+    [
+      'the response is left out',
+      {
+        type: 'performance',
+        response: [
+          ['', ''],
+          ['t', '+3'],
+        ],
+        correct: [
+          ['s', 'right'],
+          ['t', '3'],
+        ],
+      },
+    ],
+  ])('does not warn of a disagreement when %s', (_, i) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    recordedResponse(i, SCORM2004_INTERACTION_FORMAT);
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringContaining('disagree on whether it matches'),
     );

@@ -259,12 +259,12 @@ describe('SCORM2004Adapter against scorm-again', () => {
       ).toBe('0');
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          '"q1" has a step answer over the 250 characters this export standard records; the LMS gets at most its first 250 characters',
+          '"q1" has a step answer that, as recorded, is over the 250 characters this export standard records; the LMS gets at most its first 250 characters',
         ),
       );
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          '"q1" has a correct step answer over the 250 characters',
+          '"q1" has a correct step answer that, as recorded, is over the 250 characters',
         ),
       );
     });
@@ -704,7 +704,9 @@ describe('SCORM2004Adapter against scorm-again', () => {
       );
       expect(warn).toHaveBeenCalledOnce();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('has a step answer over the 250 characters'),
+        expect.stringContaining(
+          'has a step answer that, as recorded, is over the 250 characters',
+        ),
       );
     });
 
