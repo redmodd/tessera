@@ -1911,12 +1911,16 @@ describe('question component validation', () => {
     writePage(
       `<script>import { MultipleChoice } from 'tessera-learn';</script>
 <MultipleChoice id="" question="What is water?" options={["a", "b"]} correct={0} />
-<MultipleChoice id="" question="What is ice?" options={["a", "b"]} correct={0} />`,
+<MultipleChoice id="" question="What is ice?" options={["a", "b"]} correct={0} />
+<MultipleChoice id=" " question="What is snow?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={''} question="What is fog?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={undefined} question="What is rain?" options={["a", "b"]} correct={0} />
+<MultipleChoice id={null} question="What is hail?" options={["a", "b"]} correct={0} />`,
     );
     const { errors } = validateProject(testRoot);
     expect(
       errors.filter((e) => e.includes('<MultipleChoice> has an empty id')),
-    ).toHaveLength(2);
+    ).toHaveLength(6);
     expect(errors.filter((e) => e.includes('duplicate'))).toHaveLength(0);
   });
 

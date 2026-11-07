@@ -176,7 +176,7 @@ function reporter(): StandaloneQuestionDeps['report'] {
 export function useQuestion<I extends Interaction = Interaction>(
   opts: UseQuestionOptions<I>,
 ): UseQuestionHandle {
-  if (!opts.id) {
+  if (!String(opts.id ?? '').trim()) {
     throw new Error(
       `useQuestion(): ${opts.text ? `the question ${JSON.stringify(opts.text)}` : 'a question'} has no id. ` +
         'Give every question an id that is unique on its page, such as "capital_of_france".',

@@ -573,6 +573,8 @@ export const pageConfig = { graded: true }
 {/if}
 <MultipleChoice id="practice" question="B?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded id={dynamicId} question="C?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded id="" question="D?" options={['x', 'y']} correct={0} />
+<MultipleChoice graded id=" " question="E?" options={['x', 'y']} correct={0} />
 <MultipleChoice graded {...props} id="spread" />`,
     );
     createFile(

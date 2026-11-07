@@ -128,7 +128,7 @@ describe('useQuestion — standalone mode', () => {
   it('throws when the question has no id', () => {
     provideNavCtx();
     const response = () => undefined;
-    for (const id of [undefined, '']) {
+    for (const id of [undefined, '', '  ']) {
       expect(() =>
         useQuestion({ id: id as unknown as string, text: 'Pick a', response }),
       ).toThrow('useQuestion(): the question "Pick a" has no id.');

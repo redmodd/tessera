@@ -34,6 +34,15 @@ export function propMayBeTruthy(
   return value === undefined || Boolean(value);
 }
 
+/** The source sets the id to a blank string or another falsy value. */
+function hasBlankId(match: ComponentMatch): boolean {
+  const prop = match.props.get('id');
+  if (!prop) return false;
+  if (!propMayBeTruthy(match, 'id')) return true;
+  const value = prop.kind === 'string' ? prop.value : staticValue(prop);
+  return typeof value === 'string' && value.trim() === '';
+}
+
 function staticArray(prop: PropValue | undefined): unknown[] | null {
   if (prop?.kind !== 'expr' || !prop.raw.startsWith('[')) return null;
   const value = staticValue(prop);
@@ -224,10 +233,9 @@ export function validateQuestionComponents(
       );
     }
 
+    if (hasBlankId(match)) d.error(`${fileRel}: <${name}> has an empty id`);
     const resolvedId = staticQuestionId(match);
-    if (resolvedId === '') {
-      d.error(`${fileRel}: <${name}> has an empty id`);
-    } else if (resolvedId !== null) {
+    if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
         d.error(
           `${fileRel}: duplicate question id "${resolvedId}"; each question on a page needs a unique id`,

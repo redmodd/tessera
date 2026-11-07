@@ -169,13 +169,24 @@
     target.focus();
   }
 
-  // The first load keeps the browser's initial focus, and ErrorPage announces
-  // itself as an alert.
-  function showPage(index, focusBefore, gen) {
+  function showPage(index) {
     pageLoading = false;
     renderedPageIndex = index;
-    if (gen > 1 && !pageError) {
-      tick().then(() => focusPageHeading(focusBefore));
+  }
+
+  // The page boundary's onerror runs before tick() resolves, so a page that
+  // threw is already showing ErrorPage here. ErrorPage announces itself as an
+  // alert, and the first load keeps the browser's initial focus.
+  function pageRendered(index, focusBefore, gen) {
+    if (gen !== loadGeneration || pageError) return;
+    if (gen > 1) focusPageHeading(focusBefore);
+    progress.markVisited(index);
+    progress.pageMounted(index);
+    if (
+      manifest.pages[index].completesOn === 'view' &&
+      config.completion.mode === 'manual'
+    ) {
+      progress.markCompleteManually();
     }
   }
 
@@ -194,7 +205,7 @@
       );
       pageError = new Error(`Page not found: ${page.importPath}`);
       PageComponent = null;
-      showPage(index, focusBefore, gen);
+      showPage(index);
       return;
     }
 
@@ -210,22 +221,15 @@
           responses: progress.quizResponses(index),
         };
         PageComponent = mod.default;
-        showPage(index, focusBefore, gen);
-        progress.markVisited(index);
-        tick().then(() => progress.pageMounted(index));
-        if (
-          manifest.pages[index].completesOn === 'view' &&
-          config.completion.mode === 'manual'
-        ) {
-          progress.markCompleteManually();
-        }
+        showPage(index);
+        tick().then(() => pageRendered(index, focusBefore, gen));
         onIdle(() => nav.prefetch(index + 1));
       })
       .catch((err) => {
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         console.error(`Tessera: Failed to load page ${index}`, err);
         pageError = err;
-        showPage(index, focusBefore, gen);
+        showPage(index);
       });
   }
 
@@ -238,10 +242,18 @@
     untrack(() => loadPage(index));
   });
 
+  let renderError = null;
   function showRenderError(err) {
     console.error(`Tessera: Page ${renderedPageIndex} failed to render`, err);
-    pageError = err;
+    pageError = renderError = err;
   }
+
+  // A hot update swaps the page component in place, which a page showing
+  // ErrorPage never renders.
+  function retryRenderError() {
+    if (pageError && pageError === renderError) retryPage();
+  }
+  import.meta.hot?.on('vite:afterUpdate', retryRenderError);
 
   // ---- Retry ----
   function retryPage() {
@@ -261,6 +273,7 @@
   });
 
   onDestroy(() => {
+    import.meta.hot?.off('vite:afterUpdate', retryRenderError);
     if (auditMode) delete window.__tesseraAudit;
     session.dispose();
   });
