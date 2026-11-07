@@ -13,9 +13,25 @@ describe('slugFromQuestion', () => {
     expect(slugFromQuestion('  Hello, World!! ')).toBe('hello-world');
   });
 
-  it('caps length at 40 characters', () => {
-    const long = 'a'.repeat(100);
-    expect(slugFromQuestion(long).length).toBeLessThanOrEqual(40);
+  it('cuts at 40 characters, each code of another script counting as one', () => {
+    expect(slugFromQuestion('a'.repeat(100))).toBe('a'.repeat(40));
+    expect(slugFromQuestion('東'.repeat(50))).toBe('u6771'.repeat(40));
+    expect(slugFromQuestion('😀'.repeat(50))).toBe('');
+    expect(slugFromQuestion(`${'a'.repeat(39)} b`)).toBe('a'.repeat(39));
+  });
+
+  it('drops accents from Latin letters', () => {
+    expect(slugFromQuestion('Café?')).toBe('cafe');
+    expect(slugFromQuestion('Résumé')).toBe('resume');
+    expect(slugFromQuestion('Straße')).toBe('strasse');
+  });
+
+  it('spells letters of other scripts as code points', () => {
+    expect(slugFromQuestion('東京は？')).toBe('u6771u4eacu306f');
+    expect(slugFromQuestion('大阪は？')).toBe('u5927u962au306f');
+    expect(slugFromQuestion('Где Москва?')).toBe(
+      'u0413u0434u0435-u041cu043eu0441u043au0432u0430',
+    );
   });
 
   it('handles nullish input without throwing', () => {

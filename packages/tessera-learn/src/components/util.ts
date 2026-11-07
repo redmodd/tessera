@@ -14,16 +14,67 @@ export function resolveAsset(src: string): string {
 }
 
 /**
- * Build a deterministic slug from a question prompt for use as a fallback
- * `id` when the author hasn't supplied one. Stable across renders so SCORM /
- * cmi5 interaction reporting addresses the same question consistently.
+ * Latin letters NFKD does not split into a base letter and an accent: the
+ * stroked, hooked and barred letters of Latin-1, Extended-A and -B, with the
+ * lowercase forms IPA holds. Letters with no plain form (ə, ʒ, ɣ) stay out.
+ */
+const STROKED =
+  'ØøŁłĐđÐðĦħıĸŊŋŦŧƀƁɓƂƃƇƈƉɖƊɗƋƌƐɛƑƒƓɠƗɨƘƙƚƝɲƞƟɵƤƥƫƬƭƮʈƲʋƳƴƵƶǤǥȤȥȴȵȶȷȺⱥȻȼȽȾⱦȿɀɃɄɆɇɈɉɊɋɌɍɎɏƆɔ';
+const STROKED_BASE =
+  'OoLlDdDdHhikNnTtbBbBbCcDdDdDdEeFfGgIiKklNnnOoPptTtTtVvYyZzGgZzlntjAaCcLTtszBUEeJjQqRrYyOo';
+const UNSPLIT_LETTERS: Record<string, string> = {
+  ...Object.fromEntries([...STROKED].map((c, k) => [c, STROKED_BASE[k]])),
+  ß: 'ss',
+  ẞ: 'SS',
+  æ: 'ae',
+  Æ: 'AE',
+  œ: 'oe',
+  Œ: 'OE',
+  þ: 'th',
+  Þ: 'Th',
+};
+
+/** Accented Latin letters spelled without their accents. */
+export function latin(text: string): string {
+  return text
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
+}
+
+/**
+ * `value` in ASCII letters, digits, `_` and spaces. Latin letters drop their
+ * accents (`café` → `cafe`). Letters of other scripts become one `u` and four
+ * hex digits per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they
+ * stay distinct from one another. Other characters become spaces.
+ */
+export function asciiSpelling(value: string): string {
+  return value.normalize('NFC').replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
+    const plain = latin(c);
+    if (/^\w+$/.test(plain)) return plain;
+    if (!/[\p{L}\p{N}]/u.test(c)) return ' ';
+    return c.replace(
+      /./gs,
+      (u) => `u${u.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
+    );
+  });
+}
+
+/**
+ * A question prompt's ASCII spelling as a slug, the fallback `id` when the
+ * author supplies none. Runs of other characters become one `-`. The cut
+ * keeps 40 characters, each code of another script counting as one, so the
+ * slug is at most 200 characters.
  */
 export function slugFromQuestion(text: unknown): string {
-  return String(text ?? '')
+  const slug = asciiSpelling(String(text ?? ''))
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40);
+    .replace(/^-/, '');
+  return (slug.match(/u[0-9a-f]{4}|./g) ?? [])
+    .slice(0, 40)
+    .join('')
+    .replace(/-$/, '');
 }
 
 export const QUESTION_ID_PREFIX = {

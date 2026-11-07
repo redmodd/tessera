@@ -13,6 +13,7 @@ import {
   type InteractionOption,
   type OptionPairs,
 } from './interaction.js';
+import { asciiSpelling, latin } from '../components/util.js';
 
 export interface InteractionFormat {
   itemDelim: string;
@@ -229,58 +230,13 @@ function recordsIndex<T extends object>(
 }
 
 /**
- * Latin letters NFKD does not split into a base letter and an accent: the
- * stroked, hooked and barred letters of Latin-1, Extended-A and -B, with the
- * lowercase forms IPA holds. Letters with no plain form (ə, ʒ, ɣ) stay out.
- */
-const STROKED =
-  'ØøŁłĐđÐðĦħıĸŊŋŦŧƀƁɓƂƃƇƈƉɖƊɗƋƌƐɛƑƒƓɠƗɨƘƙƚƝɲƞƟɵƤƥƫƬƭƮʈƲʋƳƴƵƶǤǥȤȥȴȵȶȷȺⱥȻȼȽȾⱦȿɀɃɄɆɇɈɉɊɋɌɍɎɏƆɔ';
-const STROKED_BASE =
-  'OoLlDdDdHhikNnTtbBbBbCcDdDdDdEeFfGgIiKklNnnOoPptTtTtVvYyZzGgZzlntjAaCcLTtszBUEeJjQqRrYyOo';
-const UNSPLIT_LETTERS: Record<string, string> = {
-  ...Object.fromEntries([...STROKED].map((c, k) => [c, STROKED_BASE[k]])),
-  ß: 'ss',
-  ẞ: 'SS',
-  æ: 'ae',
-  Æ: 'AE',
-  œ: 'oe',
-  Œ: 'OE',
-  þ: 'th',
-  Þ: 'Th',
-};
-
-/** Accented Latin letters spelled without their accents. */
-function latin(text: string): string {
-  return text
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .replace(/./gu, (c) => UNSPLIT_LETTERS[c] ?? c);
-}
-
-/**
- * A SCORM 1.2 interaction id, or a SCORM id inside a response: ASCII
- * letters, digits and `_`. Moodle also allows `.` in SCORM 2004, but it is left to
- * position text (`3.Paris`). Latin letters drop their accents (`café` →
- * `cafe`). Letters of other scripts record as one `u` and four hex digits
- * per UTF-16 unit (`東京` → `u6771u4EAC`), a fixed width so they stay
- * distinct from one another. Each run of other characters records as one
+ * A SCORM 1.2 interaction id, or a SCORM id inside a response: the value's
+ * ASCII spelling. Moodle also allows `.` in SCORM 2004, but it is left to
+ * position text (`3.Paris`). Each run of other characters records as one
  * `_`, dropped at the ends. The cut keeps each code whole.
  */
 function scormId(value: string, max = 250): string {
-  const spelled = value
-    .normalize('NFC')
-    .replace(/\P{M}\p{M}*|\p{M}+/gsu, (c) => {
-      const plain = latin(c);
-      if (/^\w+$/.test(plain)) return plain;
-      if (!/[\p{L}\p{N}]/u.test(c)) return ' ';
-      return c.replace(
-        /./gs,
-        (u) =>
-          `u${u.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
-      );
-    })
-    .trim()
-    .replace(/ +/g, '_');
+  const spelled = asciiSpelling(value).trim().replace(/ +/g, '_');
   let id = '';
   for (const piece of spelled.match(/u[0-9A-F]{4}|./g) ?? []) {
     if (id.length + piece.length > max) break;
