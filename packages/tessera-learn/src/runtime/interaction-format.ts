@@ -174,7 +174,7 @@ export const SCORM12_INTERACTION_FORMAT: InteractionFormat = {
   maxPartLength: Infinity,
   namelessSteps: false,
   formatBoolean: (v) => (v ? 't' : 'f'),
-  identifier: shortIdentifier,
+  identifier: scormResponseId,
   responseId: scormResponseId,
 };
 
@@ -217,7 +217,7 @@ export const XAPI_INTERACTION_FORMAT: InteractionFormat = {
  * underscore, max 250 chars. Strict validators (SCORM Cloud) reject raw
  * option labels with spaces or punctuation with error 405/406.
  */
-export function shortIdentifier(value: string, max = 250): string {
+function shortIdentifier(value: string, max = 250): string {
   const cleaned = value.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const trimmed = cleaned.slice(0, max);
   return trimmed || '_';

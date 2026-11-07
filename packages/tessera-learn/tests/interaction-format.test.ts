@@ -309,6 +309,23 @@ describe('numeric ranges', () => {
   });
 });
 
+describe('SCORM 1.2 interaction ids', () => {
+  it.each([
+    ['café', 'cafe'],
+    ['cafè', 'cafe'],
+    ['résumé', 'resume'],
+    ['Ærø', 'AEro'],
+    ['東京', 'u6771u4EAC'],
+    ['問1', 'u554F1'],
+    ['問2', 'u554F2'],
+    ['my question', 'my_question'],
+    ['q1', 'q1'],
+  ])('records %s as %s, as ids inside a response', (id, recorded) => {
+    expect(SCORM12_INTERACTION_FORMAT.identifier(id)).toBe(recorded);
+    expect(SCORM12_INTERACTION_FORMAT.responseId(id)).toBe(recorded);
+  });
+});
+
 describe('SCORM 2004 ids inside a response', () => {
   const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
   const fmt = SCORM2004_INTERACTION_FORMAT;

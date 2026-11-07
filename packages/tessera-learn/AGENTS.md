@@ -387,7 +387,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 ### Rules
 
 - **Pass every required prop**, listed under [Question types](#question-types). A missing one is a build error.
-- **Question `id`s are unique within a page, and use only letters, digits and inner underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`) and the validator warns.
+- **Question `id`s are unique within a page, and use only ASCII letters, digits and underscores** (`planet`, `q1`, `final_2`). SCORM 1.2 rewrites anything else (`q-planet` → `q_planet`, `café` → `cafe`) and the validator warns.
 - **Omitting `id` derives one from the prompt text**, so two identically worded questions collide: the build errors, and at runtime a quiz renames the second registration (`q1-2`), which changes its `cmi.interactions` key.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](docs/recipes.md#recipe-2c-inline-layout-prose-between-questions)).
 - **Custom widgets register through `useQuestion`; only `useQuiz().submit()` scores the quiz.** Anything else and the LMS sees nothing.
