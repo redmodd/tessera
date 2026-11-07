@@ -2103,6 +2103,7 @@ let a = {}; let b = {};</script>
     ['café', 'cafe', 'scorm12', 'SCORM 1.2'],
     ['my question', 'my_question', 'scorm2004', 'SCORM 2004'],
     ['urn:q1', 'urn_q1', 'scorm2004', 'SCORM 2004'],
+    ['q🚀', 'q', 'scorm2004', 'SCORM 2004'],
   ])(
     'warns when question id %s will be rewritten to %s under %s',
     (id, recorded, standard, name) => {

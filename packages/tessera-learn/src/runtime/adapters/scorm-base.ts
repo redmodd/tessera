@@ -65,6 +65,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   #terminated = false;
   #suspendOverflowWarned = false;
   #interactionCount = 0;
+  #questionIdsByRecorded = new Map<string, string>();
 
   constructor(api: TApi, dialect: ScormDialect<TApi>) {
     super();
@@ -238,6 +239,13 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
         description,
       },
     );
+    const earlier = this.#questionIdsByRecorded.get(id);
+    if (earlier !== undefined && earlier !== questionId) {
+      console.warn(
+        `Tessera: interactions "${earlier}" and "${questionId}" both record as "${id}" under ${this.dialect.profile.name}, so the LMS record cannot tell them apart. Give them distinct ids of ASCII letters, digits and underscores.`,
+      );
+    }
+    this.#questionIdsByRecorded.set(id, questionId);
     let n: number | null = null;
     const idKey = () => `cmi.interactions.${this.#interactionCount}.id`;
     this.queue.enqueue(() => {

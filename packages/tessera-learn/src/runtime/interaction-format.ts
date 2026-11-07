@@ -289,16 +289,22 @@ function scormId(value: string, max = 250): string {
   return id || '_';
 }
 
+/** Whitespace, emoji with their joiners and modifiers, and lone surrogates. */
+const SPACE_OR_EMOJI =
+  /(?:[\s\p{Cs}\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}]|‍|️|⃣)+/gu;
+
 /**
  * A SCORM 2004 interaction id, which Moodle checks as a CMILongIdentifier:
  * up to 4000 characters, no whitespace, and `urn:` only to open a URN. Each
- * run of whitespace records as `_`, dropped at the ends, and a malformed
- * `urn:` as `urn_`.
+ * run of whitespace or emoji records as `_`, dropped at the ends, and a
+ * malformed `urn:` as `urn_`. Lone surrogates go too, since an LMS that
+ * URL-encodes the id fails on them.
  */
 function scorm2004Id(value: string): string {
   const id = value
+    .replace(SPACE_OR_EMOJI, ' ')
     .trim()
-    .replace(/\s+/g, '_')
+    .replace(/ +/g, '_')
     .replace(/^urn:(?![A-Za-z0-9-]{1,31}:.)/, 'urn_');
   return id.slice(0, 4000).replace(/[\uD800-\uDBFF]$/, '') || '_';
 }
