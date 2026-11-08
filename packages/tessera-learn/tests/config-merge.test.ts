@@ -37,6 +37,13 @@ describe('mergeCourseConfig', () => {
     },
   );
 
+  it.each([
+    ['EN-gb', 'en-GB'],
+    ['iw', 'he'],
+  ])('canonicalizes the language %s to %s', (language, canonical) => {
+    expect(mergeCourseConfig({ language }).language).toBe(canonical);
+  });
+
   it('does not leak percentage defaults into quiz-mode completion', () => {
     const merged = mergeCourseConfig({ completion: { mode: 'quiz' } });
     expect(merged.completion).toEqual({ mode: 'quiz' });

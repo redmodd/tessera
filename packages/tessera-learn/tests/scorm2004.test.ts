@@ -385,7 +385,9 @@ describe('SCORM2004Adapter', () => {
       ['de-CH-1901', 'de-CH-1901'],
       ['ca-ES-valencia', 'ca-ES'],
       ['en-US-x-twain', 'en-US'],
-      ['en-u-ca-gregory', 'en-u-ca'],
+      ['en-u-ca-gregory', 'en'],
+      ['de-DE-u-co-phonebk', 'de-DE'],
+      ['en-a-bbb-x-a-ccc', 'en'],
     ])(
       'tags the description of a %s course with {lang=%s}, which Moodle accepts',
       async (language, tag) => {

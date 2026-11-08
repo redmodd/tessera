@@ -29,28 +29,31 @@ export function courseIdentity(config: { id?: unknown }): string {
 }
 
 /**
- * A well-formed BCP-47 tag (as `Intl` parses it) with a 2-3 letter primary
- * language, the only kind SCORM 2004 and Moodle take. `zh-cmn` and `i-klingon`
- * forms fail.
+ * The canonical form (`EN-gb` → `en-GB`, `iw` → `he`) of a tag `Intl` parses
+ * with a 2-3 letter primary language, the only kind SCORM 2004 and Moodle
+ * take. `zh-cmn` and `i-klingon` forms give null.
  */
-export function isLanguageTag(value: unknown): value is string {
-  if (typeof value !== 'string' || !/^[A-Za-z]{2,3}(-|$)/.test(value))
-    return false;
+function canonicalLanguage(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
   try {
-    Intl.getCanonicalLocales(value);
-    return true;
+    const [tag] = Intl.getCanonicalLocales(value);
+    return /^[a-z]{2,3}(-|$)/.test(tag) ? tag : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
+export function isLanguageTag(value: unknown): value is string {
+  return canonicalLanguage(value) !== null;
+}
+
 /**
- * The course's language tag for `<html lang>`, the package manifests and the
- * LMS/LRS records. A missing or malformed `language` fails the build, but the
- * dev server keeps serving after the error, so it falls back to 'en'.
+ * The course's canonical language tag for `<html lang>`, the package manifests
+ * and the LMS/LRS records. A missing or malformed `language` fails the build,
+ * but the dev server keeps serving after the error, so it falls back to 'en'.
  */
 export function courseLanguage(config: { language?: unknown }): string {
-  return isLanguageTag(config.language) ? config.language : 'en';
+  return canonicalLanguage(config.language) ?? 'en';
 }
 
 interface SuccessSource {

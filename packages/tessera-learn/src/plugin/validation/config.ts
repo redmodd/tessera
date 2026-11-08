@@ -146,7 +146,7 @@ export function parseConfig(
     );
   } else if (!isLanguageTag(config.language)) {
     d.error(
-      `course.config.js: "language" (${formatValue(config.language)}) is not a valid BCP-47 tag. ${findTag}`,
+      `course.config.js: "language" (${formatValue(config.language)}) is not a supported BCP-47 tag. ${findTag}`,
     );
   }
 

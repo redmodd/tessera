@@ -3596,13 +3596,19 @@ describe('language tag', () => {
     expect(has(errors, lookup)).toBe(true);
   });
 
-  it.each(['english', 'en_US', 'en-x', 'en-US-US', 'de-1', 'zh-cmn-Hans'])(
-    'errors on the malformed tag %s',
-    (language) => {
-      createValidProject(testRoot);
-      writeConfig(
-        testRoot,
-        `export default {
+  it.each([
+    'english',
+    'en_US',
+    'en-x',
+    'en-US-US',
+    'de-1',
+    'zh-cmn-Hans',
+    'en-GB-oed',
+  ])('errors on the malformed tag %s', (language) => {
+    createValidProject(testRoot);
+    writeConfig(
+      testRoot,
+      `export default {
   title: "T",
   language: "${language}",
   navigation: { mode: "free" },
@@ -3610,12 +3616,11 @@ describe('language tag', () => {
   scoring: { passingScore: 70 },
   export: { standard: "web" },
 };`,
-      );
-      const { errors } = validateProject(testRoot);
-      expect(has(errors, 'is not a valid BCP-47 tag')).toBe(true);
-      expect(has(errors, lookup)).toBe(true);
-    },
-  );
+    );
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, 'is not a supported BCP-47 tag')).toBe(true);
+    expect(has(errors, lookup)).toBe(true);
+  });
 
   it.each(['en', 'fr-CA', 'zh-Hant-TW', 'es-419', 'ca-ES-valencia'])(
     'accepts the well-formed tag %s',
