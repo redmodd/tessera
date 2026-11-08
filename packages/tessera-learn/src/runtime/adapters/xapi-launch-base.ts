@@ -588,11 +588,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Basic ${this.#authToken}`);
     headers.set('X-Experience-API-Version', X_API_VERSION);
-    return lrsFetch(
-      url,
-      { ...options, headers },
-      this.publisher?.isUnloading() ?? false,
-    );
+    return lrsFetch(url, {
+      ...options,
+      headers,
+      keepalive: this.publisher?.isUnloading() ?? false,
+    });
   }
 
   /**

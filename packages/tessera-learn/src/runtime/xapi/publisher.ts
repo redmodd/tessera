@@ -90,6 +90,22 @@ const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
 let keepaliveBytesInFlight = 0;
 const encoder = new TextEncoder();
 const byteLength = (body: string): number => encoder.encode(body).length;
+const fitsKeepalive = (bytes: number): boolean =>
+  keepaliveBytesInFlight + bytes <= KEEPALIVE_BODY_LIMIT_BYTES;
+
+/**
+ * Runs `fn` with `bytes` counted against the keepalive quota when they fit
+ * beside the keepalive requests in flight, so its sends leave them room.
+ */
+function withKeepaliveHeld(bytes: number, fn: () => void): void {
+  const held = fitsKeepalive(bytes) ? bytes : 0;
+  keepaliveBytesInFlight += held;
+  try {
+    fn();
+  } finally {
+    keepaliveBytesInFlight -= held;
+  }
+}
 
 /**
  * `fetch`, with `keepalive` when asked and the body fits in what the keepalive
@@ -100,11 +116,10 @@ const byteLength = (body: string): number => encoder.encode(body).length;
 export function lrsFetch(
   url: string,
   init: RequestInit & { body?: string },
-  keepalive: boolean,
 ): Promise<Response> {
-  if (!keepalive) return fetch(url, { ...init, keepalive: false });
+  if (!init.keepalive) return fetch(url, init);
   const bytes = byteLength(init.body ?? '');
-  if (keepaliveBytesInFlight + bytes > KEEPALIVE_BODY_LIMIT_BYTES) {
+  if (!fitsKeepalive(bytes)) {
     console.warn(
       `Tessera: a ${bytes}-byte xAPI ${init.method ?? 'GET'} does not fit in ` +
         `the 64 KiB browsers allow keepalive requests in flight ` +
@@ -117,7 +132,7 @@ export function lrsFetch(
   const release = () => {
     keepaliveBytesInFlight -= bytes;
   };
-  return fetch(url, { ...init, keepalive: true }).then(
+  return fetch(url, init).then(
     (response) => {
       // Browsers count the request until its response body ends, not at the headers.
       void response.clone().arrayBuffer().then(release, release);
@@ -516,15 +531,7 @@ export class XAPIPublisher {
     const final = this.buildStatement(partial);
     const batch = [...flushed.flatMap((e) => e.body), final];
     const body = JSON.stringify(flushed.length ? batch : final);
-    const bytes = byteLength(body);
-    const held =
-      keepaliveBytesInFlight + bytes <= KEEPALIVE_BODY_LIMIT_BYTES ? bytes : 0;
-    keepaliveBytesInFlight += held;
-    try {
-      sendFirst?.();
-    } finally {
-      keepaliveBytesInFlight -= held;
-    }
+    if (sendFirst) withKeepaliveHeld(byteLength(body), sendFirst);
     return this.#sendClosing(body).then(async (outcome) => {
       if (!flushed.length || !isClientError(outcome.status)) {
         for (const e of flushed) this.#settle(e, outcome);
@@ -664,11 +671,12 @@ export class XAPIPublisher {
   }
 
   #post(token: string, body: string, keepalive: boolean): Promise<Response> {
-    return lrsFetch(
-      this.#statementsUrl,
-      { method: 'POST', headers: this.#buildHeaders(token), body },
+    return lrsFetch(this.#statementsUrl, {
+      method: 'POST',
+      headers: this.#buildHeaders(token),
+      body,
       keepalive,
-    );
+    });
   }
 
   #fetchWithToken(

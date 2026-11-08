@@ -974,9 +974,8 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
   /**
    * Route the mock LRS. `statements` and `headers` collect what the statements
-   * endpoint receives, `statePuts` the state writes and `exitStatePuts` the
-   * exit state's among them; `stateGet` scripts the resume read (404 by
-   * default, null leaves it unanswered).
+   * endpoint receives and `statePuts` the state writes; `stateGet` scripts the
+   * resume read (404 by default, null leaves it unanswered).
    */
   async function routeLRS(
     page: Page,
@@ -985,13 +984,11 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       headers = [],
       stateGet = { status: 404, body: '{}' },
       statePuts = [],
-      exitStatePuts = [],
     }: {
       statements?: any[];
       headers?: Array<Record<string, string>>;
       stateGet?: { status: number; body: string } | null;
       statePuts?: string[];
-      exitStatePuts?: string[];
     },
   ): Promise<void> {
     await page.route('http://xapi-mock.test/**', async (route) => {
@@ -1014,11 +1011,6 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       if (url.includes('/xapi/activities/state')) {
         if (req.method() === 'PUT') {
           statePuts.push(req.postData() ?? '');
-          if (
-            new URL(url).searchParams.get('stateId') === 'tessera-state-exit'
-          ) {
-            exitStatePuts.push(req.postData() ?? '');
-          }
           await route.fulfill({ status: 204, body: '' });
           return;
         }
@@ -1078,22 +1070,25 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
     // On a second page, so the first one's Terminated cannot pass for this one's.
     const resumed = await page.context().newPage();
-    const exitStatePuts: string[] = [];
     const statements: any[] = [];
     await routeLRS(resumed, {
       stateGet: { status: 200, body: saved },
-      exitStatePuts,
       statements,
     });
     const warnings = keepaliveWarnings(resumed);
     await resumed.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(resumed);
+    const exitPut = resumed.waitForRequest(
+      (req) =>
+        req.method() === 'PUT' &&
+        new URL(req.url()).searchParams.get('stateId') === 'tessera-state-exit',
+    );
 
     await exitWithTimersPaused(resumed);
     await waitForStatement(statements, 'terminated');
-    await expect
-      .poll(() => exitStatePuts.at(-1)?.length ?? 0)
-      .toBeGreaterThan(KEEPALIVE_QUOTA - 2048);
+    expect((await exitPut).postData()?.length ?? 0).toBeGreaterThan(
+      KEEPALIVE_QUOTA - 2048,
+    );
     expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
   });
 
