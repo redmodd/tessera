@@ -428,29 +428,11 @@ describe('generateTincanXml', () => {
     expect(xml).toContain('<launch lang="fr">index.html</launch>');
   });
 
-  it.each([
-    'en_US',
-    'en-x',
-    'en-a',
-    'en-US-US',
-    'de-1',
-    'zh-cmn-Hans',
-    'abcde',
-  ])('falls back to en for the malformed language %s', (language) => {
-    const xml = generateTincanXml({ title: 'T', language } as any);
-    expect(xml).toContain('<name lang="en">T</name>');
-  });
-
-  it.each(['es-419', 'sr-Latn-RS', 'ca-ES-valencia', 'en-US-x-twain'])(
-    'keeps the well-formed language %s',
-    (language) => {
-      const xml = generateTincanXml({ title: 'T', language } as any);
-      expect(xml).toContain(`<name lang="${language}">T</name>`);
-    },
-  );
-
   it('emits a tincan.xml with a stable activity id and the title', () => {
-    const xml = generateTincanXml({ title: 'My Course' } as any);
+    const xml = generateTincanXml({
+      title: 'My Course',
+      language: 'en',
+    } as any);
     expect(xml).toContain('xmlns="http://projecttincan.com/tincan.xsd"');
     expect(xml).toMatch(
       /<activity id="urn:tessera:au:[0-9a-f]{32}" type="http:\/\/adlnet\.gov\/expapi\/activities\/course">/,
@@ -557,6 +539,7 @@ describe('runExport', () => {
       createDistDir(testRoot),
       {
         title: 'Test Course',
+        language: 'en',
         version: '1.0.0',
         completion: { mode: 'quiz' },
         scoring: { passingScore: 80 },

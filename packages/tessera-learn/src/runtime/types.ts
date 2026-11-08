@@ -46,8 +46,8 @@ export function isLanguageTag(value: unknown): value is string {
 
 /**
  * The course's language tag for `<html lang>`, the package manifests and the
- * LMS/LRS records. A missing or malformed `language` (the validator warns)
- * falls back to 'en'.
+ * LMS/LRS records. A missing or malformed `language` fails the build, but the
+ * dev server keeps serving after the error, so it falls back to 'en'.
  */
 export function courseLanguage(config: { language?: unknown }): string {
   return isLanguageTag(config.language) ? config.language : 'en';
@@ -150,8 +150,8 @@ export interface CourseConfig {
    * structure changed since it was saved; 'never' always starts fresh. */
   resume?: (typeof RESUME_POLICIES)[number];
   /** BCP-47 language tag for <html lang> (WCAG 3.1.1) and the course text in
-   * manifests and LMS/LRS records. Defaults to 'en'. */
-  language?: string;
+   * manifests and LMS/LRS records. Required: the build fails without a valid one. */
+  language: string;
   /** Accessibility checker configuration. */
   a11y?: A11yConfig;
   branding?: {

@@ -3575,56 +3575,68 @@ describe('a11y rule 1.7 — primaryColor contrast', () => {
   });
 });
 
-describe('a11y rule 1.8 — language tag', () => {
-  it('warns when language is missing', () => {
+describe('language tag', () => {
+  const lookup = 'https://r12a.github.io/app-subtags/';
+
+  it('errors when language is missing, even when a11y ignores tessera/lang', () => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
       `export default {
   title: "T",
+  a11y: { ignore: ["tessera/lang"] },
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
 };`,
     );
-    const { warnings } = validateProject(testRoot);
-    expect(has(warnings, 'tessera/lang')).toBe(true);
+    const { errors } = validateProject(testRoot);
+    expect(has(errors, '"language" is required')).toBe(true);
+    expect(has(errors, lookup)).toBe(true);
   });
 
-  it('warns on a malformed BCP-47 tag', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
+  it.each(['english', 'en_US', 'en-x', 'en-US-US', 'de-1', 'zh-cmn-Hans'])(
+    'errors on the malformed tag %s',
+    (language) => {
+      createValidProject(testRoot);
+      writeConfig(
+        testRoot,
+        `export default {
   title: "T",
-  language: "english",
+  language: "${language}",
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
 };`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(has(warnings, 'tessera/lang')).toBe(true);
-  });
+      );
+      const { errors } = validateProject(testRoot);
+      expect(has(errors, 'is not a valid BCP-47 tag')).toBe(true);
+      expect(has(errors, lookup)).toBe(true);
+    },
+  );
 
-  it('accepts a well-formed tag', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
+  it.each(['en', 'fr-CA', 'zh-Hant-TW', 'es-419', 'ca-ES-valencia'])(
+    'accepts the well-formed tag %s',
+    (language) => {
+      createValidProject(testRoot);
+      writeConfig(
+        testRoot,
+        `export default {
   title: "T",
-  language: "fr-CA",
+  language: "${language}",
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
   scoring: { passingScore: 70 },
   export: { standard: "web" },
 };`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(has(warnings, 'tessera/lang')).toBe(false);
-  });
+      );
+      const { errors, warnings } = validateProject(testRoot);
+      expect(has(errors, '"language"')).toBe(false);
+      expect(has(warnings, '"language"')).toBe(false);
+    },
+  );
 });
 
 describe('a11y config block — level and ignore', () => {
@@ -3680,10 +3692,12 @@ describe('a11y config block — level and ignore', () => {
 
   it("level: 'error' promotes a promotable warning to an error", () => {
     createValidProject(testRoot);
+    writePage(testRoot, `<h1>Title</h1><h3>Skipped</h3>`);
     writeConfig(
       testRoot,
       `export default {
   title: "T",
+  language: "en",
   a11y: { level: "error" },
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
@@ -3692,8 +3706,8 @@ describe('a11y config block — level and ignore', () => {
 };`,
     );
     const { errors, warnings } = validateProject(testRoot);
-    expect(has(errors, 'tessera/lang')).toBe(true);
-    expect(has(warnings, 'tessera/lang')).toBe(false);
+    expect(has(errors, 'tessera/heading-order')).toBe(true);
+    expect(has(warnings, 'tessera/heading-order')).toBe(false);
   });
 });
 
@@ -3705,6 +3719,7 @@ describe('resume policy validation', () => {
       `export default {
   title: "Test",
   id: "urn:uuid:test-course",
+  language: "en",
   navigation: { mode: "free" },
   completion: { mode: "percentage" },
   scoring: { passingScore: 70 },
@@ -3808,6 +3823,7 @@ describe('success block validation', () => {
       testRoot,
       `export default {
   title: "Test",
+  language: "en",
   navigation: { mode: "free" },
   completion: { mode: "manual"${extra} },
   success: ${success},
@@ -4021,6 +4037,7 @@ export const pageConfig = { title: "Quiz", quiz: { graded: true } };
       testRoot,
       `export default {
   title: "Test",
+  language: "en",
   navigation: { mode: "free" },
   completion: { mode: "percentage", percentageThreshold: 100 },
   export: { standard: "web" },

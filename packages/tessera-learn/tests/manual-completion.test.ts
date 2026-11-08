@@ -17,6 +17,7 @@ function courseConfig(
 ): string {
   return `export default {
   title: "T",
+  language: "en",
   navigation: { mode: "${navigation}" },
   completion: { ${completion} },${extra}
   export: { standard: "web" },

@@ -138,20 +138,15 @@ export function parseConfig(
     validateBranding(config.branding, projectRoot, d);
   }
 
-  // Rule 1.8: language present and well-formed (BCP-47)
+  const findTag =
+    'Use the BCP-47 tag of the course\'s language: a language, then an optional script and region, such as "en", "fr-CA" or "zh-Hant-TW". Look one up at https://r12a.github.io/app-subtags/';
   if (config.language === undefined) {
-    d.warn(
-      tag(
-        A11Y_IDS.lang,
-        `course.config.js: "language" is not set, so <html lang> and the course text in LMS/LRS records default to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
-      ),
+    d.error(
+      `course.config.js: "language" is required. It sets <html lang> and tags the course text in LMS/LRS records. ${findTag}`,
     );
   } else if (!isLanguageTag(config.language)) {
-    d.warn(
-      tag(
-        A11Y_IDS.lang,
-        `course.config.js: "language" (${formatValue(config.language)}) is not a valid BCP-47 tag, so "en" is used. Use e.g. "en", "es", or "fr-CA"`,
-      ),
+    d.error(
+      `course.config.js: "language" (${formatValue(config.language)}) is not a valid BCP-47 tag. ${findTag}`,
     );
   }
 

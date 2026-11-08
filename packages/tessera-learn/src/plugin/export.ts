@@ -11,7 +11,6 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import {
   courseIdentity,
-  courseLanguage,
   resolveSuccess,
   type CourseConfig,
 } from '../runtime/types.js';
@@ -188,7 +187,7 @@ export function generateCMI5Xml(
 ): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
-  const lang = courseLanguage(config);
+  const lang = config.language;
   // Derive stable IDs from the course id so they survive rebuilds without
   // orphaning existing learner records in the LRS.
   const courseId = stableUrn(
@@ -226,7 +225,7 @@ export function generateCMI5Xml(
 export function generateTincanXml(config: ExportConfig): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
-  const lang = courseLanguage(config);
+  const lang = config.language;
   // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
   const auId = auIdFor(config);
   // tincan.xml carries NO xAPI version — the version is set at runtime by the

@@ -17,7 +17,7 @@ import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { parseMastery } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
-import { courseLanguage, type CourseConfig } from '../types.js';
+import type { CourseConfig } from '../types.js';
 import {
   httpOrigin,
   largerSuspendDataStandards,
@@ -73,7 +73,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     super();
     this.api = api;
     this.dialect = dialect;
-    this.#lang = courseLanguage(config);
+    this.#lang = config.language;
     this.stateLimit = dialect.profile.suspendDataLimit;
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),

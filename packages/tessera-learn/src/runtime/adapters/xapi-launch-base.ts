@@ -3,7 +3,7 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import { courseLanguage, type CourseConfig, type Verdict } from '../types.js';
+import type { CourseConfig, Verdict } from '../types.js';
 import {
   optionId,
   optionText,
@@ -196,7 +196,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   constructor(config: CourseConfig) {
     super();
-    this.lang = courseLanguage(config);
+    this.lang = config.language;
   }
 
   get #terminated(): boolean {
