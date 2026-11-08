@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { XAPIPublisher } from '../src/runtime/xapi/publisher.js';
+import { XAPIPublisher, lrsFetch } from '../src/runtime/xapi/publisher.js';
 import {
   XAPIConfigError,
   XAPIStatementError,
@@ -518,6 +518,95 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     pub.markRestored();
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
+  });
+
+  const stateUrl = 'https://lrs.example.com/xapi/activities/state';
+  const keepalivePut = (kib: number) => ({
+    method: 'PUT',
+    body: 'x'.repeat(kib * 1024),
+    keepalive: true,
+  });
+
+  it('counts a keepalive request against the quota until its response body ends', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let endBody!: () => void;
+    const body = new ReadableStream({
+      start: (controller) => {
+        endBody = () => controller.close();
+      },
+    });
+    mockFetch
+      .mockResolvedValueOnce(new Response(body))
+      .mockResolvedValue(respond(204));
+
+    await lrsFetch(stateUrl, keepalivePut(40));
+    await lrsFetch(stateUrl, keepalivePut(40));
+    endBody();
+    await flush();
+    await lrsFetch(stateUrl, keepalivePut(40));
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      false,
+      true,
+    ]);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('counts the keepalive quota in UTF-8 bytes', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockResolvedValue(respond(204));
+    await lrsFetch('https://lrs.example.com/xapi/statements', {
+      method: 'POST',
+      body: 'é'.repeat(32 * 1024 + 1),
+      keepalive: true,
+    });
+    expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
+  });
+
+  it('holdClosingQuota holds nothing for a closing batch too large for keepalive', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    pub.markUnloading();
+    const final = {
+      verb: { id: 'http://verb/final' },
+      result: { response: 'x'.repeat(64 * 1024) },
+    };
+
+    pub.holdClosingQuota(final, () => void lrsFetch(stateUrl, keepalivePut(1)));
+    await pub.sendFinal(final);
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
+  it('holdClosingQuota holds nothing for a closing batch that cannot fit beside keepalive requests in flight', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const inFlight = Promise.withResolvers<Response>();
+    mockFetch
+      .mockReturnValueOnce(inFlight.promise)
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    pub.markUnloading();
+    const held = lrsFetch(stateUrl, keepalivePut(40));
+    const final = {
+      verb: { id: 'http://verb/final' },
+      result: { response: 'x'.repeat(30 * 1024) },
+    };
+
+    pub.holdClosingQuota(final, () => void lrsFetch(stateUrl, keepalivePut(1)));
+    await pub.sendFinal(final);
+    inFlight.resolve(respond(204));
+    await held;
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      true,
+      false,
+    ]);
   });
 
   it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {

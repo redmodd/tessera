@@ -80,16 +80,70 @@ interface SendOutcome {
 const QUEUE_DEPTH_WARN = 200;
 const QUEUE_DEPTH_SATURATED = 1000;
 /**
- * Browsers cap the cumulative body size of `keepalive: true` fetches at
- * 64 KiB per page. A batched statement payload above this threshold is
- * silently dropped during unload — the request never leaves the browser.
- * We log when a keepalive send would exceed the cap so the data loss is
- * at least visible. Splitting the batch isn't safe here (statements
- * within a batch are atomic from the LRS's perspective; partial sends
- * would corrupt ordering against Terminated), so the warning is the
- * useful signal.
+ * Browsers allow 64 KiB of `keepalive: true` request bodies in flight per
+ * page, counted across requests, and reject a keepalive fetch past that
+ * before it leaves the browser. Splitting a statement batch to fit isn't
+ * safe: statements in a batch are atomic from the LRS's perspective, and a
+ * partial send would corrupt ordering against Terminated.
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
+let keepaliveBytesInFlight = 0;
+const encoder = new TextEncoder();
+const byteLength = (body: string): number => encoder.encode(body).length;
+const fitsKeepalive = (bytes: number): boolean =>
+  keepaliveBytesInFlight + bytes <= KEEPALIVE_BODY_LIMIT_BYTES;
+
+/**
+ * Runs `fn` with `bytes` counted against the keepalive quota when they fit
+ * beside the keepalive requests in flight, so its sends leave them room.
+ */
+function withKeepaliveHeld(bytes: number, fn: () => void): void {
+  const held = fitsKeepalive(bytes) ? bytes : 0;
+  keepaliveBytesInFlight += held;
+  try {
+    fn();
+  } finally {
+    keepaliveBytesInFlight -= held;
+  }
+}
+
+/**
+ * `fetch`, with `keepalive` when asked and the body fits in what the keepalive
+ * requests in flight leave of the browser's quota. A body that does not fit is
+ * sent without it, so it can still land if the page stays open. The first
+ * caller gets first claim.
+ */
+export function lrsFetch(
+  url: string,
+  init: RequestInit & { body?: string },
+): Promise<Response> {
+  if (!init.keepalive) return fetch(url, init);
+  const bytes = byteLength(init.body ?? '');
+  if (!fitsKeepalive(bytes)) {
+    console.warn(
+      `Tessera: a ${bytes}-byte xAPI ${init.method ?? 'GET'} does not fit in ` +
+        `the 64 KiB browsers allow keepalive requests in flight ` +
+        `(${keepaliveBytesInFlight} bytes in flight), so it is sent without ` +
+        `keepalive and is lost if the page closes first.`,
+    );
+    return fetch(url, { ...init, keepalive: false });
+  }
+  keepaliveBytesInFlight += bytes;
+  const release = () => {
+    keepaliveBytesInFlight -= bytes;
+  };
+  return fetch(url, init).then(
+    (response) => {
+      // Browsers count the request until its response body ends, not at the headers.
+      void response.clone().arrayBuffer().then(release, release);
+      return response;
+    },
+    (err: unknown) => {
+      release();
+      throw err;
+    },
+  );
+}
 
 const isActivity = (a: unknown): a is { id: string } =>
   isRecord(a) && typeof a.id === 'string';
@@ -457,28 +511,39 @@ export class XAPIPublisher {
     return outcomePromise;
   }
 
+  /**
+   * Runs `fn` with the bytes of the closing batch `sendFinal(partial)` would
+   * send counted against the keepalive quota, when it fits beside the
+   * keepalive requests in flight, so the requests `fn` starts leave the batch
+   * its share.
+   */
+  holdClosingQuota(partial: PartialStatement, fn: () => void): void {
+    const body = this.#closingBody(this.buildStatement(partial));
+    withKeepaliveHeld(byteLength(body), fn);
+  }
+
   sendFinal(partial: PartialStatement): Promise<DestinationOutcome> {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
+    const final = this.buildStatement(partial);
+    const body = this.#closingBody(final);
     const flushed = this.#unsent;
     this.#unsent = [];
     this.#closed = true;
     for (const e of flushed) e.taken = true;
-    const final = this.buildStatement(partial);
-    const batch = [...flushed.flatMap((e) => e.body), final];
-    return this.#sendClosing(flushed.length ? batch : final).then(
-      async (outcome) => {
-        if (!flushed.length || !isClientError(outcome.status)) {
-          for (const e of flushed) this.#settle(e, outcome);
-          return this.#toDestination(outcome);
-        }
-        for (const e of flushed) {
-          this.#settle(e, await this.#sendClosing(e.body));
-        }
-        return this.#toDestination(await this.#sendClosing(final));
-      },
-    );
+    return this.#sendClosing(body).then(async (outcome) => {
+      if (!flushed.length || !isClientError(outcome.status)) {
+        for (const e of flushed) this.#settle(e, outcome);
+        return this.#toDestination(outcome);
+      }
+      for (const e of flushed) {
+        this.#settle(e, await this.#sendClosing(JSON.stringify(e.body)));
+      }
+      return this.#toDestination(
+        await this.#sendClosing(JSON.stringify(final)),
+      );
+    });
   }
 
   /**
@@ -514,7 +579,7 @@ export class XAPIPublisher {
     this.#unloading = false;
   }
 
-  /** Whether the publisher is in unloading mode (for tests). */
+  /** Whether the publisher is in unloading mode. */
   isUnloading(): boolean {
     return this.#unloading;
   }
@@ -526,26 +591,28 @@ export class XAPIPublisher {
     options?: SendStatementOptions,
   ): Promise<SendOutcome | null> {
     const taken = () => entry.taken;
-    return this.#sendRetrying(entry.body, {
+    return this.#sendRetrying(JSON.stringify(entry.body), {
       attempts: options?.retry === false ? 1 : RETRY_ATTEMPTS,
       stop: taken,
     }).then((outcome) => (taken() ? null : outcome));
   }
 
-  #sendClosing(
-    statementOrBatch: Statement | Statement[],
-  ): Promise<SendOutcome> {
-    return this.#sendRetrying(statementOrBatch, {
+  #closingBody(final: Statement): string {
+    if (!this.#unsent.length) return JSON.stringify(final);
+    return JSON.stringify([...this.#unsent.flatMap((e) => e.body), final]);
+  }
+
+  #sendClosing(body: string): Promise<SendOutcome> {
+    return this.#sendRetrying(body, {
       attempts: RETRY_ATTEMPTS,
       keepalive: true,
     });
   }
 
   #sendRetrying(
-    statementOrBatch: Statement | Statement[],
+    body: string,
     opts: { attempts: number; keepalive?: boolean; stop?: () => boolean },
   ): Promise<SendOutcome> {
-    const body = JSON.stringify(statementOrBatch);
     const stop = opts.stop ?? (() => false);
 
     const attempt = (n: number): Promise<SendOutcome> => {
@@ -553,7 +620,6 @@ export class XAPIPublisher {
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
       const keepalive = opts.keepalive || isFinal || this.#unloading;
-      if (keepalive) this.#warnOverKeepaliveCap(body, statementOrBatch);
       return this.#sendOnce(body, keepalive).then((outcome) => {
         // 4xx (other than the 401 path which #sendOnce already retried) won't
         // recover, so short-circuit.
@@ -567,20 +633,6 @@ export class XAPIPublisher {
     };
 
     return stop() ? Promise.resolve<SendOutcome>({ ok: false }) : attempt(0);
-  }
-
-  #warnOverKeepaliveCap(
-    body: string,
-    statementOrBatch: Statement | Statement[],
-  ): void {
-    if (body.length <= KEEPALIVE_BODY_LIMIT_BYTES) return;
-    const count = Array.isArray(statementOrBatch) ? statementOrBatch.length : 1;
-    console.warn(
-      `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
-        `over the 64 KiB keepalive cap. The browser may silently drop this ` +
-        `request during unload. Reduce per-statement size or split sends ` +
-        `before terminate.`,
-    );
   }
 
   #settle(entry: UnsentEntry, outcome: SendOutcome): void {
@@ -624,7 +676,7 @@ export class XAPIPublisher {
   }
 
   #post(token: string, body: string, keepalive: boolean): Promise<Response> {
-    return fetch(this.#statementsUrl, {
+    return lrsFetch(this.#statementsUrl, {
       method: 'POST',
       headers: this.#buildHeaders(token),
       body,

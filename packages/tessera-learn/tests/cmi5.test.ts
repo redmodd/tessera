@@ -1477,7 +1477,7 @@ describe('CMI5Adapter', () => {
       expect(new URL(puts[0][0]).searchParams.get('stateId')).toBe(
         'tessera-state',
       );
-      expect(puts[0][1].keepalive).toBeUndefined();
+      expect(puts[0][1].keepalive).toBe(false);
     });
 
     it('writes the exit state when the final save fails', async () => {
@@ -1494,6 +1494,74 @@ describe('CMI5Adapter', () => {
         url.includes('tessera-state-exit'),
       );
       expect(exitPut?.[1].keepalive).toBe(true);
+    });
+
+    const exitAfterFailedSave = async (notesBytes: number) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = await initAdapter();
+      await adapter.loadState();
+
+      mockFetch.mockClear();
+      const exitPut = Promise.withResolvers<Response>();
+      mockFetch
+        .mockResolvedValueOnce(respond(500))
+        .mockReturnValueOnce(exitPut.promise);
+      adapter.saveState({
+        b: 1,
+        u: { notes: 'x'.repeat(notesBytes) },
+      } as never);
+      const exiting = adapter.exit(noDeadline);
+      await flush();
+      expect(statementFor('terminated')).toBeUndefined();
+      exitPut.resolve(respond(204));
+      await exiting;
+
+      return mockFetch.mock.calls.map(([url, init]: any[]) => [
+        new URL(url).searchParams.get('stateId') ?? 'statements',
+        init.keepalive,
+      ]);
+    };
+
+    it('when the final save fails, sends the exit state with keepalive and waits for it before Terminated', async () => {
+      expect(await exitAfterFailedSave(32 * 1024)).toEqual([
+        ['tessera-state', false],
+        ['tessera-state-exit', true],
+        ['statements', true],
+      ]);
+    });
+
+    it('when the final save fails, sends an exit state too large to share the quota without keepalive, leaving it to Terminated', async () => {
+      expect(await exitAfterFailedSave(64 * 1024 - 256)).toEqual([
+        ['tessera-state', false],
+        ['tessera-state-exit', false],
+        ['statements', true],
+      ]);
+    });
+
+    it('on pagehide, sends an exit state too large to share the quota without keepalive, ahead of Terminated with it', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = await initAdapter();
+      await adapter.loadState();
+      adapter.saveState({
+        b: 1,
+        u: { notes: 'x'.repeat(64 * 1024 - 256) },
+      } as never);
+      await flush();
+
+      mockFetch.mockClear();
+      adapter.terminate();
+
+      const sent = mockFetch.mock.calls.map(([url, init]: any[]) => [
+        new URL(url).pathname.split('/').pop(),
+        init.keepalive,
+      ]);
+      expect(sent).toEqual([
+        ['state', false],
+        ['statements', true],
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('without keepalive'),
+      );
     });
 
     it('stops waiting on a stalled LRS at the deadline', async () => {

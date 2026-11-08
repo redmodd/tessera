@@ -124,6 +124,34 @@ async function expectPagehideAbortsResumeGet(
 const withAnHourSpent = (saved: string): string =>
   JSON.stringify({ ...JSON.parse(saved), d: 3600 });
 
+// Chromium allows this many bytes of keepalive request bodies in flight per page.
+const KEEPALIVE_QUOTA = 64 * 1024;
+
+/** Pagehide with the page's timers paused, so a failed send can't retry, as on a closed tab. */
+async function exitWithTimersPaused(page: Page): Promise<void> {
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1000);
+  await exitCourse(page);
+}
+
+/** The runtime's warnings about requests sent without keepalive. */
+function keepaliveWarnings(page: Page): string[] {
+  const warnings: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.text().includes('without keepalive')) warnings.push(msg.text());
+  });
+  return warnings;
+}
+
+/** Saved state that fits the keepalive quota alone, but not beside the closing statement batch. */
+const withNearKeepaliveQuota = (saved: string): string => {
+  const state = { ...JSON.parse(saved), u: { notes: '' } };
+  state.u.notes = 'x'.repeat(
+    KEEPALIVE_QUOTA - 256 - JSON.stringify(state).length,
+  );
+  return JSON.stringify(state);
+};
+
 async function expectAnHourOnVerdictAndCompletion(
   page: Page,
   statements: any[],
@@ -847,6 +875,93 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(terminated.result.duration).not.toContain('H');
   });
 
+  test('pagehide sends Terminated and the exit state when together they pass the keepalive quota', async ({
+    page,
+  }) => {
+    const documents = new Map<string, string>();
+    await installCmi5Mock(page, { documents });
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(documents.get('tessera-state') ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withNearKeepaliveQuota(documents.get('tessera-state')!);
+
+    // On a second page, so the first one's exit save cannot replace `saved`.
+    const resumed = await page.context().newPage();
+    const resumedDocuments = new Map([['tessera-state', saved]]);
+    const statements = await installCmi5Mock(resumed, {
+      documents: resumedDocuments,
+    });
+    const warnings = keepaliveWarnings(resumed);
+    await resumed.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await exitWithTimersPaused(resumed);
+    await waitForStatement(statements, 'terminated');
+    await expect
+      .poll(() => resumedDocuments.get('tessera-state-exit')?.length ?? 0)
+      .toBeGreaterThan(KEEPALIVE_QUOTA - 2048);
+    expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
+  });
+
+  test('Exit course after a failed save stores a large exit state, then sends Terminated with keepalive before returning', async ({
+    page,
+  }) => {
+    const documents = new Map<string, string>();
+    await installCmi5Mock(page, { documents });
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(documents.get('tessera-state') ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withNearKeepaliveQuota(documents.get('tessera-state')!);
+
+    const RETURN_URL = 'http://cmi5-mock.test/return';
+    const resumed = await page.context().newPage();
+    const resumedDocuments = new Map([['tessera-state', saved]]);
+    const statements = await installCmi5Mock(resumed, {
+      documents: resumedDocuments,
+      launchData: { returnURL: RETURN_URL },
+    });
+    await resumed.route(
+      (url) => url.searchParams.get('stateId') === 'tessera-state',
+      (route) =>
+        route.request().method() === 'PUT'
+          ? route.fulfill({ status: 500 })
+          : route.fallback(),
+    );
+    let exitStateBeforeTerminated = false;
+    let terminatedBeforeReturn = false;
+    resumed.on('request', (req) => {
+      if (
+        req.url().includes('/statements') &&
+        req.postData()?.includes('/terminated')
+      ) {
+        exitStateBeforeTerminated = resumedDocuments.has('tessera-state-exit');
+      }
+    });
+    await resumed.route(RETURN_URL, async (route) => {
+      terminatedBeforeReturn = !!findStatement(statements, 'terminated');
+      await route.fulfill({ contentType: 'text/html', body: '<h1>LMS</h1>' });
+    });
+    const warnings = keepaliveWarnings(resumed);
+    await resumed.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await clickExitCourse(resumed);
+    await resumed.waitForURL(RETURN_URL);
+
+    expect(resumedDocuments.get('tessera-state-exit')?.length).toBeGreaterThan(
+      KEEPALIVE_QUOTA - 2048,
+    );
+    expect(exitStateBeforeTerminated).toBe(true);
+    expect(terminatedBeforeReturn).toBe(true);
+    expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
+  });
+
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {
@@ -994,6 +1109,43 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Accordion & Carousel',
     );
+  });
+
+  test('pagehide sends Terminated when it and the exit state together pass the keepalive quota', async ({
+    page,
+  }) => {
+    const statePuts: string[] = [];
+    await routeLRS(page, { statePuts });
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withNearKeepaliveQuota(statePuts.at(-1)!);
+
+    // On a second page, so the first one's Terminated cannot pass for this one's.
+    const resumed = await page.context().newPage();
+    const statements: any[] = [];
+    await routeLRS(resumed, {
+      stateGet: { status: 200, body: saved },
+      statements,
+    });
+    const warnings = keepaliveWarnings(resumed);
+    await resumed.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+    const exitPut = resumed.waitForRequest(
+      (req) =>
+        req.method() === 'PUT' &&
+        new URL(req.url()).searchParams.get('stateId') === 'tessera-state-exit',
+    );
+
+    await exitWithTimersPaused(resumed);
+    await waitForStatement(statements, 'terminated');
+    expect((await exitPut).postData()?.length ?? 0).toBeGreaterThan(
+      KEEPALIVE_QUOTA - 2048,
+    );
+    expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
   });
 
   test('a resumed session reports the time so far on every statement, Terminated included', async ({
