@@ -333,11 +333,6 @@ export class XAPIPublisher {
     return this.#sessionId;
   }
 
-  /** Resolved http(s) endpoint URL (with trailing slash). */
-  getEndpoint(): string {
-    return this.#endpoint;
-  }
-
   /**
    * Build a fully-formed statement from a partial. Mints a UUID, fills in
    * actor / timestamp / context.registration / context.contextActivities.grouping
@@ -490,11 +485,8 @@ export class XAPIPublisher {
     const outcomePromise = new Promise<DestinationOutcome>((r) => {
       resolveOutcome = r;
     });
-    // Use raw .then chaining (not async/await) so that when the queue's
-    // previous promise resolves, the next .then's microtask runs the send
-    // path synchronously up to fetch — same timing as the original
-    // cmi5.ts queue, which a few tests rely on (e.g., Initialized must
-    // POST before mockClear() runs in the test body).
+    // Raw .then chaining (not async/await): when the previous send settles,
+    // the next one runs synchronously up to fetch in the same microtask.
     const entry: UnsentEntry = {
       body: statementOrBatch,
       settle: resolveOutcome,
@@ -659,7 +651,7 @@ export class XAPIPublisher {
       return this.#fetchWithToken(this.#cachedAuth, body, keepalive);
     }
     // Cold path: need to resolve the auth resolver.
-    return this.#resolveAuth(false)
+    return this.#resolveAuth()
       .then((token) => this.#fetchWithToken(token, body, keepalive))
       .catch((err) => ({
         ok: false,
@@ -713,7 +705,7 @@ export class XAPIPublisher {
       !this.#unloading
     ) {
       this.#cachedAuth = null;
-      return this.#resolveAuth(true)
+      return this.#resolveAuth()
         .then((newToken) => this.#post(newToken, body, keepalive))
         .then((retryResp): SendOutcome => {
           if (retryResp.ok || retryResp.status === 409) {
@@ -760,21 +752,8 @@ export class XAPIPublisher {
     );
   }
 
-  #resolveAuth(forceRefresh: boolean): Promise<string> {
-    if (!forceRefresh && this.#cachedAuth !== null) {
-      return Promise.resolve(this.#cachedAuth);
-    }
-    if (typeof this.#authValue === 'string') {
-      // Static auth: an empty string means unauthenticated; otherwise
-      // revalidate.
-      if (this.#authValue.length > 0) {
-        const err = validateAuthCredential(this.#authValue);
-        if (err)
-          return Promise.reject(new XAPIConfigError(`xapi.auth: ${err}`));
-      }
-      this.#cachedAuth = this.#authValue;
-      return Promise.resolve(this.#cachedAuth);
-    }
+  /** Only reached with function-form auth; the constructor caches static auth. */
+  #resolveAuth(): Promise<string> {
     return Promise.resolve()
       .then(() => (this.#authValue as () => string | Promise<string>)())
       .then((resolved) => {

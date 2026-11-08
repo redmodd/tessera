@@ -100,6 +100,12 @@ describe('callSyncOrWarn', () => {
 });
 
 describe('WriteQueue', () => {
+  function expectEmpty(queue: WriteQueue, calls: unknown[]): void {
+    const before = [...calls];
+    queue.drainSync();
+    expect(calls).toEqual(before);
+  }
+
   it('flushes operations sequentially', async () => {
     const order: number[] = [];
     const queue = new WriteQueue();
@@ -119,7 +125,7 @@ describe('WriteQueue', () => {
 
     await flush();
     expect(order).toEqual([1, 2, 3]);
-    expect(queue.pending).toBe(0);
+    expectEmpty(queue, order);
   });
 
   it.each(['351', 351])(
@@ -150,7 +156,7 @@ describe('WriteQueue', () => {
       await flush();
 
       expect(calls).toEqual(['a', 'b', 'c']);
-      expect(queue.pending).toBe(0);
+      expectEmpty(queue, calls);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('[cmi.interactions.1.id] (LMS error 351'),
       );
@@ -185,7 +191,6 @@ describe('WriteQueue', () => {
       await vi.runAllTimersAsync();
 
       expect(calls).toEqual(['b', 'b', 'b']);
-      expect(queue.pending).toBe(2);
 
       failing = false;
       calls.length = 0;
@@ -197,7 +202,7 @@ describe('WriteQueue', () => {
       await vi.runAllTimersAsync();
 
       expect(calls).toEqual(['b', 'c', 'd']);
-      expect(queue.pending).toBe(0);
+      expectEmpty(queue, calls);
     },
   );
 
@@ -219,7 +224,7 @@ describe('WriteQueue', () => {
     queue.drainSync();
 
     expect(calls).toEqual([1, 2]);
-    expect(queue.pending).toBe(0);
+    expectEmpty(queue, calls);
   });
 
   it('drainSync continues past failures', () => {
@@ -240,7 +245,7 @@ describe('WriteQueue', () => {
     // 'a' is retried by drainSync (it was caught mid-backoff, which won't
     // fire during unload — so we re-run it sync). Then 'b' runs.
     expect(calls).toEqual(['a', 'a', 'b']);
-    expect(queue.pending).toBe(0);
+    expectEmpty(queue, calls);
   });
 
   it('drainSync warns with the LMS error for each write that fails at unload', () => {
@@ -281,6 +286,6 @@ describe('WriteQueue', () => {
     // drainSync sees the entry is in-flight (mid-backoff) and retries it
     // synchronously. This time it succeeds.
     expect(calls).toEqual(['a', 'a']);
-    expect(queue.pending).toBe(0);
+    expectEmpty(queue, calls);
   });
 });

@@ -50,7 +50,7 @@ export interface PageConfig {
   completesOn?: 'view';
 }
 
-export interface ManifestLesson {
+interface ManifestLesson {
   title: string;
   slug: string;
   pages: ManifestPage[];
@@ -269,7 +269,7 @@ export function listedGradedQuestions(
 }
 
 /** Result of parsing a `.svelte` source for its `pageConfig` module-script export. */
-export type PageConfigParseResult =
+type PageConfigParseResult =
   /** No module script, or no `pageConfig =` export. Treat as "no config". */
   | { kind: 'none' }
   /** Found and successfully parsed. */
@@ -352,14 +352,14 @@ export interface WalkedLesson {
   files: string[];
 }
 
-export interface WalkedSection {
+interface WalkedSection {
   name: string;
   dir: string;
   metaPath: string;
   lessons: WalkedLesson[];
 }
 
-export interface WalkedCourse {
+interface WalkedCourse {
   sections: WalkedSection[];
   /** `.svelte` files in `pages/` itself, outside the section/lesson structure. */
   strayFiles: string[];

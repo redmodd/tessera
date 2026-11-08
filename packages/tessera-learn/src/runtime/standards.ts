@@ -101,7 +101,6 @@ type StandardsWhere<F extends keyof StandardProfile> = {
 
 export type LMSStandard = StandardsWhere<'packaged'>;
 export type LaunchLRSStandard = StandardsWhere<'hasLaunchLRS'>;
-export type ActorDerivingStandard = StandardsWhere<'derivesLearnerActor'>;
 
 /** `undefined` for anything outside the table, so callers withhold standard-specific output. */
 export function standardProfile(

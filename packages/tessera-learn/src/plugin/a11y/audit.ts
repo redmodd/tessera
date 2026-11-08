@@ -1,4 +1,4 @@
-import { spawn, type SpawnOptions } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -24,7 +24,7 @@ export type ImpactLevel = (typeof IMPACT_LEVELS)[number];
 // skips export packaging, and stubs xAPI while it's set. See plugin/index.ts.
 export const AUDIT_ENV_FLAG = 'TESSERA_A11Y_AUDIT';
 
-export interface AxeNodeDetail {
+interface AxeNodeDetail {
   target: string;
   html: string;
   summary: string;
@@ -134,16 +134,6 @@ function reportManualInstall(lead: string): void {
   );
 }
 
-type SpawnFn = (
-  command: string,
-  args: string[],
-  options: SpawnOptions,
-) => {
-  on(event: 'error', listener: (err: Error) => void): unknown;
-  on(event: 'exit', listener: (code: number | null) => void): unknown;
-  kill?(signal?: NodeJS.Signals): unknown;
-};
-
 function resolvePlaywrightBin():
   { command: string; args: string[] } | undefined {
   const require = createRequire(import.meta.url);
@@ -171,11 +161,7 @@ const INSTALL_TIMEOUT_MS = 10 * 60_000;
 
 // Run the workspace's own `playwright` bin with the current Node binary so the
 // install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
-export async function installChromium(
-  workspaceRoot: string,
-  spawnFn: SpawnFn = spawn,
-  timeoutMs: number = INSTALL_TIMEOUT_MS,
-): Promise<boolean> {
+export async function installChromium(workspaceRoot: string): Promise<boolean> {
   const bin = resolvePlaywrightBin();
   if (!bin) {
     console.error(
@@ -185,7 +171,7 @@ export async function installChromium(
   }
 
   return new Promise<boolean>((resolvePromise) => {
-    const child = spawnFn(bin.command, bin.args, {
+    const child = spawn(bin.command, bin.args, {
       stdio: 'inherit',
       cwd: workspaceRoot,
     });
@@ -199,13 +185,13 @@ export async function installChromium(
     const timer = setTimeout(() => {
       console.error(
         `\x1b[31m[tessera a11y]\x1b[0m Chromium install timed out after ${Math.round(
-          timeoutMs / 60_000,
+          INSTALL_TIMEOUT_MS / 60_000,
         )} min; aborting.`,
       );
-      child.kill?.('SIGKILL');
+      child.kill('SIGKILL');
       finish(false);
-    }, timeoutMs);
-    timer.unref?.();
+    }, INSTALL_TIMEOUT_MS);
+    timer.unref();
     child.on('error', (err) => {
       console.error(
         `\x1b[31m[tessera a11y]\x1b[0m Failed to start the Chromium install: ${err.message}`,
@@ -448,38 +434,22 @@ export async function runAudit(
       };
 
       const totalPages = manifest.pages.length;
-      const hasAuditHook = await page.evaluate(
-        () => typeof window.__tesseraAudit?.goToIndex === 'function',
-      );
-
-      if (!hasAuditHook) {
-        // No navigation hook — audit the entry only, but flag the reduced scope
-        // rather than passing it off as full coverage.
-        if (totalPages > 1) {
-          console.warn(
-            `\x1b[33m[tessera a11y]\x1b[0m Could not enumerate pages; auditing the entry page only ` +
-              `(1 of ${totalPages}). The report records the reduced scope.`,
-          );
-        }
-        pages.push(await recordPage(0, manifest.pages[0]?.title ?? '(entry)'));
-      } else {
-        for (let i = 0; i < totalPages; i++) {
-          await page.evaluate(
-            (idx: number) => window.__tesseraAudit!.goToIndex(idx),
-            i,
-          );
-          await page.waitForFunction(
-            (idx: number) =>
-              document.getElementById('tessera-app')?.dataset
-                .tesseraPageIndex === String(idx),
-            i,
-            { timeout: 20_000 },
-          );
-          await page.waitForLoadState('networkidle');
-          pages.push(
-            await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
-          );
-        }
+      for (let i = 0; i < totalPages; i++) {
+        await page.evaluate(
+          (idx: number) => window.__tesseraAudit!.goToIndex(idx),
+          i,
+        );
+        await page.waitForFunction(
+          (idx: number) =>
+            document.getElementById('tessera-app')?.dataset.tesseraPageIndex ===
+            String(idx),
+          i,
+          { timeout: 20_000 },
+        );
+        await page.waitForLoadState('networkidle');
+        pages.push(
+          await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
+        );
       }
     } finally {
       await browser.close();
@@ -566,11 +536,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
     }
   }
   console.log(`\n[tessera a11y] Report written to ${reportPath}`);
-  if (report.pagesAudited < report.totalPages) {
-    console.log(
-      `\x1b[33m[tessera a11y] Covered ${report.pagesAudited} of ${report.totalPages} page(s)\x1b[0m — reduced scope, the rest were not audited.`,
-    );
-  } else if (report.pagesFailedToLoad > 0) {
+  if (report.pagesFailedToLoad > 0) {
     const scanned = report.pagesAudited - report.pagesFailedToLoad;
     console.log(
       `[tessera a11y] Reached all ${report.totalPages} page(s); scanned ${scanned}, ${report.pagesFailedToLoad} failed to load.`,

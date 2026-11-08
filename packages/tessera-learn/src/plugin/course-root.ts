@@ -52,14 +52,6 @@ function scanCourses(workspaceRoot: string): {
   return { courses: courses.sort(), malformed: malformed.sort() };
 }
 
-export function listCourses(workspaceRoot: string): string[] {
-  return scanCourses(workspaceRoot).courses;
-}
-
-export function listMalformedCourses(workspaceRoot: string): string[] {
-  return scanCourses(workspaceRoot).malformed;
-}
-
 const NOT_A_WORKSPACE =
   'Not inside a Tessera workspace — no `courses/` directory was found at or above the current directory.';
 

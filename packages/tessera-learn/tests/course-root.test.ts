@@ -5,8 +5,6 @@ import { tmpdir } from 'node:os';
 import {
   resolveCourse,
   findWorkspaceRoot,
-  listCourses,
-  listMalformedCourses,
   type ResolveResult,
 } from '../src/plugin/course-root.js';
 import { makeWorkspace } from './helpers.js';
@@ -36,31 +34,29 @@ describe('findWorkspaceRoot', () => {
   });
 });
 
-describe('listCourses', () => {
-  it('returns sorted course names that contain a course.config.js', () => {
-    expect(listCourses(ws)).toEqual(['advanced', 'getting-started']);
+describe('the course list hint', () => {
+  it('lists sorted course names that contain a course.config.js', () => {
+    expect(errorOf(resolveCourse(ws))).toContain(
+      'Available courses:\n  advanced\n  getting-started\n',
+    );
   });
 
-  it('ignores directories without a course.config.js', () => {
-    mkdirSync(join(ws, 'courses', 'not-a-course'), { recursive: true });
-    expect(listCourses(ws)).toEqual(['advanced', 'getting-started']);
-  });
-});
-
-describe('listMalformedCourses', () => {
-  it('flags a directory that has pages/ but no course.config.js', () => {
-    mkdirSync(join(ws, 'courses', 'half-built', 'pages'), { recursive: true });
-    expect(listMalformedCourses(ws)).toEqual(['half-built']);
-  });
-
-  it('does not flag legitimate non-course directories', () => {
+  it('ignores directories without a course.config.js or pages/', () => {
     mkdirSync(join(ws, 'courses', 'shared-assets'), { recursive: true });
     writeFileSync(join(ws, 'courses', 'README.md'), '# courses');
-    expect(listMalformedCourses(ws)).toEqual([]);
+    const error = errorOf(resolveCourse(ws));
+    expect(error).not.toContain('shared-assets');
+    expect(error).not.toContain('README');
+    expect(error).not.toContain('Skipped');
   });
 
-  it('does not flag valid courses', () => {
-    expect(listMalformedCourses(ws)).toEqual([]);
+  it('flags a directory that has pages/ but no course.config.js', () => {
+    mkdirSync(join(ws, 'courses', 'half-built', 'pages'), { recursive: true });
+    const error = errorOf(resolveCourse(ws));
+    expect(error).toContain(
+      'Skipped (missing course.config.js):\n  courses/half-built',
+    );
+    expect(error).not.toContain('  half-built\n');
   });
 });
 

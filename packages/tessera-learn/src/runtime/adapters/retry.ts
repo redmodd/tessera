@@ -284,8 +284,4 @@ export class WriteQueue {
       callSyncOrWarn(entry.fn, entry.context, this.errorReporter);
     }
   }
-
-  get pending(): number {
-    return this.#queue.length;
-  }
 }

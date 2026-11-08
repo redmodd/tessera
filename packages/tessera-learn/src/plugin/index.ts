@@ -323,8 +323,10 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     },
     success,
     scoring: {
-      passingScore: unjudgedManual ? 0 : DEFAULT_PASSING_SCORE,
       ...userConfig.scoring,
+      passingScore:
+        userConfig.scoring?.passingScore ??
+        (unjudgedManual ? 0 : DEFAULT_PASSING_SCORE),
     },
     export: {
       ...userConfig.export,

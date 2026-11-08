@@ -38,7 +38,7 @@ const BRANCH_KEYS: Record<string, ReadonlySet<string>> = {
   AwaitBlock: new Set(['pending', 'then', 'catch']),
 };
 
-export type NamedObjectLiteral =
+type NamedObjectLiteral =
   { kind: 'none' } | { kind: 'invalid' } | { kind: 'literal'; text: string };
 
 interface Node {
@@ -241,7 +241,7 @@ function locallyImportedNames(root: Node): Set<string> {
   );
 }
 
-export interface ScriptImport {
+interface ScriptImport {
   from: string;
   locals: string[];
 }
@@ -416,7 +416,7 @@ export function defaultExportFunctions(jsSource: string): {
 /** Keys of each `xapi` export entry: `'unknown'` where not statically readable. */
 export type RuntimeXAPIHooks = Map<string, ReadonlySet<string> | 'unknown'>;
 
-export interface CourseRuntimeExports {
+interface CourseRuntimeExports {
   xapi: RuntimeXAPIHooks | 'none' | 'unknown';
   hasDefaultExport: boolean;
 }

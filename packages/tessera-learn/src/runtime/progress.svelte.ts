@@ -18,7 +18,6 @@ import {
   type SavedState,
   type SuccessStatus,
 } from './persistence.js';
-import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
 type SavedProgress = Pick<SavedState, 'v' | 'g' | 'c' | 'm' | 's' | 'k' | 'p'>;
 
@@ -239,15 +238,15 @@ export class ProgressState {
     this.#success = resolveSuccess(config);
   }
 
-  visitedPages = $state(new SvelteSet<number>());
+  readonly visitedPages = new SvelteSet<number>();
 
   /**
    * Chunk progress — for pages that reveal content in stages (Continue buttons).
    * Maps pageIndex → highest revealed chunk index (0-based).
    */
-  chunkProgress = $state(new SvelteMap<number, number>());
+  readonly chunkProgress = new SvelteMap<number, number>();
 
-  gradedUnits = $state(new SvelteMap<number, GradedUnit>());
+  readonly gradedUnits = new SvelteMap<number, GradedUnit>();
 
   // Latch for manual completion. Monotonic; only flips forward.
   #manuallyCompleted = $state(false);
@@ -812,9 +811,8 @@ export class ProgressState {
     const mode = this.#config.completion.mode;
     if (mode === 'manual') return 'incomplete';
     if (mode === 'percentage') {
-      const threshold =
-        this.#config.completion.percentageThreshold ??
-        DEFAULT_PERCENTAGE_THRESHOLD;
+      // mergeCourseConfig always sets it in percentage mode.
+      const threshold = this.#config.completion.percentageThreshold!;
       const percent =
         this.#totalPages > 0
           ? (this.completedPages / this.#totalPages) * 100

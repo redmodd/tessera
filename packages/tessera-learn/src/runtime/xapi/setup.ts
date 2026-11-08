@@ -122,9 +122,10 @@ function resolveDestination(
  * `course.runtime.js` resolvers keyed by destination id. Returns null
  * when xapi is unset, or when no destinations could be resolved.
  *
- * The returned client must have `init()` awaited before being registered
- * so author code calling `useXAPI()` sees a fully initialized client
- * (in particular, `getActor()` is safe to call sync).
+ * Each destination is initialized before it joins the client, so author code
+ * calling `useXAPI()` sees a fully initialized client (in particular,
+ * `getActor()` is safe to call sync). A destination that fails to initialize
+ * is skipped.
  */
 export async function buildXAPIClient(
   config: CourseConfig,

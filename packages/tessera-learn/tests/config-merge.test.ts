@@ -78,6 +78,18 @@ describe('mergeCourseConfig', () => {
     expect(merged.scoring.passingScore).toBe(70);
   });
 
+  it('defaults a passingScore set to undefined', () => {
+    const merged = mergeCourseConfig({
+      scoring: { passingScore: undefined as unknown as number },
+    });
+    expect(merged.scoring.passingScore).toBe(70);
+  });
+
+  it('keeps an author-supplied passingScore of 0', () => {
+    const merged = mergeCourseConfig({ scoring: { passingScore: 0 } });
+    expect(merged.scoring.passingScore).toBe(0);
+  });
+
   it('defaults resume to "auto" when absent', () => {
     expect(mergeCourseConfig({}).resume).toBe('auto');
   });
