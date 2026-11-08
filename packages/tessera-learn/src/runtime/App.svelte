@@ -13,7 +13,6 @@
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
-  import { DEFAULT_PASSING_SCORE } from './defaults.js';
   import { applyBranding } from './branding.js';
   import { CourseSession } from './course-session.svelte.js';
   import { createAdapter } from 'virtual:tessera-adapter';
@@ -32,9 +31,9 @@
   // ---- State classes ----
   // The Tier-2 auditor appends ?__tessera_audit to unlock navigation so it can
   // scan every page, including ones gated behind a quiz.
-  const auditMode =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).has('__tessera_audit');
+  const auditMode = new URLSearchParams(window.location.search).has(
+    '__tessera_audit',
+  );
   const progress = new ProgressState(manifest, config);
   const nav = new NavigationState(manifest, progress, config, {
     auditMode,
@@ -61,14 +60,10 @@
     courseUnmounted: new Promise((r) => (unmountCourse = r)),
   });
 
-  const onIdle =
-    typeof window !== 'undefined' && window.requestIdleCallback
-      ? window.requestIdleCallback.bind(window)
-      : (cb) =>
-          setTimeout(
-            () => cb({ didTimeout: false, timeRemaining: () => 50 }),
-            1,
-          );
+  const onIdle = window.requestIdleCallback
+    ? window.requestIdleCallback.bind(window)
+    : (cb) =>
+        setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1);
 
   // Page loading state
   let PageComponent = $state(null);
@@ -79,12 +74,12 @@
   // requested navigation to settle before scanning.
   let renderedPageIndex = $state(-1);
 
-  // ---- Page context (reactive, read by Quiz in Step 8) ----
+  // ---- Page context (reactive, read by Quiz) ----
   let pageContext = $state({
     quiz: null,
     quizState: null,
     get passingScore() {
-      return config.scoring?.passingScore ?? DEFAULT_PASSING_SCORE;
+      return config.scoring.passingScore;
     },
     get index() {
       return renderedPageIndex < 0 ? undefined : renderedPageIndex;
@@ -107,11 +102,7 @@
   });
 
   // ---- Adapter context (read by useQuestion / useQuiz) ----
-  setAdapterContext({
-    get adapter() {
-      return adapter;
-    },
-  });
+  setAdapterContext({ adapter });
 
   // ---- User-scoped state (read/written by usePersistence) ----
   setUserStateStore(session.userStateStore);

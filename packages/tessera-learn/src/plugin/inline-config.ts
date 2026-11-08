@@ -30,7 +30,7 @@ export function buildInlineConfig(
 // Optional author-owned escape hatch, never scaffolded or reconciled. A *partial*
 // Vite config the caller merges on top of buildInlineConfig(), so tesseraPlugin()
 // stays wired in and the author only writes the delta.
-export async function loadUserConfig(
+async function loadUserConfig(
   projectRoot: string,
   env: ConfigEnv,
 ): Promise<InlineConfig | null> {

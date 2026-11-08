@@ -9,6 +9,13 @@ import {
   mapNodeDetail,
   mapViolation,
 } from '../src/plugin/a11y/audit.js';
+import { useFakeTimers } from './helpers.js';
+
+const spawn = vi.hoisted(() => vi.fn());
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()),
+  spawn,
+}));
 
 describe('axeTags', () => {
   it('maps each standard to its cumulative tag list', () => {
@@ -270,65 +277,62 @@ describe('launchWithInstall', () => {
   });
 });
 
-function fakeSpawn(behavior: 'exit0' | 'exit1' | 'error') {
-  const calls: { command: string; args: string[] }[] = [];
-  const fn = (command: string, args: string[]) => {
-    calls.push({ command, args });
-    return {
-      on(event: string, listener: (arg: any) => void) {
-        if (event === 'exit' && behavior !== 'error') {
-          listener(behavior === 'exit0' ? 0 : 1);
-        }
-        if (event === 'error' && behavior === 'error') {
-          listener(new Error('spawn ENOENT'));
-        }
-        return this;
-      },
-    };
+function fakeChild(behavior: 'exit0' | 'exit1' | 'error' | 'hang') {
+  const child = {
+    killed: false,
+    on(event: string, listener: (arg: any) => void) {
+      if (event === 'exit' && (behavior === 'exit0' || behavior === 'exit1')) {
+        listener(behavior === 'exit0' ? 0 : 1);
+      }
+      if (event === 'error' && behavior === 'error') {
+        listener(new Error('spawn ENOENT'));
+      }
+      return this;
+    },
+    kill() {
+      child.killed = true;
+      return true;
+    },
   };
-  return { fn, calls };
+  spawn.mockReturnValueOnce(child);
+  return child;
 }
 
 describe('installChromium', () => {
   it('runs the resolved playwright bin with the current Node binary', async () => {
-    const spawn = fakeSpawn('exit0');
-    const ok = await installChromium('/workspace', spawn.fn);
+    fakeChild('exit0');
+    const ok = await installChromium('/workspace');
 
     expect(ok).toBe(true);
-    expect(spawn.calls[0].command).toBe(process.execPath);
-    expect(spawn.calls[0].args[0]).toMatch(/cli\.js$/);
-    expect(spawn.calls[0].args.slice(1)).toEqual(['install', 'chromium']);
+    const [command, args, options] = spawn.mock.lastCall!;
+    expect(command).toBe(process.execPath);
+    expect(args[0]).toMatch(/cli\.js$/);
+    expect(args.slice(1)).toEqual(['install', 'chromium']);
+    expect(options.cwd).toBe('/workspace');
   });
 
   it('returns false on a non-zero exit', async () => {
-    const ok = await installChromium('/workspace', fakeSpawn('exit1').fn);
-    expect(ok).toBe(false);
+    fakeChild('exit1');
+    expect(await installChromium('/workspace')).toBe(false);
   });
 
   it('logs a breadcrumb and returns false on a spawn error', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const ok = await installChromium('/workspace', fakeSpawn('error').fn);
+    fakeChild('error');
 
-    expect(ok).toBe(false);
+    expect(await installChromium('/workspace')).toBe(false);
     expect(error.mock.calls[0][0]).toContain('spawn ENOENT');
   });
 
   it('kills the child and returns false when the install times out', async () => {
-    let killed = false;
-    const hangingSpawn = (() => ({
-      on() {
-        return this;
-      },
-      kill() {
-        killed = true;
-        return true;
-      },
-    })) as unknown as Parameters<typeof installChromium>[1];
+    useFakeTimers();
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    const child = fakeChild('hang');
 
-    const ok = await installChromium('/workspace', hangingSpawn, 5);
+    const result = installChromium('/workspace');
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
 
-    expect(ok).toBe(false);
-    expect(killed).toBe(true);
+    expect(await result).toBe(false);
+    expect(child.killed).toBe(true);
   });
 });

@@ -320,8 +320,8 @@ function isJson5(text: string | null): boolean {
 // Permissive approximation of the browser's accepted color set: hex 3/4/6/8,
 // any CSS functional notation (rgb/hsl/hwb/lab/lch/oklab/oklch/color), or a
 // bare keyword (named colors, transparent, currentColor). parseColor's real
-// check (App.svelte) is browser-only and the runtime degrades gracefully, so
-// an unrecognized value is advisory, never an error — lean permissive to avoid
+// check (runtime/branding.ts) is browser-only and the runtime degrades gracefully, so
+// an unrecognized value is advisory, never an error. Lean permissive to avoid
 // rejecting values the browser would accept.
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const FUNC_COLOR_RE =

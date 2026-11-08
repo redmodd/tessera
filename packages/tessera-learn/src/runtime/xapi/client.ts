@@ -89,11 +89,6 @@ export class XAPIClient {
     return this.#publishers[0].getSessionId();
   }
 
-  /** Returns the underlying publishers — mostly useful for tests. */
-  getPublishers(): readonly XAPIPublisher[] {
-    return this.#publishers;
-  }
-
   /**
    * Propagate "page is unloading" to every publisher so independent
    * (explicit-endpoint) destinations send with `keepalive` during the close

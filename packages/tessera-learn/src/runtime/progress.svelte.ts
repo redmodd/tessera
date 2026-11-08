@@ -239,15 +239,15 @@ export class ProgressState {
     this.#success = resolveSuccess(config);
   }
 
-  visitedPages = $state(new SvelteSet<number>());
+  readonly visitedPages = new SvelteSet<number>();
 
   /**
    * Chunk progress — for pages that reveal content in stages (Continue buttons).
    * Maps pageIndex → highest revealed chunk index (0-based).
    */
-  chunkProgress = $state(new SvelteMap<number, number>());
+  readonly chunkProgress = new SvelteMap<number, number>();
 
-  gradedUnits = $state(new SvelteMap<number, GradedUnit>());
+  readonly gradedUnits = new SvelteMap<number, GradedUnit>();
 
   // Latch for manual completion. Monotonic; only flips forward.
   #manuallyCompleted = $state(false);

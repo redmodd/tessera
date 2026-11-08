@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { virtualModule } from './virtual-module.js';
 import type { BuildContext } from './build-context.js';
 
-export interface OverridePluginOptions {
+interface OverridePluginOptions {
   name: string;
   virtualId: string;
   projectFile: string;
