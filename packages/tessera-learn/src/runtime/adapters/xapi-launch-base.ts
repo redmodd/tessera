@@ -15,7 +15,11 @@ import { STANDARDS, httpOrigin, type LaunchLRSStandard } from '../standards.js';
 import { formatISO8601Duration, toScaled } from './format.js';
 import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
-import { XAPIPublisher, type XAPIPublisherOptions } from '../xapi/publisher.js';
+import {
+  XAPIPublisher,
+  keepaliveFetch,
+  type XAPIPublisherOptions,
+} from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
 import {
   validateAgent,
@@ -469,10 +473,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.commit();
     this.#termination.abort();
     if (!this.publisher) return;
-    if (unloading) {
-      this.publisher.markUnloading();
-      if (this.state) void this.#putState(this.state, EXIT_STATE_ID);
-    }
+    if (unloading) this.publisher.markUnloading();
     this.#finalSend = this.#report(
       'Terminated',
       this.publisher.sendFinal({
@@ -481,6 +482,9 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         context: this.buildContext(),
       }),
     );
+    // After the closing batch, so the statements get first claim on the
+    // keepalive quota; the running state already holds a recent bookmark.
+    if (unloading && this.state) void this.#putState(this.state, EXIT_STATE_ID);
   }
 
   override async exit(deadline: Promise<unknown>): Promise<void> {
@@ -573,17 +577,15 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   protected async xapiFetch(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit & { body?: string } = {},
   ): Promise<Response> {
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Basic ${this.#authToken}`);
     headers.set('X-Experience-API-Version', X_API_VERSION);
-    const keepalive = this.publisher?.isUnloading() ?? false;
-    return fetch(url, {
-      ...options,
-      headers,
-      ...(keepalive ? { keepalive: true } : {}),
-    });
+    const init = { ...options, headers };
+    return this.publisher?.isUnloading()
+      ? keepaliveFetch(url, init)
+      : fetch(url, init);
   }
 
   /**

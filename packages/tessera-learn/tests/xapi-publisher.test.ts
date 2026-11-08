@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { XAPIPublisher } from '../src/runtime/xapi/publisher.js';
+import {
+  XAPIPublisher,
+  keepaliveFetch,
+} from '../src/runtime/xapi/publisher.js';
 import {
   XAPIConfigError,
   XAPIStatementError,
@@ -517,6 +520,39 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     pub.markUnloading();
     pub.markRestored();
     await pub.sendStatement({ verb: { id: 'http://verb/x' } });
+    expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
+  });
+
+  it('sends a body past what in-flight keepalive requests leave of 64 KiB without keepalive', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const first = Promise.withResolvers<Response>();
+    mockFetch
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue(respond(204));
+    const put = { method: 'PUT', body: 'x'.repeat(40 * 1024) };
+    const url = 'https://lrs.example.com/xapi/activities/state';
+
+    const held = keepaliveFetch(url, put);
+    await keepaliveFetch(url, put);
+    first.resolve(respond(204));
+    await held;
+    await keepaliveFetch(url, put);
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      false,
+      true,
+    ]);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('counts the keepalive quota in UTF-8 bytes', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockResolvedValue(respond(204));
+    await keepaliveFetch('https://lrs.example.com/xapi/statements', {
+      method: 'POST',
+      body: 'é'.repeat(32 * 1024 + 1),
+    });
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
   });
 

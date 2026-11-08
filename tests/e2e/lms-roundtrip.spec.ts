@@ -124,6 +124,25 @@ async function expectPagehideAbortsResumeGet(
 const withAnHourSpent = (saved: string): string =>
   JSON.stringify({ ...JSON.parse(saved), d: 3600 });
 
+// Chromium allows this many bytes of keepalive request bodies in flight per page.
+const KEEPALIVE_QUOTA = 64 * 1024;
+
+/** Saved state that fits the keepalive quota alone, but not beside the closing statement batch. */
+/** Pagehide with the page's timers paused, so a failed send can't retry, as on a closed tab. */
+async function exitWithTimersPaused(page: Page): Promise<void> {
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1000);
+  await exitCourse(page);
+}
+
+const withNearKeepaliveQuota = (saved: string): string => {
+  const state = { ...JSON.parse(saved), u: { notes: '' } };
+  state.u.notes = 'x'.repeat(
+    KEEPALIVE_QUOTA - 256 - JSON.stringify(state).length,
+  );
+  return JSON.stringify(state);
+};
+
 async function expectAnHourOnVerdictAndCompletion(
   page: Page,
   statements: any[],
@@ -847,6 +866,35 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(terminated.result.duration).not.toContain('H');
   });
 
+  test('pagehide sends Terminated and the exit state when together they pass the keepalive quota', async ({
+    page,
+  }) => {
+    const documents = new Map<string, string>();
+    await installCmi5Mock(page, { documents });
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(documents.get('tessera-state') ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withNearKeepaliveQuota(documents.get('tessera-state')!);
+
+    // On a second page, so the first one's exit save cannot replace `saved`.
+    const resumed = await page.context().newPage();
+    const resumedDocuments = new Map([['tessera-state', saved]]);
+    const statements = await installCmi5Mock(resumed, {
+      documents: resumedDocuments,
+    });
+    await resumed.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await exitWithTimersPaused(resumed);
+    await waitForStatement(statements, 'terminated');
+    await expect
+      .poll(() => resumedDocuments.get('tessera-state-exit')?.length ?? 0)
+      .toBeGreaterThan(KEEPALIVE_QUOTA - 2048);
+  });
+
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {
@@ -994,6 +1042,30 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await expect(page.locator('.tessera-content h1')).toContainText(
       'Accordion & Carousel',
     );
+  });
+
+  test('pagehide sends Terminated when it and the exit state together pass the keepalive quota', async ({
+    page,
+  }) => {
+    const stateGet = { status: 404, body: '{}' };
+    const statePuts: string[] = [];
+    const statements: any[] = [];
+    await routeLRS(page, { stateGet, statePuts, statements });
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
+      .toBeGreaterThan(0);
+    stateGet.status = 200;
+    stateGet.body = withNearKeepaliveQuota(statePuts.at(-1)!);
+
+    await page.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(page);
+    statements.length = 0;
+
+    await exitWithTimersPaused(page);
+    await waitForStatement(statements, 'terminated');
   });
 
   test('a resumed session reports the time so far on every statement, Terminated included', async ({

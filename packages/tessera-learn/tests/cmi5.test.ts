@@ -887,7 +887,7 @@ describe('CMI5Adapter', () => {
     expect(statementRequests(mockFetch)).toHaveLength(1);
   });
 
-  it('terminate starts the state write and a queued-then-Terminated batch before returning', async () => {
+  it('terminate starts a queued-then-Terminated batch and then the state write before returning', async () => {
     const adapter = await initAdapter();
     await adapter.loadState();
     await flush();
@@ -905,9 +905,9 @@ describe('CMI5Adapter', () => {
       sent.map(
         ([url, init]: any[]) => `${init.method} ${new URL(url).pathname}`,
       ),
-    ).toEqual(['PUT /xapi/activities/state', 'POST /xapi/statements']);
+    ).toEqual(['POST /xapi/statements', 'PUT /xapi/activities/state']);
     expect(sent.every(([, init]: any[]) => init.keepalive)).toBe(true);
-    expect(JSON.parse(sent[1][1].body).map((s: any) => s.verb.id)).toEqual([
+    expect(JSON.parse(sent[0][1].body).map((s: any) => s.verb.id)).toEqual([
       `${VERB}completed`,
       `${VERB}terminated`,
     ]);
@@ -1494,6 +1494,32 @@ describe('CMI5Adapter', () => {
         url.includes('tessera-state-exit'),
       );
       expect(exitPut?.[1].keepalive).toBe(true);
+    });
+
+    it('on pagehide, sends Terminated with keepalive before an exit state too large to share the quota', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = await initAdapter();
+      await adapter.loadState();
+      adapter.saveState({
+        b: 1,
+        u: { notes: 'x'.repeat(64 * 1024 - 256) },
+      } as never);
+      await flush();
+
+      mockFetch.mockClear();
+      adapter.terminate();
+
+      const sent = mockFetch.mock.calls.map(([url, init]: any[]) => [
+        new URL(url).pathname.split('/').pop(),
+        init.keepalive,
+      ]);
+      expect(sent).toEqual([
+        ['statements', true],
+        ['state', false],
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('without keepalive'),
+      );
     });
 
     it('stops waiting on a stalled LRS at the deadline', async () => {

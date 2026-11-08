@@ -80,16 +80,39 @@ interface SendOutcome {
 const QUEUE_DEPTH_WARN = 200;
 const QUEUE_DEPTH_SATURATED = 1000;
 /**
- * Browsers cap the cumulative body size of `keepalive: true` fetches at
- * 64 KiB per page. A batched statement payload above this threshold is
- * silently dropped during unload — the request never leaves the browser.
- * We log when a keepalive send would exceed the cap so the data loss is
- * at least visible. Splitting the batch isn't safe here (statements
- * within a batch are atomic from the LRS's perspective; partial sends
- * would corrupt ordering against Terminated), so the warning is the
- * useful signal.
+ * Browsers allow 64 KiB of `keepalive: true` request bodies in flight per
+ * page, counted across requests, and reject a keepalive fetch past that
+ * before it leaves the browser. Splitting a statement batch to fit isn't
+ * safe: statements in a batch are atomic from the LRS's perspective, and a
+ * partial send would corrupt ordering against Terminated.
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
+let keepaliveBytesInFlight = 0;
+
+/**
+ * `fetch` with `keepalive` when the body fits in what the keepalive requests
+ * in flight leave of the browser's quota, and without it otherwise, so it can
+ * still land if the page stays open. The first caller gets first claim.
+ */
+export function keepaliveFetch(
+  url: string,
+  init: RequestInit & { body?: string },
+): Promise<Response> {
+  const bytes = new TextEncoder().encode(init.body ?? '').length;
+  if (keepaliveBytesInFlight + bytes > KEEPALIVE_BODY_LIMIT_BYTES) {
+    console.warn(
+      `Tessera: a ${bytes}-byte xAPI ${init.method ?? 'GET'} does not fit in ` +
+        `the 64 KiB browsers allow keepalive requests in flight ` +
+        `(${keepaliveBytesInFlight} bytes in flight), so it is sent without ` +
+        `keepalive and is lost if the page closes first.`,
+    );
+    return fetch(url, { ...init, keepalive: false });
+  }
+  keepaliveBytesInFlight += bytes;
+  return fetch(url, { ...init, keepalive: true }).finally(() => {
+    keepaliveBytesInFlight -= bytes;
+  });
+}
 
 const isActivity = (a: unknown): a is { id: string } =>
   isRecord(a) && typeof a.id === 'string';
@@ -553,7 +576,6 @@ export class XAPIPublisher {
       // keepalive on final attempt (so it survives unload) and any
       // attempt after the adapter has flagged the page as unloading.
       const keepalive = opts.keepalive || isFinal || this.#unloading;
-      if (keepalive) this.#warnOverKeepaliveCap(body, statementOrBatch);
       return this.#sendOnce(body, keepalive).then((outcome) => {
         // 4xx (other than the 401 path which #sendOnce already retried) won't
         // recover, so short-circuit.
@@ -567,20 +589,6 @@ export class XAPIPublisher {
     };
 
     return stop() ? Promise.resolve<SendOutcome>({ ok: false }) : attempt(0);
-  }
-
-  #warnOverKeepaliveCap(
-    body: string,
-    statementOrBatch: Statement | Statement[],
-  ): void {
-    if (body.length <= KEEPALIVE_BODY_LIMIT_BYTES) return;
-    const count = Array.isArray(statementOrBatch) ? statementOrBatch.length : 1;
-    console.warn(
-      `Tessera: xAPI ${count}-statement batch is ${body.length} bytes, ` +
-        `over the 64 KiB keepalive cap. The browser may silently drop this ` +
-        `request during unload. Reduce per-statement size or split sends ` +
-        `before terminate.`,
-    );
   }
 
   #settle(entry: UnsentEntry, outcome: SendOutcome): void {
@@ -624,12 +632,10 @@ export class XAPIPublisher {
   }
 
   #post(token: string, body: string, keepalive: boolean): Promise<Response> {
-    return fetch(this.#statementsUrl, {
-      method: 'POST',
-      headers: this.#buildHeaders(token),
-      body,
-      keepalive,
-    });
+    const init = { method: 'POST', headers: this.#buildHeaders(token), body };
+    return keepalive
+      ? keepaliveFetch(this.#statementsUrl, init)
+      : fetch(this.#statementsUrl, { ...init, keepalive });
   }
 
   #fetchWithToken(
