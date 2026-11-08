@@ -105,8 +105,9 @@ export class QuizEngine implements UseQuizHandle {
     }
   }
 
-  // Derived values are plain getters over $state, not $derived. Getters recompute on read with or without a tracking
-  // effect, so engine-construction tests need no $effect.root.
+  // Derived values are plain getters over $state, not $derived. Getters
+  // recompute on read with or without a tracking effect, so
+  // engine-construction tests need no $effect.root.
   get #totalQuestions(): number {
     return this.#internalQuestions.length;
   }

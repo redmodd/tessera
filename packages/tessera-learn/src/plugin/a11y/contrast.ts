@@ -1,9 +1,9 @@
 /**
  * Pure-JS WCAG contrast helpers. runtime/branding.ts's parseColor is
- * canvas-based and browser-only; this runs at build time in the linter (rule 1.7). Only opaque
- * #hex (3/4/6/8) is parsed — other CSS color forms and translucent hex return
- * null and fall through to the Tier-2 axe audit, which uses the browser's own
- * parser.
+ * canvas-based and browser-only; this runs at build time in the linter (rule
+ * 1.7). Only opaque #hex (3/4/6/8) is parsed. Other CSS color forms and
+ * translucent hex return null and fall through to the Tier-2 axe audit, which
+ * uses the browser's own parser.
  */
 
 function parseHex(
