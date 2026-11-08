@@ -539,7 +539,7 @@ Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-s
 }
 ```
 
-**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-light` and `-dark` shades mix from the `:root` value of `--tessera-primary`, so override it on `:root` for them to follow. A `branding.primaryColor` the browser can't parse is ignored, and an unparseable color property in CSS falls back to its default above. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
+**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-light` and `-dark` shades mix from the `:root` value of `--tessera-primary`, so override it on `:root` for them to follow. A `branding.primaryColor` the browser can't parse is ignored. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. The mixed shades have no fallback, so give them a valid color or leave them unset. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
 
 ---
 
