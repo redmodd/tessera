@@ -1,7 +1,5 @@
 ---
-'tessera-learn': patch
+'tessera-learn': minor
 ---
 
-The xAPI client from `useXAPI()` no longer has the undocumented `getPublishers()` method.
-
-A `scoring.passingScore` set to `undefined` in `course.config.js` now falls back to the default.
+**Breaking:** the xAPI client from `useXAPI()` no longer has the undocumented `getPublishers()` method. To upgrade, remove calls to it and use the client's own methods, such as `getActor()`.

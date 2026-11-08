@@ -18,7 +18,6 @@ import {
   type SavedState,
   type SuccessStatus,
 } from './persistence.js';
-import { DEFAULT_PERCENTAGE_THRESHOLD } from './defaults.js';
 
 type SavedProgress = Pick<SavedState, 'v' | 'g' | 'c' | 'm' | 's' | 'k' | 'p'>;
 
@@ -812,9 +811,8 @@ export class ProgressState {
     const mode = this.#config.completion.mode;
     if (mode === 'manual') return 'incomplete';
     if (mode === 'percentage') {
-      const threshold =
-        this.#config.completion.percentageThreshold ??
-        DEFAULT_PERCENTAGE_THRESHOLD;
+      // mergeCourseConfig always sets it in percentage mode.
+      const threshold = this.#config.completion.percentageThreshold!;
       const percent =
         this.#totalPages > 0
           ? (this.completedPages / this.#totalPages) * 100
