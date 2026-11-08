@@ -239,6 +239,7 @@ describe('generateCMI5Xml', () => {
     const xml = cmi5Xml({
       title: 'My Course',
       description: 'A great course',
+      language: 'fr-CA',
       scoring: { passingScore: 80 },
     });
 
@@ -246,9 +247,9 @@ describe('generateCMI5Xml', () => {
     expect(xml).toContain(
       'xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd"',
     );
-    expect(xml).toContain('<langstring lang="en-US">My Course</langstring>');
+    expect(xml).toContain('<langstring lang="fr-CA">My Course</langstring>');
     expect(xml).toContain(
-      '<langstring lang="en-US">A great course</langstring>',
+      '<langstring lang="fr-CA">A great course</langstring>',
     );
   });
 
@@ -279,9 +280,7 @@ describe('generateCMI5Xml', () => {
 
   it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
     const xml = cmi5Xml({ title: '' });
-    expect(xml).toContain(
-      '<langstring lang="en-US">Untitled Course</langstring>',
-    );
+    expect(xml).toContain('<langstring lang="en">Untitled Course</langstring>');
   });
 
   it('includes URN IRIs for course and AU ids', () => {
@@ -418,22 +417,33 @@ describe('generateCMI5Xml', () => {
 });
 
 describe('generateTincanXml', () => {
+  const tincanXml = (config: Parameters<typeof mergeCourseConfig>[0]) =>
+    generateTincanXml(mergeCourseConfig(config));
+
+  it('tags the name, description and launch with the course language', () => {
+    const xml = tincanXml({
+      title: 'Mon cours',
+      description: 'Bases',
+      language: 'fr',
+    });
+    expect(xml).toContain('<name lang="fr">Mon cours</name>');
+    expect(xml).toContain('<description lang="fr">Bases</description>');
+    expect(xml).toContain('<launch lang="fr">index.html</launch>');
+  });
+
   it('emits a tincan.xml with a stable activity id and the title', () => {
-    const xml = generateTincanXml({ title: 'My Course' } as any);
+    const xml = tincanXml({ title: 'My Course' });
     expect(xml).toContain('xmlns="http://projecttincan.com/tincan.xsd"');
     expect(xml).toMatch(
       /<activity id="urn:tessera:au:[0-9a-f]{32}" type="http:\/\/adlnet\.gov\/expapi\/activities\/course">/,
     );
     expect(xml).toContain('My Course');
-    expect(xml).toContain('<launch lang="en-US">index.html</launch>');
     // No xAPI version field exists in the tincan schema.
     expect(xml).not.toMatch(/1\.0\.3|2\.0/);
   });
 
   it('is identical regardless of which xapi version will run', () => {
-    const a = generateTincanXml({ title: 'Same' } as any);
-    const b = generateTincanXml({ title: 'Same' } as any);
-    expect(a).toBe(b);
+    expect(tincanXml({ title: 'Same' })).toBe(tincanXml({ title: 'Same' }));
   });
 });
 
@@ -526,6 +536,7 @@ describe('runExport', () => {
       createDistDir(testRoot),
       {
         title: 'Test Course',
+        language: 'en',
         version: '1.0.0',
         completion: { mode: 'quiz' },
         scoring: { passingScore: 80 },

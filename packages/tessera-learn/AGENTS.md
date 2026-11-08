@@ -552,7 +552,7 @@ export default {
   description: '',
   author: '',
   version: '1.0.0',
-  language: 'en', // BCP-47 tag for <html lang>; defaults to "en"
+  language: 'en', // required BCP-47 tag for <html lang> and LMS/LRS text
   resume: 'auto', // "auto" (default) restores progress unless page structure changed | "never"
 
   branding: {
@@ -600,7 +600,7 @@ export default {
 | Field                           | Behaviour                                                                                                                                                                                                                                                                                                                                                                             |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`                            | Unique course identity; seeds the web localStorage key and the cmi5/xAPI activity id. Scaffolders mint a `urn:uuid:…`. Missing → falls back to a fixed value (collides across courses), and the build warns under web, cmi5 and xAPI. `tessera duplicate` regenerates it.                                                                                                             |
-| `language`                      | Sets `<html lang>` (WCAG 3.1.1). Missing/implausible value warns and falls back to `"en"`                                                                                                                                                                                                                                                                                             |
+| `language`                      | **Required.** Sets `<html lang>` (WCAG 3.1.1) and tags course text in manifests and LMS/LRS records. A missing or malformed tag fails the build, as does `und`, `mul` or `zxx`. Use language, then optional script and region: `en`, `fr-CA`, `zh-Hant-TW`, `es-419`. Look one up at https://r12a.github.io/app-subtags/                                                              |
 | `resume`                        | `"auto"` (default) restores saved progress, but **discards it when pages were added, removed, reordered or had their file renamed** since the save, or when a `tessera-learn` update changed the save format. `"never"` always starts fresh. Discarded scores and progress are not remapped, so upload a restructured course to the LMS as a _new version_, not an overwrite in place |
 | `navigation.mode: "free"`       | All pages accessible except those blocked by gating quizzes                                                                                                                                                                                                                                                                                                                           |
 | `navigation.mode: "sequential"` | Pages unlock one at a time as each completes: a plain page on view, a quiz page on submit, a `graded: true` page once every graded question on it is answered                                                                                                                                                                                                                         |
@@ -608,12 +608,12 @@ export default {
 | `completion.mode: "quiz"`       | Completes when the graded average >= `scoring.passingScore`. Needs a required graded page                                                                                                                                                                                                                                                                                             |
 | `completion.mode: "manual"`     | Completes when an author trigger fires. See [Manual completion](docs/scoring.md#manual-completion)                                                                                                                                                                                                                                                                                    |
 | `success.from`                  | What judges pass/fail, independent of completion. See [Success criterion](docs/scoring.md#success-criterion)                                                                                                                                                                                                                                                                          |
-| `a11y.level: "error"`           | Promotes captions/transcript, empty question labels, heading order, contrast, language and, at build time, Svelte a11y warnings to errors. Missing `alt` and missing media `title` are errors at either level                                                                                                                                                                         |
+| `a11y.level: "error"`           | Promotes captions/transcript, empty question labels, heading order, contrast and, at build time, Svelte a11y warnings to errors. Missing `alt` and missing media `title` are errors at either level                                                                                                                                                                                   |
 | `a11y.ignore`                   | Flat list matched literally against every diagnostic rule ID across all tiers (`tessera/…`, `a11y_…`, bare axe IDs). Suppresses a matching diagnostic at any severity, the missing `alt` / `title` errors included                                                                                                                                                                    |
 
 ### Minimum config
 
-Every field has a default, so `export default { title: "My Course" }` is complete: free nav, full-percentage completion, web export, `<html lang="en">`, `passingScore: 70`. Keep the scaffolded `id`, `language` and `passingScore`: the build warns without `language`, without `id` under web, cmi5 or xAPI, and without `passingScore` once a graded page decides pass/fail.
+Every field but `language` has a default, so `export default { title: "My Course", language: "en" }` is complete: free nav, full-percentage completion, web export, `passingScore: 70`. Keep the scaffolded `id` and `passingScore`: the build warns without `id` under web, cmi5 or xAPI, and without `passingScore` once a graded page decides pass/fail.
 
 ### Runtime hooks: `course.runtime.js`
 
@@ -667,7 +667,6 @@ Two passes plus components that are accessible by construction.
 | `tessera/question-label`   | question prompts are not empty                            |
 | `tessera/heading-order`    | page headings skip no level                               |
 | `tessera/primary-contrast` | `branding.primaryColor` has enough contrast against white |
-| `tessera/lang`             | `language` is set and is a well-formed BCP-47 tag         |
 | `a11y_*`                   | the Svelte compiler's accessibility warnings              |
 
 **Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast) and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.

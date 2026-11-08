@@ -5,6 +5,7 @@ import {
 } from '../src/runtime/adapters/scorm2004.js';
 import type { SavedState } from '../src/runtime/persistence.js';
 import {
+  createConfig,
   flush,
   noDeadline,
   scorm12Api,
@@ -17,13 +18,13 @@ describe('SCORM2004Adapter.connect', () => {
   it('connects to an API on a parent frame', async () => {
     const api = scorm2004Api();
     stubLmsFrame({ API_1484_11: api });
-    await SCORM2004Adapter.connect()!.init();
+    await SCORM2004Adapter.connect(createConfig())!.init();
     expect(api.Initialize).toHaveBeenCalled();
   });
 
   it('returns null when no frame exposes the API', () => {
     stubLmsFrame({ API: scorm12Api() });
-    expect(SCORM2004Adapter.connect()).toBeNull();
+    expect(SCORM2004Adapter.connect(createConfig())).toBeNull();
   });
 });
 
@@ -33,7 +34,7 @@ describe('SCORM2004Adapter', () => {
 
   beforeEach(() => {
     api = scorm2004Api();
-    adapter = new SCORM2004Adapter(api);
+    adapter = new SCORM2004Adapter(api, createConfig());
   });
 
   it('calls Initialize on init', async () => {
@@ -317,7 +318,7 @@ describe('SCORM2004Adapter', () => {
   describe('LMS-supplied thresholds', () => {
     async function masteryFrom(value: string) {
       api = scorm2004Api({ 'cmi.scaled_passing_score': value });
-      adapter = new SCORM2004Adapter(api);
+      adapter = new SCORM2004Adapter(api, createConfig());
       await adapter.init();
       return adapter.getMasteryScore();
     }
@@ -345,8 +346,9 @@ describe('SCORM2004Adapter', () => {
     const interaction0 = () =>
       valuesUnder(api.SetValue.mock.calls, 'cmi.interactions.0');
 
-    it('writes the question text as the description, cut to 250 characters', async () => {
+    it('writes the question text as the description, tagged with the course language and cut to 250 characters', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      adapter = new SCORM2004Adapter(api, createConfig({ language: 'fr' }));
       adapter.reportInteraction(
         'q1',
         { type: 'true-false', response: true },
@@ -368,14 +370,44 @@ describe('SCORM2004Adapter', () => {
       await flush();
       const at = (n: number) =>
         valuesUnder(api.SetValue.mock.calls, `cmi.interactions.${n}`);
-      expect(at(0).description).toBe('Is it?');
-      expect(at(1).description).toBe('x'.repeat(250));
+      expect(at(0).description).toBe('{lang=fr}Is it?');
+      expect(at(1).description).toBe('{lang=fr}' + 'x'.repeat(250));
       expect(at(2)).not.toHaveProperty('description');
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0][0]).toMatch(
         /description of interaction "q3" is left out/,
       );
     });
+
+    it.each([
+      ['fr-CA', 'fr-CA'],
+      ['zh-Hant-TW', 'zh-Hant-TW'],
+      ['de-CH-1901', 'de-CH-1901'],
+      ['ca-ES-valencia', 'ca-ES'],
+      ['en-US-x-twain', 'en-US'],
+      ['en-x-ab', 'en'],
+      ['en-u-ca-gregory', 'en'],
+      ['de-DE-u-co-phonebk', 'de-DE'],
+      ['en-a-bbb-x-a-ccc', 'en'],
+    ])(
+      'tags the description of a %s course with {lang=%s}, which Moodle accepts',
+      async (language, tag) => {
+        adapter = new SCORM2004Adapter(api, createConfig({ language }));
+        adapter.reportInteraction(
+          'q1',
+          { type: 'true-false', response: true },
+          null,
+          'Vrai?',
+        );
+        await flush();
+        const { description } = interaction0();
+        expect(description).toBe(`{lang=${tag}}Vrai?`);
+        // Moodle's SCORM 2004 CMILangString250, anchored.
+        expect(description).toMatch(
+          /^\{lang=[a-zA-Z]{2,3}(-[a-zA-Z0-9-]{2,8})?\}[^{].{0,250}$/,
+        );
+      },
+    );
 
     it('replaces whitespace in the interaction id', async () => {
       adapter.reportInteraction(
@@ -723,6 +755,7 @@ describe('SCORM2004Adapter', () => {
           'cmi.learner_id': 'learner-7',
           'cmi.learner_name': 'Grace Hopper',
         }),
+        createConfig(),
       );
       expect(withLearner.deriveActor('https://example.com/courses/1')).toEqual({
         account: { homePage: 'https://example.com', name: 'learner-7' },

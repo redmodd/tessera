@@ -17,7 +17,6 @@ export const A11Y_IDS = {
   questionLabel: 'tessera/question-label',
   headingOrder: 'tessera/heading-order',
   primaryContrast: 'tessera/primary-contrast',
-  lang: 'tessera/lang',
 } as const;
 
 /** Promotable by `a11y.level: 'error'`; the rest are hard contract errors. */
@@ -27,7 +26,6 @@ const PROMOTABLE_A11Y_IDS = new Set<string>([
   A11Y_IDS.questionLabel,
   A11Y_IDS.headingOrder,
   A11Y_IDS.primaryContrast,
-  A11Y_IDS.lang,
 ]);
 
 /** Prefix a diagnostic with its rule ID so `a11y.ignore` / `level` can match it. */

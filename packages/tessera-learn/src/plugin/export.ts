@@ -41,7 +41,7 @@ function slugify(text: string): string {
 
 type ExportConfig = Pick<
   CourseConfig,
-  'title' | 'id' | 'description' | 'version' | 'scoring'
+  'title' | 'id' | 'description' | 'version' | 'scoring' | 'language'
 > &
   Partial<Pick<CourseConfig, 'completion' | 'success'>>;
 
@@ -187,6 +187,7 @@ export function generateCMI5Xml(
 ): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
+  const lang = config.language;
   // Derive stable IDs from the course id so they survive rebuilds without
   // orphaning existing learner records in the LRS.
   const courseId = stableUrn(
@@ -210,12 +211,12 @@ export function generateCMI5Xml(
   return `<?xml version="1.0" encoding="UTF-8"?>
 <courseStructure xmlns="https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd">
   <course id="${courseId}">
-    <title><langstring lang="en-US">${title}</langstring></title>
-    <description><langstring lang="en-US">${description}</langstring></description>
+    <title><langstring lang="${lang}">${title}</langstring></title>
+    <description><langstring lang="${lang}">${description}</langstring></description>
   </course>
   <au id="${auId}" launchMethod="AnyWindow" moveOn="${moveOn}"${masteryAttr}>
-    <title><langstring lang="en-US">${title}</langstring></title>
-    <description><langstring lang="en-US">${description}</langstring></description>
+    <title><langstring lang="${lang}">${title}</langstring></title>
+    <description><langstring lang="${lang}">${description}</langstring></description>
     <url>index.html</url>
   </au>
 </courseStructure>`;
@@ -224,6 +225,7 @@ export function generateCMI5Xml(
 export function generateTincanXml(config: ExportConfig): string {
   const title = escapeXml(config.title);
   const description = escapeXml(config.description || '');
+  const lang = config.language;
   // Reuse the cmi5/SCORM stable-id scheme so re-exports don't orphan LRS records.
   const auId = auIdFor(config);
   // tincan.xml carries NO xAPI version — the version is set at runtime by the
@@ -232,9 +234,9 @@ export function generateTincanXml(config: ExportConfig): string {
 <tincan xmlns="http://projecttincan.com/tincan.xsd">
   <activities>
     <activity id="${auId}" type="${XAPI_COURSE_TYPE}">
-      <name>${title}</name>
-      <description lang="en-US">${description}</description>
-      <launch lang="en-US">index.html</launch>
+      <name lang="${lang}">${title}</name>
+      <description lang="${lang}">${description}</description>
+      <launch lang="${lang}">index.html</launch>
     </activity>
   </activities>
 </tincan>`;

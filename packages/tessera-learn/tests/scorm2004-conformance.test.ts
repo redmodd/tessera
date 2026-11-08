@@ -8,7 +8,7 @@ import {
   relaunch2004,
   type RealLms2004,
 } from './helpers/real-lms.js';
-import { flush } from './helpers.js';
+import { createConfig, flush } from './helpers.js';
 
 const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
 
@@ -18,7 +18,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
 
   function start(): Promise<void> {
     lms = createReal2004Lms();
-    adapter = new SCORM2004Adapter(lms.api);
+    adapter = new SCORM2004Adapter(lms.api, createConfig());
     return adapter.init();
   }
 
@@ -38,6 +38,28 @@ describe('SCORM2004Adapter against scorm-again', () => {
     adapter.commit();
     await flush();
     expect(lms.errors).toEqual([]);
+  });
+
+  it.each([
+    ['fr-CA', 'fr-CA'],
+    ['zh-Hant-TW', 'zh-Hant-TW'],
+    ['ca-ES-valencia', 'ca-ES'],
+  ])('stores the tagged description of a %s course', async (language, tag) => {
+    lms = createReal2004Lms();
+    adapter = new SCORM2004Adapter(lms.api, createConfig({ language }));
+    await adapter.init();
+    const text = 'é'.repeat(260);
+    adapter.reportInteraction(
+      'q1',
+      { type: 'true-false', response: true },
+      null,
+      text,
+    );
+    await flush();
+    expect(lms.errors).toEqual([]);
+    expect(lms.raw.GetValue('cmi.interactions.0.description')).toBe(
+      `{lang=${tag}}${text.slice(0, 250)}`,
+    );
   });
 
   it('stores raw/min/max/scaled score the runtime reads back', async () => {
@@ -756,7 +778,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
     expect(lms.errors).toEqual([]);
 
     lms = relaunch2004(lms);
-    const resumed = new SCORM2004Adapter(lms.api);
+    const resumed = new SCORM2004Adapter(lms.api, createConfig());
     await resumed.init();
     expect(resumed.getState()).toEqual(state);
     resumed.reportInteraction(
@@ -776,7 +798,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
     expect(lms.errors).toEqual([]);
 
     lms = relaunch2004(lms);
-    await new SCORM2004Adapter(lms.api).init();
+    await new SCORM2004Adapter(lms.api, createConfig()).init();
     expect(lms.raw.GetValue('cmi.total_time')).toBe('PT1M30S');
   });
 

@@ -18,12 +18,14 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   /** The course definition tincan.xml declares, for an LRS that never reads the package. */
   readonly #activityDefinition: Record<string, unknown>;
 
-  constructor({ title, description }: CourseConfig) {
-    super();
+  constructor(config: CourseConfig) {
+    super(config);
     this.#activityDefinition = {
       type: XAPI_COURSE_TYPE,
-      name: { 'en-US': title },
-      ...(description && { description: { 'en-US': description } }),
+      name: { [this.lang]: config.title },
+      ...(config.description && {
+        description: { [this.lang]: config.description },
+      }),
     };
   }
 

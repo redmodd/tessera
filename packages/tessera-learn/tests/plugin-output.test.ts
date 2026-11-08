@@ -65,7 +65,7 @@ function writeConfigSource(source: string) {
 
 function writeConfig(standard: string) {
   writeConfigSource(
-    `export default { title: "Café 中文 🎓", export: { standard: "${standard}" } };`,
+    `export default { title: "Café 中文 🎓", language: "en", export: { standard: "${standard}" } };`,
   );
 }
 
@@ -152,21 +152,21 @@ describe('generated index.html Content-Security-Policy', () => {
 
   it('appends export.csp overrides onto the baseline directive', () => {
     const html = buildHtmlFromConfig(
-      `{ title: "T", export: { standard: "web", csp: { "font-src": ["https://fonts.gstatic.com"] } } }`,
+      `{ title: "T", language: "en", export: { standard: "web", csp: { "font-src": ["https://fonts.gstatic.com"] } } }`,
     );
     expect(html).toContain("font-src 'self' data: https://fonts.gstatic.com");
   });
 
   it('drops the CSP meta when export.csp is false', () => {
     const html = buildHtmlFromConfig(
-      `{ title: "T", export: { standard: "web", csp: false } }`,
+      `{ title: "T", language: "en", export: { standard: "web", csp: false } }`,
     );
     expect(html).not.toContain('Content-Security-Policy');
   });
 
   it('ignores a malformed export.csp and keeps the baseline', () => {
     const html = buildHtmlFromConfig(
-      `{ title: "T", export: { standard: "web", csp: { "font-src": "https://x" } } }`,
+      `{ title: "T", language: "en", export: { standard: "web", csp: { "font-src": "https://x" } } }`,
     );
     expect(html).toContain('http-equiv="Content-Security-Policy"');
     expect(html).toContain("object-src 'none'");
@@ -294,14 +294,14 @@ describe('export packaging gate', () => {
 
   it('packages a manual-mode cmi5 course with no masteryScore', async () => {
     const xml = await exportCmi5(
-      '{ title: "Course", completion: { mode: "manual" }, export: { standard: "cmi5" } }',
+      '{ title: "Course", language: "en", completion: { mode: "manual" }, export: { standard: "cmi5" } }',
     );
     expect(xml).not.toContain('masteryScore');
     expect(xml).toContain('moveOn="Completed"');
   });
 
   const quizVerdictConfig =
-    '{ title: "Course", success: { from: "quiz" }, scoring: { passingScore: 70 }, export: { standard: "cmi5" } }';
+    '{ title: "Course", language: "en", success: { from: "quiz" }, scoring: { passingScore: 70 }, export: { standard: "cmi5" } }';
 
   it('asks for a Passed when a graded page is required', async () => {
     const xml = await exportCmi5(
@@ -398,11 +398,11 @@ describe('export packaging gate', () => {
   });
 
   const editedConfig =
-    'export default { title: "Edited", export: "scorm12", xapi: { endpoint: "https://lrs.example/xapi/" } };';
+    'export default { title: "Edited", language: "en", export: "scorm12", xapi: { endpoint: "https://lrs.example/xapi/" } };';
 
   it('builds and packages the validated config when course.config.js changes mid-build', async () => {
     writeConfigSource(
-      'export default { title: "Validated", export: { standard: "scorm12" } };',
+      'export default { title: "Validated", language: "en", export: { standard: "scorm12" } };',
     );
     seedStaleDist();
     const { entry, exporter, validation, get } = buildPlugins();
@@ -460,7 +460,7 @@ describe('export packaging gate', () => {
     }
 
     writeConfigSource(
-      'export default { title: "Course", export: { standard: "scorm12" }, resume: "sometimes" };',
+      'export default { title: "Course", language: "en", export: { standard: "scorm12" }, resume: "sometimes" };',
     );
     expect(() => buildStart(validation)).toThrow();
 
@@ -566,7 +566,7 @@ describe('xapi setup virtual module', () => {
     for (const standard of ['scorm12', 'scorm2004', 'web']) {
       expect(
         loadSetup(
-          `{ title: "T", export: { standard: "${standard}" }, xapi: { endpoint: "lms" } }`,
+          `{ title: "T", language: "en", export: { standard: "${standard}" }, xapi: { endpoint: "lms" } }`,
         ),
       ).not.toContain(real);
     }
@@ -575,7 +575,7 @@ describe('xapi setup virtual module', () => {
   it('wires the client for an explicit endpoint alongside an inert lms entry', () => {
     expect(
       loadSetup(
-        `{ title: "T", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { id: "lrs", endpoint: "https://lrs.example/xapi/", auth: "eDp5", actor: { mbox: "mailto:a@b.c" }, activityId: "https://example.com/course" }] }`,
+        `{ title: "T", language: "en", export: { standard: "scorm12" }, xapi: [{ endpoint: "lms" }, { id: "lrs", endpoint: "https://lrs.example/xapi/", auth: "eDp5", actor: { mbox: "mailto:a@b.c" }, activityId: "https://example.com/course" }] }`,
       ),
     ).toContain(real);
   });
@@ -584,7 +584,7 @@ describe('xapi setup virtual module', () => {
     for (const standard of ['cmi5', 'xapi']) {
       expect(
         loadSetup(
-          `{ title: "T", export: { standard: "${standard}" }, xapi: { endpoint: "lms" } }`,
+          `{ title: "T", language: "en", export: { standard: "${standard}" }, xapi: { endpoint: "lms" } }`,
         ),
       ).toContain(real);
     }
@@ -982,7 +982,7 @@ describe('dev revalidation', () => {
   });
 
   it('reports a warning once and an error on every save', async () => {
-    const withUnknownField = `export default { title: "T", export: { standard: "web" }, extra: 1 };`;
+    const withUnknownField = `export default { title: "T", language: "en", export: { standard: "web" }, extra: 1 };`;
     const validation = startDev();
     const warnings = vi.mocked(console.warn);
     const save = async (source: string) => {
@@ -1008,7 +1008,7 @@ describe('dev revalidation', () => {
   });
 
   const scormConfig = (endpoint: string) =>
-    `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "${endpoint}", activityId: "https://example.com/course", auth: "eDp5", actorAccountHomePage: "https://example.com" } };`;
+    `export default { title: "T", language: "en", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "${endpoint}", activityId: "https://example.com/course", auth: "eDp5", actorAccountHomePage: "https://example.com" } };`;
 
   const writeGradedPage = (name: string, weight?: number) =>
     writeFileSync(
@@ -1020,8 +1020,11 @@ describe('dev revalidation', () => {
     [
       'unknown field "extra"',
       'course.config.js',
-      () => writeConfigSource(`export default { title: "T", extra: 1 };`),
-      () => writeConfigSource(`export default { title: "T" };`),
+      () =>
+        writeConfigSource(
+          `export default { title: "T", language: "en", extra: 1 };`,
+        ),
+      () => writeConfigSource(`export default { title: "T", language: "en" };`),
     ],
     [
       'xapi.endpoint should end with a slash',
@@ -1119,7 +1122,7 @@ describe('dev revalidation', () => {
     );
   });
 
-  const xapiConfig = `export default { title: "T", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "https://lrs.example/xapi/", activityId: "https://example.com/course", actorAccountHomePage: "https://example.com" } };`;
+  const xapiConfig = `export default { title: "T", language: "en", export: { standard: "scorm12" }, xapi: { id: "lrs", endpoint: "https://lrs.example/xapi/", activityId: "https://example.com/course", actorAccountHomePage: "https://example.com" } };`;
 
   it.each([
     [
@@ -1144,13 +1147,13 @@ describe('dev revalidation', () => {
     ],
     [
       'course.config.js',
-      `export default { title: "T", export: { standard: "web" }, completion: { mode: "percentage", trigger: "page" } };`,
-      `export default { title: "T", export: { standard: "web" }, completion: "percentage" };`,
+      `export default { title: "T", language: "en", export: { standard: "web" }, completion: { mode: "percentage", trigger: "page" } };`,
+      `export default { title: "T", language: "en", export: { standard: "web" }, completion: "percentage" };`,
     ],
     [
       'course.config.js',
-      `export default { title: "T", export: { standard: "scorm12", csp: false } };`,
-      `export default { title: "T", export: { standard: "scrom12", csp: false } };`,
+      `export default { title: "T", language: "en", export: { standard: "scorm12", csp: false } };`,
+      `export default { title: "T", language: "en", export: { standard: "scrom12", csp: false } };`,
     ],
     [
       'course.runtime.js',

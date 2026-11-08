@@ -17,6 +17,7 @@ import type { LMSErrorReporter } from './retry.js';
 import { BaseAdapter } from './base.js';
 import { parseMastery } from './format.js';
 import type { XAPIAgent } from '../xapi/types.js';
+import type { CourseConfig } from '../types.js';
 import {
   httpOrigin,
   largerSuspendDataStandards,
@@ -44,7 +45,7 @@ export interface ScormDialect<TApi> {
     typeValue(type: Interaction['type']): string;
     resultLabels: { correct: string; incorrect: string };
     /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
-    description?(text: string): string | null;
+    description?(text: string, lang: string): string | null;
   };
   initialize(api: TApi): string;
   terminate(api: TApi): string;
@@ -66,11 +67,13 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   #suspendOverflowWarned = false;
   #interactionCount = 0;
   #questionIdsByRecorded = new Map<string, string>();
+  readonly #lang: string;
 
-  constructor(api: TApi, dialect: ScormDialect<TApi>) {
+  constructor(api: TApi, dialect: ScormDialect<TApi>, config: CourseConfig) {
     super();
     this.api = api;
     this.dialect = dialect;
+    this.#lang = config.language;
     this.stateLimit = dialect.profile.suspendDataLimit;
     this.errorReporter = {
       code: () => this.dialect.getLastError(this.api),
@@ -218,11 +221,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   ): void {
     if (!this.canWrite()) return;
     const description = text
-      ? this.dialect.interactionFields.description?.(text)
+      ? this.dialect.interactionFields.description?.(text, this.#lang)
       : undefined;
     if (description === null) {
       console.warn(
-        `Tessera: the description of interaction "${questionId}" is left out of the LMS record: ${this.dialect.profile.name} reads a leading "{lang=" as a language tag. Reword the start of the question.`,
+        `Tessera: the description of interaction "${questionId}" is left out of the LMS record: ${this.dialect.profile.name} rejects a second "{lang=" tag after the course language tag. Reword the start of the question.`,
       );
     }
     const { id, fields } = buildScormInteractionFields(

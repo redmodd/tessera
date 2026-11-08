@@ -20,6 +20,7 @@ import {
   RESUME_POLICIES,
   SUCCESS_SOURCES,
   VERDICTS,
+  canonicalLanguage,
   courseIdentity,
   isRecord,
   isStringArray,
@@ -61,14 +62,8 @@ const KNOWN_CONFIG_FIELDS = new Set(
   } satisfies Record<keyof CourseConfig, true>),
 );
 
-// Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
-// plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
-const BCP47_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
-
-/** Plausible BCP-47 tag? Shared by the linter and the <html lang> emitter. */
-export function isPlausibleLanguageTag(value: unknown): value is string {
-  return typeof value === 'string' && BCP47_RE.test(value);
-}
+const FIND_LANGUAGE_TAG =
+  'Use the BCP-47 tag of the course\'s language: a language, then an optional script and region, such as "en", "fr-CA" or "zh-Hant-TW". Look one up at https://r12a.github.io/app-subtags/';
 
 const COMPLETION_MODES = Object.keys({
   quiz: true,
@@ -146,20 +141,13 @@ export function parseConfig(
     validateBranding(config.branding, projectRoot, d);
   }
 
-  // Rule 1.8: language present and well-formed (BCP-47)
   if (config.language === undefined) {
-    d.warn(
-      tag(
-        A11Y_IDS.lang,
-        `course.config.js: "language" is not set — defaulting <html lang> to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
-      ),
+    d.error(
+      `course.config.js: "language" is required. It sets <html lang> and tags the course text in LMS/LRS records. ${FIND_LANGUAGE_TAG}`,
     );
-  } else if (!isPlausibleLanguageTag(config.language)) {
-    d.warn(
-      tag(
-        A11Y_IDS.lang,
-        `course.config.js: "language" (${formatValue(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
-      ),
+  } else if (canonicalLanguage(config.language) === null) {
+    d.error(
+      `course.config.js: "language" (${formatValue(config.language)}) is not a supported BCP-47 tag. ${FIND_LANGUAGE_TAG}`,
     );
   }
 

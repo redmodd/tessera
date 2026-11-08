@@ -78,9 +78,12 @@ describe('CMI5Adapter', () => {
     setLaunchParams(CMI5_LAUNCH);
   });
 
-  async function initAdapter(lms: Parameters<typeof cmi5Fetch>[0] = {}) {
+  async function initAdapter(
+    lms: Parameters<typeof cmi5Fetch>[0] = {},
+    config = createConfig(),
+  ) {
     mockFetch.mockImplementation(cmi5Fetch(lms));
-    const adapter = new CMI5Adapter();
+    const adapter = new CMI5Adapter(config);
     await adapter.init();
     return adapter;
   }
@@ -523,7 +526,10 @@ describe('CMI5Adapter', () => {
     };
 
     it('starts Answered from the template, with the AU as parent', async () => {
-      const adapter = await initAdapter({ launchData });
+      const adapter = await initAdapter(
+        { launchData },
+        createConfig({ language: 'fr' }),
+      );
       adapter.reportInteraction(
         'q1',
         { type: 'choice', response: ['a'], correct: ['a'] },
@@ -533,9 +539,7 @@ describe('CMI5Adapter', () => {
       await flush();
 
       const answered = statementFor('answered');
-      expect(answered.object.definition.description).toEqual({
-        'en-US': 'Pick a',
-      });
+      expect(answered.object.definition.description).toEqual({ fr: 'Pick a' });
       expect(answered.context).toEqual({
         registration: CMI5_LAUNCH.registration,
         contextActivities: {

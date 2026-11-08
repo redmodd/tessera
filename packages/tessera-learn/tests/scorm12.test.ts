@@ -6,6 +6,7 @@ import {
 import type { SavedState } from '../src/runtime/persistence.js';
 import { validateAgent } from '../src/runtime/xapi/validation.js';
 import {
+  createConfig,
   flush,
   noDeadline,
   printed,
@@ -20,7 +21,7 @@ describe('SCORM12Adapter.connect', () => {
   it('connects to an API on a parent frame', async () => {
     const api = scorm12Api();
     stubLmsFrame({ API: api });
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -32,7 +33,7 @@ describe('SCORM12Adapter.connect', () => {
     win.parent = win;
     win.top = win;
     vi.stubGlobal('window', win);
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -43,7 +44,7 @@ describe('SCORM12Adapter.connect', () => {
     const popup: Record<string, unknown> = { opener };
     popup.parent = popup;
     vi.stubGlobal('window', { parent: popup, top: popup, opener: null });
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -54,7 +55,7 @@ describe('SCORM12Adapter.connect', () => {
     const lms: Record<string, unknown> = { opener: null };
     lms.parent = lms;
     vi.stubGlobal('window', { parent: lms, top: lms, opener });
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -63,7 +64,7 @@ describe('SCORM12Adapter.connect', () => {
     win.parent = win;
     win.top = win;
     vi.stubGlobal('window', win);
-    expect(SCORM12Adapter.connect()).toBeNull();
+    expect(SCORM12Adapter.connect(createConfig())).toBeNull();
   });
 
   it("prefers an API on the course's frame chain over the opener's", async () => {
@@ -74,7 +75,7 @@ describe('SCORM12Adapter.connect', () => {
     const popup: Record<string, unknown> = { API: api, opener };
     popup.parent = popup;
     vi.stubGlobal('window', { parent: popup, top: popup, opener: null });
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
     expect(openerApi.LMSInitialize).not.toHaveBeenCalled();
   });
@@ -87,7 +88,7 @@ describe('SCORM12Adapter.connect', () => {
         throw new DOMException('Blocked', 'SecurityError');
       },
     };
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -102,7 +103,7 @@ describe('SCORM12Adapter.connect', () => {
       },
     };
     vi.stubGlobal('window', { parent: crossOrigin });
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
@@ -110,13 +111,13 @@ describe('SCORM12Adapter.connect', () => {
     const api = scorm12Api();
     stubLmsFrame({ API: api });
     (window as unknown as Record<string, unknown>).API = { id: 'API' };
-    await SCORM12Adapter.connect()!.init();
+    await SCORM12Adapter.connect(createConfig())!.init();
     expect(api.LMSInitialize).toHaveBeenCalled();
   });
 
   it('returns null when no frame exposes the API', () => {
     stubLmsFrame({ API_1484_11: scorm2004Api() });
-    expect(SCORM12Adapter.connect()).toBeNull();
+    expect(SCORM12Adapter.connect(createConfig())).toBeNull();
   });
 });
 
@@ -126,7 +127,7 @@ describe('SCORM12Adapter', () => {
 
   beforeEach(() => {
     api = scorm12Api();
-    adapter = new SCORM12Adapter(api);
+    adapter = new SCORM12Adapter(api, createConfig());
   });
 
   // ---- lifecycle / init ----
@@ -272,7 +273,7 @@ describe('SCORM12Adapter', () => {
   describe('LMS-supplied mastery_score', () => {
     async function masteryFrom(value: string) {
       api = scorm12Api({ 'cmi.student_data.mastery_score': value });
-      adapter = new SCORM12Adapter(api);
+      adapter = new SCORM12Adapter(api, createConfig());
       await adapter.init();
       return adapter.getMasteryScore();
     }
@@ -1288,6 +1289,7 @@ describe('SCORM12Adapter', () => {
           'cmi.core.student_id': 'student-42',
           'cmi.core.student_name': 'Ada Lovelace',
         }),
+        createConfig(),
       );
       const actor = withLearner.deriveActor(activityId);
       expect(actor).toEqual({
@@ -1301,6 +1303,7 @@ describe('SCORM12Adapter', () => {
     it('honors an actorAccountHomePage override', () => {
       const withLearner = new SCORM12Adapter(
         scorm12Api({ 'cmi.core.student_id': 'sid' }),
+        createConfig(),
       );
       expect(
         withLearner.deriveActor(activityId, 'https://lms.example.com')?.account

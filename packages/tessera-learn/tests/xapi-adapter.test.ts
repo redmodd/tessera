@@ -34,9 +34,9 @@ async function sentActor(actor: unknown) {
 }
 
 /** An adapter past its launch, with the launch requests cleared. */
-async function launchedAdapter() {
+async function launchedAdapter(config = createConfig()) {
   setXAPILaunch();
-  const adapter = new XAPIAdapter(createConfig());
+  const adapter = new XAPIAdapter(config);
   await adapter.init();
   await flush();
   fetchMock.mockClear();
@@ -407,8 +407,8 @@ describe('XAPIAdapter', () => {
     );
   });
 
-  it('sends the question text and puts the course in parent on Answered', async () => {
-    const adapter = await launchedAdapter();
+  it('sends the question text in the course language and puts the course in parent on Answered', async () => {
+    const adapter = await launchedAdapter(createConfig({ language: 'fr' }));
 
     adapter.reportInteraction(
       'q1',
@@ -419,9 +419,7 @@ describe('XAPIAdapter', () => {
     await flush();
 
     const [answered] = posted();
-    expect(answered.object.definition.description).toEqual({
-      'en-US': 'Pick a',
-    });
+    expect(answered.object.definition.description).toEqual({ fr: 'Pick a' });
     expect(answered.context.contextActivities).toEqual({
       parent: [{ id: 'urn:tessera:au:abc' }],
     });
@@ -434,7 +432,7 @@ describe('XAPIAdapter', () => {
         response: ['0'],
         options: [{ id: '0', text: '3' }, '1'],
       },
-      { choices: [{ id: '0', description: { 'en-US': '3' } }, { id: '1' }] },
+      { choices: [{ id: '0', description: { fr: '3' } }, { id: '1' }] },
     ],
     [
       {
@@ -442,7 +440,7 @@ describe('XAPIAdapter', () => {
         response: ['0'],
         options: [{ id: '0', text: 4 as never }],
       },
-      { choices: [{ id: '0', description: { 'en-US': '4' } }] },
+      { choices: [{ id: '0', description: { fr: '4' } }] },
     ],
     [
       {
@@ -455,8 +453,8 @@ describe('XAPIAdapter', () => {
       },
       {
         choices: [
-          { id: 'a', description: { 'en-US': 'First' } },
-          { id: 'b', description: { 'en-US': 'Second' } },
+          { id: 'a', description: { fr: 'First' } },
+          { id: 'b', description: { fr: 'Second' } },
         ],
       },
     ],
@@ -470,8 +468,8 @@ describe('XAPIAdapter', () => {
         },
       },
       {
-        source: [{ id: '0', description: { 'en-US': 'Hydrogen' } }],
-        target: [{ id: '0', description: { 'en-US': 'H' } }],
+        source: [{ id: '0', description: { fr: 'Hydrogen' } }],
+        target: [{ id: '0', description: { fr: 'H' } }],
       },
     ],
     [
@@ -480,7 +478,7 @@ describe('XAPIAdapter', () => {
         response: 'agree',
         options: [{ id: 'agree', text: 'Agree' }],
       },
-      { scale: [{ id: 'agree', description: { 'en-US': 'Agree' } }] },
+      { scale: [{ id: 'agree', description: { fr: 'Agree' } }] },
     ],
     [
       {
@@ -488,12 +486,12 @@ describe('XAPIAdapter', () => {
         response: [['mix', 2]],
         options: [{ id: 'mix', text: 'Mix the batter' }],
       },
-      { steps: [{ id: 'mix', description: { 'en-US': 'Mix the batter' } }] },
+      { steps: [{ id: 'mix', description: { fr: 'Mix the batter' } }] },
     ],
   ])(
     'sends %o option text as interaction components',
     async (interaction, lists) => {
-      const adapter = await launchedAdapter();
+      const adapter = await launchedAdapter(createConfig({ language: 'fr' }));
 
       adapter.reportInteraction('q1', interaction, null);
       await flush();
@@ -548,7 +546,11 @@ describe('XAPIAdapter', () => {
   it('sends the course name and description on the course activity', async () => {
     setXAPILaunch();
     const adapter = XAPIAdapter.connect(
-      createConfig({ title: 'Safety 101', description: 'Shop floor basics' }),
+      createConfig({
+        title: 'Safety 101',
+        description: 'Shop floor basics',
+        language: 'fr',
+      }),
     )!;
     await adapter.init();
     await flush();
@@ -558,8 +560,8 @@ describe('XAPIAdapter', () => {
       objectType: 'Activity',
       definition: {
         type: 'http://adlnet.gov/expapi/activities/course',
-        name: { 'en-US': 'Safety 101' },
-        description: { 'en-US': 'Shop floor basics' },
+        name: { fr: 'Safety 101' },
+        description: { fr: 'Shop floor basics' },
       },
     });
   });

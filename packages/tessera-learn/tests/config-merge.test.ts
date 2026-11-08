@@ -14,6 +14,41 @@ describe('mergeCourseConfig', () => {
     expect(mergeCourseConfig({ title: 'My Course' }).title).toBe('My Course');
   });
 
+  it.each([
+    undefined,
+    'english',
+    'en_US',
+    'en-x',
+    'en-a',
+    'en-US-US',
+    'de-1',
+    'zh-cmn-Hans',
+    'en-GB-oed',
+    'abcde',
+    'und',
+    'zxx-Latn',
+    'mul',
+  ])(
+    'falls back to en for the missing or malformed language %s',
+    (language) => {
+      expect(mergeCourseConfig({ language }).language).toBe('en');
+    },
+  );
+
+  it.each(['es-419', 'sr-Latn-RS', 'ca-ES-valencia', 'en-US-x-twain'])(
+    'keeps the well-formed language %s',
+    (language) => {
+      expect(mergeCourseConfig({ language }).language).toBe(language);
+    },
+  );
+
+  it.each([
+    ['EN-gb', 'en-GB'],
+    ['iw', 'he'],
+  ])('canonicalizes the language %s to %s', (language, canonical) => {
+    expect(mergeCourseConfig({ language }).language).toBe(canonical);
+  });
+
   it('does not leak percentage defaults into quiz-mode completion', () => {
     const merged = mergeCourseConfig({ completion: { mode: 'quiz' } });
     expect(merged.completion).toEqual({ mode: 'quiz' });

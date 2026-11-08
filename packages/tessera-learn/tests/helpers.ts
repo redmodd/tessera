@@ -286,6 +286,7 @@ export function createConfig(
 ): CourseConfig {
   return {
     title: 'Test',
+    language: 'en',
     description: '',
     author: '',
     version: '1.0.0',

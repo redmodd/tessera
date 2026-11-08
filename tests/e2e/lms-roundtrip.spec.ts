@@ -39,7 +39,7 @@ const QUIZ_TEXT = [
 ];
 
 const components = (texts: string[]) =>
-  texts.map((text, i) => ({ id: String(i), description: { 'en-US': text } }));
+  texts.map((text, i) => ({ id: String(i), description: { en: text } }));
 
 /** The graded quiz's options as LRS interaction components, per question. */
 const QUIZ_COMPONENTS = [
@@ -609,7 +609,9 @@ test.describe.serial('LMS round-trip — SCORM 2004', () => {
       'fill-in',
       'matching',
     ]);
-    expect(await interactionField(page, 'description')).toEqual(QUIZ_TEXT);
+    expect(await interactionField(page, 'description')).toEqual(
+      QUIZ_TEXT.map((text) => `{lang=en}${text}`),
+    );
     const pairs = '1.1[.]1.One[,]2.2[.]2.Two[,]3.3[.]3.Three';
     expect(await interactionField(page, 'learner_response')).toEqual([
       '2.4',
@@ -782,9 +784,9 @@ test.describe.serial('LMS round-trip — CMI5', () => {
         { id: 'http://tessera.test/activity/course-1' },
       ]);
     }
-    expect(
-      answered.map((s) => s.object?.definition?.description?.['en-US']),
-    ).toEqual(QUIZ_TEXT);
+    expect(answered.map((s) => s.object?.definition?.description?.en)).toEqual(
+      QUIZ_TEXT,
+    );
     expect(answered.map((s) => componentLists(s.object?.definition))).toEqual(
       QUIZ_COMPONENTS,
     );
@@ -1074,9 +1076,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       objectType: 'Activity',
       definition: {
         type: 'http://adlnet.gov/expapi/activities/course',
-        name: { 'en-US': 'E2E Test Course' },
+        name: { en: 'E2E Test Course' },
         description: {
-          'en-US': 'A comprehensive course for end-to-end testing',
+          en: 'A comprehensive course for end-to-end testing',
         },
       },
     });
@@ -1139,9 +1141,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       'fill-in',
       'matching',
     ]);
-    expect(
-      answered.map((s) => s.object?.definition?.description?.['en-US']),
-    ).toEqual(QUIZ_TEXT);
+    expect(answered.map((s) => s.object?.definition?.description?.en)).toEqual(
+      QUIZ_TEXT,
+    );
     expect(answered.map((s) => componentLists(s.object?.definition))).toEqual(
       QUIZ_COMPONENTS,
     );
