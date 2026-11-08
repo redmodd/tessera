@@ -20,8 +20,8 @@ import {
   RESUME_POLICIES,
   SUCCESS_SOURCES,
   VERDICTS,
+  canonicalLanguage,
   courseIdentity,
-  isLanguageTag,
   isRecord,
   isStringArray,
   oneOf,
@@ -61,6 +61,9 @@ const KNOWN_CONFIG_FIELDS = new Set(
     a11y: true,
   } satisfies Record<keyof CourseConfig, true>),
 );
+
+const FIND_LANGUAGE_TAG =
+  'Use the BCP-47 tag of the course\'s language: a language, then an optional script and region, such as "en", "fr-CA" or "zh-Hant-TW". Look one up at https://r12a.github.io/app-subtags/';
 
 const COMPLETION_MODES = Object.keys({
   quiz: true,
@@ -138,15 +141,13 @@ export function parseConfig(
     validateBranding(config.branding, projectRoot, d);
   }
 
-  const findTag =
-    'Use the BCP-47 tag of the course\'s language: a language, then an optional script and region, such as "en", "fr-CA" or "zh-Hant-TW". Look one up at https://r12a.github.io/app-subtags/';
   if (config.language === undefined) {
     d.error(
-      `course.config.js: "language" is required. It sets <html lang> and tags the course text in LMS/LRS records. ${findTag}`,
+      `course.config.js: "language" is required. It sets <html lang> and tags the course text in LMS/LRS records. ${FIND_LANGUAGE_TAG}`,
     );
-  } else if (!isLanguageTag(config.language)) {
+  } else if (canonicalLanguage(config.language) === null) {
     d.error(
-      `course.config.js: "language" (${formatValue(config.language)}) is not a supported BCP-47 tag. ${findTag}`,
+      `course.config.js: "language" (${formatValue(config.language)}) is not a supported BCP-47 tag. ${FIND_LANGUAGE_TAG}`,
     );
   }
 

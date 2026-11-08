@@ -31,9 +31,9 @@ export function courseIdentity(config: { id?: unknown }): string {
 /**
  * The canonical form (`EN-gb` → `en-GB`, `iw` → `he`) of a tag `Intl` parses
  * with a 2-3 letter primary language, the only kind SCORM 2004 and Moodle
- * take. `zh-cmn` and `i-klingon` forms give null.
+ * take, or null: `Intl` rejects `en-x` and `zh-cmn-Hans`, and accepts `abcde`.
  */
-function canonicalLanguage(value: unknown): string | null {
+export function canonicalLanguage(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   try {
     const [tag] = Intl.getCanonicalLocales(value);
@@ -41,10 +41,6 @@ function canonicalLanguage(value: unknown): string | null {
   } catch {
     return null;
   }
-}
-
-export function isLanguageTag(value: unknown): value is string {
-  return canonicalLanguage(value) !== null;
 }
 
 /**

@@ -16,12 +16,14 @@ describe('mergeCourseConfig', () => {
 
   it.each([
     undefined,
+    'english',
     'en_US',
     'en-x',
     'en-a',
     'en-US-US',
     'de-1',
     'zh-cmn-Hans',
+    'en-GB-oed',
     'abcde',
   ])(
     'falls back to en for the missing or malformed language %s',

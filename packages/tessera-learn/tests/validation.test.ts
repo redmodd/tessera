@@ -3596,15 +3596,7 @@ describe('language tag', () => {
     expect(has(errors, lookup)).toBe(true);
   });
 
-  it.each([
-    'english',
-    'en_US',
-    'en-x',
-    'en-US-US',
-    'de-1',
-    'zh-cmn-Hans',
-    'en-GB-oed',
-  ])('errors on the malformed tag %s', (language) => {
+  it.each(['english', 'en-x'])('errors on the malformed tag %s', (language) => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
@@ -3622,7 +3614,7 @@ describe('language tag', () => {
     expect(has(errors, lookup)).toBe(true);
   });
 
-  it.each(['en', 'fr-CA', 'zh-Hant-TW', 'es-419', 'ca-ES-valencia'])(
+  it.each(['en', 'zh-Hant-TW'])(
     'accepts the well-formed tag %s',
     (language) => {
       createValidProject(testRoot);

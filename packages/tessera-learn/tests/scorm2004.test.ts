@@ -385,6 +385,7 @@ describe('SCORM2004Adapter', () => {
       ['de-CH-1901', 'de-CH-1901'],
       ['ca-ES-valencia', 'ca-ES'],
       ['en-US-x-twain', 'en-US'],
+      ['en-x-ab', 'en'],
       ['en-u-ca-gregory', 'en'],
       ['de-DE-u-co-phonebk', 'de-DE'],
       ['en-a-bbb-x-a-ccc', 'en'],

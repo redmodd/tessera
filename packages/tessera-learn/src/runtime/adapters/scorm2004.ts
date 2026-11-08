@@ -31,13 +31,10 @@ export interface SCORM2004API {
 }
 
 // Moodle rejects the whole description when more than 8 characters follow the
-// primary language, so a longer tag loses its extensions and private use, then
+// primary language, so the tag loses its extensions and private use, then
 // subtags from the end until it fits: `ca-ES-valencia` → `ca-ES`.
 function descriptionLang(lang: string): string {
-  let subtags = lang.split('-');
-  if (subtags.slice(1).join('-').length <= 8) return lang;
-  const singleton = subtags.findIndex((s, i) => i > 0 && s.length === 1);
-  if (singleton > 0) subtags = subtags.slice(0, singleton);
+  const subtags = new Intl.Locale(lang).baseName.split('-');
   while (subtags.slice(1).join('-').length > 8) subtags.pop();
   return subtags.join('-');
 }
