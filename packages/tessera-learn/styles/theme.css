@@ -1,15 +1,62 @@
 @layer tessera {
-  /* Registered so an unparseable value falls back to the default instead of
-     blanking every color mixed from it. */
+  /* Theme colors are registered so an unparseable value falls back to the
+     default instead of blanking every color mixed from it. */
   @property --tessera-primary {
     syntax: '<color>';
     inherits: true;
     initial-value: #2563eb;
   }
 
+  @property --tessera-text {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #1f2937;
+  }
+
+  @property --tessera-text-light {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #6b7280;
+  }
+
+  @property --tessera-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #ffffff;
+  }
+
+  @property --tessera-bg-secondary {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #f9fafb;
+  }
+
+  @property --tessera-border {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #e5e7eb;
+  }
+
+  @property --tessera-success {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #147638;
+  }
+
+  @property --tessera-error {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #b91c1c;
+  }
+
+  @property --tessera-warning {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #d97706;
+  }
+
   :root {
     /* Colors */
-    --tessera-primary: #2563eb;
     --tessera-primary-light: color-mix(
       in srgb,
       var(--tessera-primary) 15%,
@@ -20,12 +67,6 @@
       var(--tessera-primary) 70%,
       black
     );
-    --tessera-text: #1f2937;
-    --tessera-text-light: #6b7280;
-    --tessera-bg: #ffffff;
-    --tessera-bg-secondary: #f9fafb;
-    --tessera-border: #e5e7eb;
-    --tessera-success: #147638;
     --tessera-success-bg: color-mix(
       in srgb,
       var(--tessera-success) 8%,
@@ -36,7 +77,6 @@
       var(--tessera-success) 25%,
       transparent
     );
-    --tessera-error: #b91c1c;
     --tessera-error-bg: color-mix(
       in srgb,
       var(--tessera-error) 8%,
@@ -47,7 +87,6 @@
       var(--tessera-error) 25%,
       transparent
     );
-    --tessera-warning: #d97706;
 
     /* Typography */
     --tessera-font-family: 'Inter', system-ui, sans-serif;
