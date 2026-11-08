@@ -484,8 +484,8 @@ export class XAPIPublisher {
 
   /**
    * `sendFirst` runs just before the closing batch is sent, with the batch's
-   * bytes already counted against the keepalive quota, so its requests go
-   * out first without taking the batch's share.
+   * bytes already counted against the keepalive quota when it fits, so its
+   * requests go out first without taking the batch's share.
    */
   sendFinal(
     partial: PartialStatement,
@@ -501,7 +501,8 @@ export class XAPIPublisher {
     const final = this.buildStatement(partial);
     const batch = [...flushed.flatMap((e) => e.body), final];
     const closing = flushed.length ? batch : final;
-    const held = byteLength(JSON.stringify(closing));
+    const bytes = byteLength(JSON.stringify(closing));
+    const held = bytes <= KEEPALIVE_BODY_LIMIT_BYTES ? bytes : 0;
     keepaliveBytesInFlight += held;
     try {
       sendFirst?.();

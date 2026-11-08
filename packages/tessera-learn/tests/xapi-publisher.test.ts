@@ -556,6 +556,28 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
   });
 
+  it('sendFinal holds no quota for a closing batch too large for keepalive', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    pub.markUnloading();
+    const put = { method: 'PUT', body: 'x'.repeat(1024) };
+    const url = 'https://lrs.example.com/xapi/activities/state';
+
+    await pub.sendFinal(
+      {
+        verb: { id: 'http://verb/final' },
+        result: { response: 'x'.repeat(64 * 1024) },
+      },
+      () => void keepaliveFetch(url, put),
+    );
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
   it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {
     mockFetch
       .mockReturnValueOnce(new Promise(() => {}))

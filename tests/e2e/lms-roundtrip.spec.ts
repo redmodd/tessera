@@ -974,8 +974,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
 
   /**
    * Route the mock LRS. `statements` and `headers` collect what the statements
-   * endpoint receives and `statePuts` the state writes; `stateGet` scripts the
-   * resume read (404 by default, null leaves it unanswered).
+   * endpoint receives, `statePuts` the state writes and `exitStatePuts` the
+   * exit state's among them; `stateGet` scripts the resume read (404 by
+   * default, null leaves it unanswered).
    */
   async function routeLRS(
     page: Page,
@@ -984,11 +985,13 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       headers = [],
       stateGet = { status: 404, body: '{}' },
       statePuts = [],
+      exitStatePuts = [],
     }: {
       statements?: any[];
       headers?: Array<Record<string, string>>;
       stateGet?: { status: number; body: string } | null;
       statePuts?: string[];
+      exitStatePuts?: string[];
     },
   ): Promise<void> {
     await page.route('http://xapi-mock.test/**', async (route) => {
@@ -1011,6 +1014,11 @@ test.describe.serial('LMS round-trip — xAPI', () => {
       if (url.includes('/xapi/activities/state')) {
         if (req.method() === 'PUT') {
           statePuts.push(req.postData() ?? '');
+          if (
+            new URL(url).searchParams.get('stateId') === 'tessera-state-exit'
+          ) {
+            exitStatePuts.push(req.postData() ?? '');
+          }
           await route.fulfill({ status: 204, body: '' });
           return;
         }
@@ -1060,8 +1068,9 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   }) => {
     const stateGet = { status: 404, body: '{}' };
     const statePuts: string[] = [];
+    const exitStatePuts: string[] = [];
     const statements: any[] = [];
-    await routeLRS(page, { stateGet, statePuts, statements });
+    await routeLRS(page, { stateGet, statePuts, exitStatePuts, statements });
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
     await navigateToPage(page, 'Accordion & Carousel');
@@ -1075,9 +1084,13 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
     statements.length = 0;
+    exitStatePuts.length = 0;
 
     await exitWithTimersPaused(page);
     await waitForStatement(statements, 'terminated');
+    await expect
+      .poll(() => exitStatePuts.at(-1)?.length ?? 0)
+      .toBeGreaterThan(KEEPALIVE_QUOTA - 2048);
     expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
   });
 
