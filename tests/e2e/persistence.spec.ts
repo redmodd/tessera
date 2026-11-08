@@ -92,10 +92,9 @@ test.describe('Persistence — localStorage', () => {
     await navigateToPage(page, 'Callouts & Images');
 
     const storageData = await readSavedState(page);
-    expect(storageData).toHaveProperty('d');
     expect(storageData.d).toBeGreaterThanOrEqual(1);
-    expect(storageData.b).toBeGreaterThanOrEqual(0);
-    expect(storageData.v.length).toBeGreaterThanOrEqual(2);
+    expect(storageData.b).toBe(2);
+    expect(storageData.v).toEqual([0, 1, 2]);
   });
 
   test('a page restored from the back/forward cache saves again when the learner leaves', async ({
