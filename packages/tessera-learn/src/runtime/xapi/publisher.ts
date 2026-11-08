@@ -88,6 +88,8 @@ const QUEUE_DEPTH_SATURATED = 1000;
  */
 const KEEPALIVE_BODY_LIMIT_BYTES = 64 * 1024;
 let keepaliveBytesInFlight = 0;
+const encoder = new TextEncoder();
+const byteLength = (body: string): number => encoder.encode(body).length;
 
 /**
  * `fetch` with `keepalive` when the body fits in what the keepalive requests
@@ -98,7 +100,7 @@ export function keepaliveFetch(
   url: string,
   init: RequestInit & { body?: string },
 ): Promise<Response> {
-  const bytes = new TextEncoder().encode(init.body ?? '').length;
+  const bytes = byteLength(init.body ?? '');
   if (keepaliveBytesInFlight + bytes > KEEPALIVE_BODY_LIMIT_BYTES) {
     console.warn(
       `Tessera: a ${bytes}-byte xAPI ${init.method ?? 'GET'} does not fit in ` +
@@ -480,7 +482,15 @@ export class XAPIPublisher {
     return outcomePromise;
   }
 
-  sendFinal(partial: PartialStatement): Promise<DestinationOutcome> {
+  /**
+   * `sendFirst` runs just before the closing batch is sent, with the batch's
+   * bytes already counted against the keepalive quota, so its requests go
+   * out first without taking the batch's share.
+   */
+  sendFinal(
+    partial: PartialStatement,
+    sendFirst?: () => void,
+  ): Promise<DestinationOutcome> {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
@@ -490,18 +500,24 @@ export class XAPIPublisher {
     for (const e of flushed) e.taken = true;
     const final = this.buildStatement(partial);
     const batch = [...flushed.flatMap((e) => e.body), final];
-    return this.#sendClosing(flushed.length ? batch : final).then(
-      async (outcome) => {
-        if (!flushed.length || !isClientError(outcome.status)) {
-          for (const e of flushed) this.#settle(e, outcome);
-          return this.#toDestination(outcome);
-        }
-        for (const e of flushed) {
-          this.#settle(e, await this.#sendClosing(e.body));
-        }
-        return this.#toDestination(await this.#sendClosing(final));
-      },
-    );
+    const closing = flushed.length ? batch : final;
+    const held = byteLength(JSON.stringify(closing));
+    keepaliveBytesInFlight += held;
+    try {
+      sendFirst?.();
+    } finally {
+      keepaliveBytesInFlight -= held;
+    }
+    return this.#sendClosing(closing).then(async (outcome) => {
+      if (!flushed.length || !isClientError(outcome.status)) {
+        for (const e of flushed) this.#settle(e, outcome);
+        return this.#toDestination(outcome);
+      }
+      for (const e of flushed) {
+        this.#settle(e, await this.#sendClosing(e.body));
+      }
+      return this.#toDestination(await this.#sendClosing(final));
+    });
   }
 
   /**

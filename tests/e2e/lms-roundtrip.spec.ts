@@ -127,7 +127,6 @@ const withAnHourSpent = (saved: string): string =>
 // Chromium allows this many bytes of keepalive request bodies in flight per page.
 const KEEPALIVE_QUOTA = 64 * 1024;
 
-/** Saved state that fits the keepalive quota alone, but not beside the closing statement batch. */
 /** Pagehide with the page's timers paused, so a failed send can't retry, as on a closed tab. */
 async function exitWithTimersPaused(page: Page): Promise<void> {
   await page.clock.install();
@@ -135,6 +134,16 @@ async function exitWithTimersPaused(page: Page): Promise<void> {
   await exitCourse(page);
 }
 
+/** The runtime's warnings about requests sent without keepalive. */
+function keepaliveWarnings(page: Page): string[] {
+  const warnings: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.text().includes('without keepalive')) warnings.push(msg.text());
+  });
+  return warnings;
+}
+
+/** Saved state that fits the keepalive quota alone, but not beside the closing statement batch. */
 const withNearKeepaliveQuota = (saved: string): string => {
   const state = { ...JSON.parse(saved), u: { notes: '' } };
   state.u.notes = 'x'.repeat(
@@ -885,6 +894,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     const statements = await installCmi5Mock(resumed, {
       documents: resumedDocuments,
     });
+    const warnings = keepaliveWarnings(resumed);
     await resumed.goto(cmi5LaunchURL(BASE));
     await waitForTesseraContent(resumed);
 
@@ -893,6 +903,7 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     await expect
       .poll(() => resumedDocuments.get('tessera-state-exit')?.length ?? 0)
       .toBeGreaterThan(KEEPALIVE_QUOTA - 2048);
+    expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
   });
 
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
@@ -1060,12 +1071,14 @@ test.describe.serial('LMS round-trip — xAPI', () => {
     stateGet.status = 200;
     stateGet.body = withNearKeepaliveQuota(statePuts.at(-1)!);
 
+    const warnings = keepaliveWarnings(page);
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
     statements.length = 0;
 
     await exitWithTimersPaused(page);
     await waitForStatement(statements, 'terminated');
+    expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
   });
 
   test('a resumed session reports the time so far on every statement, Terminated included', async ({

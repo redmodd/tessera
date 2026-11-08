@@ -887,7 +887,7 @@ describe('CMI5Adapter', () => {
     expect(statementRequests(mockFetch)).toHaveLength(1);
   });
 
-  it('terminate starts a queued-then-Terminated batch and then the state write before returning', async () => {
+  it('terminate starts the state write and a queued-then-Terminated batch before returning', async () => {
     const adapter = await initAdapter();
     await adapter.loadState();
     await flush();
@@ -905,9 +905,9 @@ describe('CMI5Adapter', () => {
       sent.map(
         ([url, init]: any[]) => `${init.method} ${new URL(url).pathname}`,
       ),
-    ).toEqual(['POST /xapi/statements', 'PUT /xapi/activities/state']);
+    ).toEqual(['PUT /xapi/activities/state', 'POST /xapi/statements']);
     expect(sent.every(([, init]: any[]) => init.keepalive)).toBe(true);
-    expect(JSON.parse(sent[0][1].body).map((s: any) => s.verb.id)).toEqual([
+    expect(JSON.parse(sent[1][1].body).map((s: any) => s.verb.id)).toEqual([
       `${VERB}completed`,
       `${VERB}terminated`,
     ]);
@@ -1496,7 +1496,7 @@ describe('CMI5Adapter', () => {
       expect(exitPut?.[1].keepalive).toBe(true);
     });
 
-    it('on pagehide, sends Terminated with keepalive before an exit state too large to share the quota', async () => {
+    it('on pagehide, sends an exit state too large to share the quota without keepalive, ahead of Terminated with it', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const adapter = await initAdapter();
       await adapter.loadState();
@@ -1514,8 +1514,8 @@ describe('CMI5Adapter', () => {
         init.keepalive,
       ]);
       expect(sent).toEqual([
-        ['statements', true],
         ['state', false],
+        ['statements', true],
       ]);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('without keepalive'),

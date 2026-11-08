@@ -476,15 +476,21 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (unloading) this.publisher.markUnloading();
     this.#finalSend = this.#report(
       'Terminated',
-      this.publisher.sendFinal({
-        verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
-        result: durationOf(this.terminatedSeconds),
-        context: this.buildContext(),
-      }),
+      this.publisher.sendFinal(
+        {
+          verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
+          result: durationOf(this.terminatedSeconds),
+          context: this.buildContext(),
+        },
+        // Ahead of Terminated: a cmi5 LMS rejects the session's token once
+        // Terminated is stored.
+        () => {
+          if (unloading && this.state) {
+            void this.#putState(this.state, EXIT_STATE_ID);
+          }
+        },
+      ),
     );
-    // After the closing batch, so the statements get first claim on the
-    // keepalive quota; the running state already holds a recent bookmark.
-    if (unloading && this.state) void this.#putState(this.state, EXIT_STATE_ID);
   }
 
   override async exit(deadline: Promise<unknown>): Promise<void> {
