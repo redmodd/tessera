@@ -220,13 +220,13 @@ test.describe('Component — Callout', () => {
         }),
       );
     const before = await colors();
+    expect(before).toHaveLength(4);
     await page.addStyleTag({
       content: `:root { ${['bg', 'success', 'error', 'warning']
         .map((token) => `--tessera-${token}: #12345;`)
         .join(' ')} }`,
     });
     await expect.poll(colors).toEqual(before);
-    expect(before).toHaveLength(4);
   });
 });
 
