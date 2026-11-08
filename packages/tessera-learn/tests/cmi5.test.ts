@@ -1496,6 +1496,37 @@ describe('CMI5Adapter', () => {
       expect(exitPut?.[1].keepalive).toBe(true);
     });
 
+    it('when the final save fails, sends a large exit state with keepalive and waits for it before Terminated', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const adapter = await initAdapter();
+      await adapter.loadState();
+
+      mockFetch.mockClear();
+      const exitPut = Promise.withResolvers<Response>();
+      mockFetch
+        .mockResolvedValueOnce(respond(500))
+        .mockReturnValueOnce(exitPut.promise);
+      adapter.saveState({
+        b: 1,
+        u: { notes: 'x'.repeat(64 * 1024 - 256) },
+      } as never);
+      const exiting = adapter.exit(noDeadline);
+      await flush();
+      expect(statementFor('terminated')).toBeUndefined();
+      exitPut.resolve(respond(204));
+      await exiting;
+
+      const sent = mockFetch.mock.calls.map(([url, init]: any[]) => [
+        new URL(url).searchParams.get('stateId') ?? 'statements',
+        init.keepalive,
+      ]);
+      expect(sent).toEqual([
+        ['tessera-state', false],
+        ['tessera-state-exit', true],
+        ['statements', true],
+      ]);
+    });
+
     it('on pagehide, sends an exit state too large to share the quota without keepalive, ahead of Terminated with it', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const adapter = await initAdapter();

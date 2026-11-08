@@ -497,10 +497,14 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const settles = (task: Promise<unknown>) =>
       Promise.race([task.then(() => true), deadline.then(() => false)]);
     if (!this.#terminated) {
-      const saved =
-        !this.publisher ||
-        ((await settles(this.publisher.drained())) && this.#stateSaved);
-      this.terminate(!saved);
+      const drained =
+        !this.publisher || (await settles(this.publisher.drained()));
+      // Past the deadline, the exit state goes beside Terminated, as on pagehide.
+      if (drained && !this.#stateSaved && this.state) {
+        this.publisher?.markUnloading();
+        await settles(this.#putState(this.state, EXIT_STATE_ID));
+      }
+      this.terminate(!drained);
     }
     if (this.#finalSend) await settles(this.#finalSend);
   }
