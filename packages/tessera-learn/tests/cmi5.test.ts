@@ -1477,7 +1477,7 @@ describe('CMI5Adapter', () => {
       expect(new URL(puts[0][0]).searchParams.get('stateId')).toBe(
         'tessera-state',
       );
-      expect(puts[0][1].keepalive).toBeUndefined();
+      expect(puts[0][1].keepalive).toBe(false);
     });
 
     it('writes the exit state when the final save fails', async () => {

@@ -1,9 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  XAPIPublisher,
-  keepaliveFetch,
-} from '../src/runtime/xapi/publisher.js';
+import { XAPIPublisher, lrsFetch } from '../src/runtime/xapi/publisher.js';
 import {
   XAPIConfigError,
   XAPIStatementError,
@@ -532,11 +529,11 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     const put = { method: 'PUT', body: 'x'.repeat(40 * 1024) };
     const url = 'https://lrs.example.com/xapi/activities/state';
 
-    const held = keepaliveFetch(url, put);
-    await keepaliveFetch(url, put);
+    const held = lrsFetch(url, put, true);
+    await lrsFetch(url, put, true);
     first.resolve(respond(204));
     await held;
-    await keepaliveFetch(url, put);
+    await lrsFetch(url, put, true);
 
     expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
       true,
@@ -549,10 +546,11 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
   it('counts the keepalive quota in UTF-8 bytes', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockFetch.mockResolvedValue(respond(204));
-    await keepaliveFetch('https://lrs.example.com/xapi/statements', {
-      method: 'POST',
-      body: 'é'.repeat(32 * 1024 + 1),
-    });
+    await lrsFetch(
+      'https://lrs.example.com/xapi/statements',
+      { method: 'POST', body: 'é'.repeat(32 * 1024 + 1) },
+      true,
+    );
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
   });
 
@@ -569,7 +567,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
         verb: { id: 'http://verb/final' },
         result: { response: 'x'.repeat(64 * 1024) },
       },
-      () => void keepaliveFetch(url, put),
+      () => void lrsFetch(url, put, true),
     );
 
     expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
@@ -587,17 +585,18 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     const pub = await initPublisher();
     pub.markUnloading();
     const url = 'https://lrs.example.com/xapi/activities/state';
-    const held = keepaliveFetch(url, {
-      method: 'PUT',
-      body: 'x'.repeat(40 * 1024),
-    });
+    const held = lrsFetch(
+      url,
+      { method: 'PUT', body: 'x'.repeat(40 * 1024) },
+      true,
+    );
 
     await pub.sendFinal(
       {
         verb: { id: 'http://verb/final' },
         result: { response: 'x'.repeat(30 * 1024) },
       },
-      () => void keepaliveFetch(url, { method: 'PUT', body: 'x'.repeat(1024) }),
+      () => void lrsFetch(url, { method: 'PUT', body: 'x'.repeat(1024) }, true),
     );
     inFlight.resolve(respond(204));
     await held;

@@ -17,7 +17,7 @@ import { RETRY_ATTEMPTS, backoffMs } from './retry.js';
 import { BaseAdapter } from './base.js';
 import {
   XAPIPublisher,
-  keepaliveFetch,
+  lrsFetch,
   type XAPIPublisherOptions,
 } from '../xapi/publisher.js';
 import { X_API_VERSION } from '../xapi/version.js';
@@ -588,10 +588,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Basic ${this.#authToken}`);
     headers.set('X-Experience-API-Version', X_API_VERSION);
-    const init = { ...options, headers };
-    return this.publisher?.isUnloading()
-      ? keepaliveFetch(url, init)
-      : fetch(url, init);
+    return lrsFetch(
+      url,
+      { ...options, headers },
+      this.publisher?.isUnloading() ?? false,
+    );
   }
 
   /**

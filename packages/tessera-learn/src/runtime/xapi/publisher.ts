@@ -92,14 +92,17 @@ const encoder = new TextEncoder();
 const byteLength = (body: string): number => encoder.encode(body).length;
 
 /**
- * `fetch` with `keepalive` when the body fits in what the keepalive requests
- * in flight leave of the browser's quota, and without it otherwise, so it can
- * still land if the page stays open. The first caller gets first claim.
+ * `fetch`, with `keepalive` when asked and the body fits in what the keepalive
+ * requests in flight leave of the browser's quota. A body that does not fit is
+ * sent without it, so it can still land if the page stays open. The first
+ * caller gets first claim.
  */
-export function keepaliveFetch(
+export function lrsFetch(
   url: string,
   init: RequestInit & { body?: string },
+  keepalive: boolean,
 ): Promise<Response> {
+  if (!keepalive) return fetch(url, { ...init, keepalive: false });
   const bytes = byteLength(init.body ?? '');
   if (keepaliveBytesInFlight + bytes > KEEPALIVE_BODY_LIMIT_BYTES) {
     console.warn(
@@ -501,8 +504,8 @@ export class XAPIPublisher {
     for (const e of flushed) e.taken = true;
     const final = this.buildStatement(partial);
     const batch = [...flushed.flatMap((e) => e.body), final];
-    const closing = flushed.length ? batch : final;
-    const bytes = byteLength(JSON.stringify(closing));
+    const body = JSON.stringify(flushed.length ? batch : final);
+    const bytes = byteLength(body);
     const held =
       keepaliveBytesInFlight + bytes <= KEEPALIVE_BODY_LIMIT_BYTES ? bytes : 0;
     keepaliveBytesInFlight += held;
@@ -511,15 +514,17 @@ export class XAPIPublisher {
     } finally {
       keepaliveBytesInFlight -= held;
     }
-    return this.#sendClosing(closing).then(async (outcome) => {
+    return this.#sendClosing(body).then(async (outcome) => {
       if (!flushed.length || !isClientError(outcome.status)) {
         for (const e of flushed) this.#settle(e, outcome);
         return this.#toDestination(outcome);
       }
       for (const e of flushed) {
-        this.#settle(e, await this.#sendClosing(e.body));
+        this.#settle(e, await this.#sendClosing(JSON.stringify(e.body)));
       }
-      return this.#toDestination(await this.#sendClosing(final));
+      return this.#toDestination(
+        await this.#sendClosing(JSON.stringify(final)),
+      );
     });
   }
 
@@ -568,26 +573,23 @@ export class XAPIPublisher {
     options?: SendStatementOptions,
   ): Promise<SendOutcome | null> {
     const taken = () => entry.taken;
-    return this.#sendRetrying(entry.body, {
+    return this.#sendRetrying(JSON.stringify(entry.body), {
       attempts: options?.retry === false ? 1 : RETRY_ATTEMPTS,
       stop: taken,
     }).then((outcome) => (taken() ? null : outcome));
   }
 
-  #sendClosing(
-    statementOrBatch: Statement | Statement[],
-  ): Promise<SendOutcome> {
-    return this.#sendRetrying(statementOrBatch, {
+  #sendClosing(body: string): Promise<SendOutcome> {
+    return this.#sendRetrying(body, {
       attempts: RETRY_ATTEMPTS,
       keepalive: true,
     });
   }
 
   #sendRetrying(
-    statementOrBatch: Statement | Statement[],
+    body: string,
     opts: { attempts: number; keepalive?: boolean; stop?: () => boolean },
   ): Promise<SendOutcome> {
-    const body = JSON.stringify(statementOrBatch);
     const stop = opts.stop ?? (() => false);
 
     const attempt = (n: number): Promise<SendOutcome> => {
@@ -651,10 +653,11 @@ export class XAPIPublisher {
   }
 
   #post(token: string, body: string, keepalive: boolean): Promise<Response> {
-    const init = { method: 'POST', headers: this.#buildHeaders(token), body };
-    return keepalive
-      ? keepaliveFetch(this.#statementsUrl, init)
-      : fetch(this.#statementsUrl, { ...init, keepalive: false });
+    return lrsFetch(
+      this.#statementsUrl,
+      { method: 'POST', headers: this.#buildHeaders(token), body },
+      keepalive,
+    );
   }
 
   #fetchWithToken(

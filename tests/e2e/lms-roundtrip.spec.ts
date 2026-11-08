@@ -1066,27 +1066,30 @@ test.describe.serial('LMS round-trip — xAPI', () => {
   test('pagehide sends Terminated when it and the exit state together pass the keepalive quota', async ({
     page,
   }) => {
-    const stateGet = { status: 404, body: '{}' };
     const statePuts: string[] = [];
-    const exitStatePuts: string[] = [];
-    const statements: any[] = [];
-    await routeLRS(page, { stateGet, statePuts, exitStatePuts, statements });
+    await routeLRS(page, { statePuts });
     await page.goto(xapiLaunchURL(BASE));
     await waitForTesseraContent(page);
     await navigateToPage(page, 'Accordion & Carousel');
     await expect
       .poll(() => JSON.parse(statePuts.at(-1) ?? '{}').b)
       .toBeGreaterThan(0);
-    stateGet.status = 200;
-    stateGet.body = withNearKeepaliveQuota(statePuts.at(-1)!);
+    const saved = withNearKeepaliveQuota(statePuts.at(-1)!);
 
-    const warnings = keepaliveWarnings(page);
-    await page.goto(xapiLaunchURL(BASE));
-    await waitForTesseraContent(page);
-    statements.length = 0;
-    exitStatePuts.length = 0;
+    // On a second page, so the first one's Terminated cannot pass for this one's.
+    const resumed = await page.context().newPage();
+    const exitStatePuts: string[] = [];
+    const statements: any[] = [];
+    await routeLRS(resumed, {
+      stateGet: { status: 200, body: saved },
+      exitStatePuts,
+      statements,
+    });
+    const warnings = keepaliveWarnings(resumed);
+    await resumed.goto(xapiLaunchURL(BASE));
+    await waitForTesseraContent(resumed);
 
-    await exitWithTimersPaused(page);
+    await exitWithTimersPaused(resumed);
     await waitForStatement(statements, 'terminated');
     await expect
       .poll(() => exitStatePuts.at(-1)?.length ?? 0)
