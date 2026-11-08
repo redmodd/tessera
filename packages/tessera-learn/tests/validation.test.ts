@@ -3596,7 +3596,7 @@ describe('language tag', () => {
     expect(has(errors, lookup)).toBe(true);
   });
 
-  it.each(['english', 'en-x'])('errors on the malformed tag %s', (language) => {
+  it.each(['english', 'en-x', 'und'])('errors on the tag %s', (language) => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,

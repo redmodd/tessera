@@ -225,7 +225,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       : undefined;
     if (description === null) {
       console.warn(
-        `Tessera: the description of interaction "${questionId}" is left out of the LMS record: ${this.dialect.profile.name} reads a leading "{lang=" as a language tag. Reword the start of the question.`,
+        `Tessera: the description of interaction "${questionId}" is left out of the LMS record: ${this.dialect.profile.name} rejects a second "{lang=" tag after the course language tag. Reword the start of the question.`,
       );
     }
     const { id, fields } = buildScormInteractionFields(

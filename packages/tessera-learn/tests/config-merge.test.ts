@@ -25,6 +25,9 @@ describe('mergeCourseConfig', () => {
     'zh-cmn-Hans',
     'en-GB-oed',
     'abcde',
+    'und',
+    'zxx-Latn',
+    'mul',
   ])(
     'falls back to en for the missing or malformed language %s',
     (language) => {
