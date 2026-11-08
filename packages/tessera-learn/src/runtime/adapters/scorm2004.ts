@@ -17,6 +17,7 @@ import {
 } from './format.js';
 import { STANDARDS } from '../standards.js';
 import { cutText } from '../interaction-format.js';
+import type { CourseConfig } from '../types.js';
 
 export interface SCORM2004API {
   Initialize(param: string): string;
@@ -44,9 +45,9 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
-    // localized_string_type, SPM 250. A leading `{lang=` is read as a language tag or rejected, and no tag can escape it.
-    description: (text) =>
-      text.startsWith('{lang=') ? null : cutText(text, 250),
+    // localized_string_type, SPM 250 after the tag. Text starting with `{lang=` is rejected even after a tag.
+    description: (text, lang) =>
+      text.startsWith('{lang=') ? null : `{lang=${lang}}${cutText(text, 250)}`,
   },
   initialize: (api) => api.Initialize(''),
   terminate: (api) => api.Terminate(''),
@@ -69,13 +70,13 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   #mode: SCORM2004Mode = 'normal';
   #exitMode: ExitMode = 'suspend';
 
-  static connect(): SCORM2004Adapter | null {
+  static connect(config: CourseConfig): SCORM2004Adapter | null {
     const api = findLMSAPI(SCORM2004_DIALECT);
-    return api ? new SCORM2004Adapter(api) : null;
+    return api ? new SCORM2004Adapter(api, config) : null;
   }
 
-  constructor(api: SCORM2004API) {
-    super(api, SCORM2004_DIALECT);
+  constructor(api: SCORM2004API, config: CourseConfig) {
+    super(api, SCORM2004_DIALECT, config);
   }
 
   override async init(): Promise<void> {

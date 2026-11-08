@@ -32,7 +32,7 @@ function cmi5Config(xapi: CourseConfig['xapi']): CourseConfig {
 }
 
 async function initCMI5Adapter() {
-  const adapter = new CMI5Adapter();
+  const adapter = new CMI5Adapter(createConfig());
   await adapter.init();
   return adapter;
 }
@@ -316,7 +316,10 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
   it('derives the actor from the connected LMS', async () => {
     const client = await buildXAPIClient(
       scormConfig(),
-      new SCORM12Adapter(scorm12Api({ 'cmi.core.student_id': 'learner-7' })),
+      new SCORM12Adapter(
+        scorm12Api({ 'cmi.core.student_id': 'learner-7' }),
+        createConfig(),
+      ),
     );
     expect(client!.getActor()).toEqual({
       account: { homePage: 'https://example.com', name: 'learner-7' },
@@ -327,7 +330,10 @@ describe('buildXAPIClient — SCORM explicit destination', () => {
   it('skips the destination with a warning when the LMS has no learner id', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(
-      await buildXAPIClient(scormConfig(), new SCORM12Adapter(scorm12Api())),
+      await buildXAPIClient(
+        scormConfig(),
+        new SCORM12Adapter(scorm12Api(), createConfig()),
+      ),
     ).toBeNull();
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/"analytics" has no actor/),

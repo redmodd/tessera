@@ -21,6 +21,7 @@ import {
   SUCCESS_SOURCES,
   VERDICTS,
   courseIdentity,
+  isPlausibleLanguageTag,
   isRecord,
   isStringArray,
   oneOf,
@@ -60,15 +61,6 @@ const KNOWN_CONFIG_FIELDS = new Set(
     a11y: true,
   } satisfies Record<keyof CourseConfig, true>),
 );
-
-// Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
-// plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
-const BCP47_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
-
-/** Plausible BCP-47 tag? Shared by the linter and the <html lang> emitter. */
-export function isPlausibleLanguageTag(value: unknown): value is string {
-  return typeof value === 'string' && BCP47_RE.test(value);
-}
 
 const COMPLETION_MODES = Object.keys({
   quiz: true,

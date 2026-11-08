@@ -18,6 +18,7 @@ import {
   type Manifest,
 } from './manifest.js';
 import {
+  courseLanguage,
   isRequiredGradedPage,
   resolveSuccess,
   type CourseConfig,
@@ -38,7 +39,6 @@ import {
   VALIDATED_ROOT_FILES,
 } from './validation.js';
 import { a11ySettingsFrom, isIgnored } from './validation/a11y.js';
-import { isPlausibleLanguageTag } from './validation/config.js';
 import {
   Diagnostics,
   formatValue,
@@ -199,12 +199,8 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
   };
 }
 
-// 'en' fallback applied here: the config default-merge runs later than buildStart.
-// Only a validated BCP-47 tag is interpolated into <html lang>, so a malformed
-// value (caught separately as a warning) can't ship a broken attribute.
 function readLanguage(read: CourseConfigRead): string {
-  const lang = read.ok ? read.config.language : undefined;
-  return isPlausibleLanguageTag(lang) ? lang : 'en';
+  return courseLanguage(read.ok ? read.config : {});
 }
 
 // Web export only — never on LMS packages (whose iframe JS bridges a meta CSP

@@ -8,7 +8,7 @@ import {
   relaunch2004,
   type RealLms2004,
 } from './helpers/real-lms.js';
-import { flush } from './helpers.js';
+import { createConfig, flush } from './helpers.js';
 
 const ids = (n: number) => Array.from({ length: n }, (_, k) => `s${k}`);
 
@@ -18,7 +18,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
 
   function start(): Promise<void> {
     lms = createReal2004Lms();
-    adapter = new SCORM2004Adapter(lms.api);
+    adapter = new SCORM2004Adapter(lms.api, createConfig());
     return adapter.init();
   }
 
@@ -756,7 +756,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
     expect(lms.errors).toEqual([]);
 
     lms = relaunch2004(lms);
-    const resumed = new SCORM2004Adapter(lms.api);
+    const resumed = new SCORM2004Adapter(lms.api, createConfig());
     await resumed.init();
     expect(resumed.getState()).toEqual(state);
     resumed.reportInteraction(
@@ -776,7 +776,7 @@ describe('SCORM2004Adapter against scorm-again', () => {
     expect(lms.errors).toEqual([]);
 
     lms = relaunch2004(lms);
-    await new SCORM2004Adapter(lms.api).init();
+    await new SCORM2004Adapter(lms.api, createConfig()).init();
     expect(lms.raw.GetValue('cmi.total_time')).toBe('PT1M30S');
   });
 

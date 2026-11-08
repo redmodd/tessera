@@ -8,7 +8,7 @@ import {
   writtenValues,
   type RealLms12,
 } from './helpers/real-lms.js';
-import { flush, useFakeTimers } from './helpers.js';
+import { createConfig, flush, useFakeTimers } from './helpers.js';
 
 describe('SCORM12Adapter against scorm-again', () => {
   let lms: RealLms12;
@@ -16,7 +16,7 @@ describe('SCORM12Adapter against scorm-again', () => {
 
   function start(): Promise<void> {
     lms = createReal12Lms();
-    adapter = new SCORM12Adapter(lms.api);
+    adapter = new SCORM12Adapter(lms.api, createConfig());
     return adapter.init();
   }
 
@@ -161,7 +161,7 @@ describe('SCORM12Adapter against scorm-again', () => {
     // Second session: a fresh runtime seeded with the persisted record, the
     // way a real LMS restores state on re-launch.
     lms = relaunch12(lms);
-    const resumed = new SCORM12Adapter(lms.api);
+    const resumed = new SCORM12Adapter(lms.api, createConfig());
     await resumed.init();
     expect(resumed.getState()).toEqual(state);
     // New interaction must not clobber index 0 — _count was 1, so it lands at 1.

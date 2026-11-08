@@ -1,6 +1,6 @@
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { STANDARDS, XAPI_COURSE_TYPE } from '../standards.js';
-import type { CourseConfig } from '../types.js';
+import { courseLanguage, type CourseConfig } from '../types.js';
 
 /**
  * Plain xAPI ("Tin Can") launch adapter. Reads launch params straight off the
@@ -18,12 +18,15 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
   /** The course definition tincan.xml declares, for an LRS that never reads the package. */
   readonly #activityDefinition: Record<string, unknown>;
 
-  constructor({ title, description }: CourseConfig) {
-    super();
+  constructor(config: CourseConfig) {
+    super(config);
+    const lang = courseLanguage(config);
     this.#activityDefinition = {
       type: XAPI_COURSE_TYPE,
-      name: { 'en-US': title },
-      ...(description && { description: { 'en-US': description } }),
+      name: { [lang]: config.title },
+      ...(config.description && {
+        description: { [lang]: config.description },
+      }),
     };
   }
 

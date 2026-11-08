@@ -3,7 +3,7 @@ import type {
   SavedState,
   SuccessStatus,
 } from '../persistence.js';
-import type { CourseConfig, Verdict } from '../types.js';
+import { courseLanguage, type CourseConfig, type Verdict } from '../types.js';
 import {
   optionId,
   optionText,
@@ -103,6 +103,7 @@ function interactionComponents(
   questionId: string,
   list: string,
   options: InteractionOption[],
+  lang: string,
 ): Array<Record<string, unknown>> | null {
   const ids = Array.isArray(options) ? options.map(optionId) : null;
   if (
@@ -118,7 +119,7 @@ function interactionComponents(
   return options.map((option, k) => {
     const text = optionText(option);
     return text
-      ? { id: ids[k], description: { 'en-US': text } }
+      ? { id: ids[k], description: { [lang]: text } }
       : { id: ids[k] };
   });
 }
@@ -191,6 +192,12 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSeq = 0;
   #stateSaved = true;
   #termination = new AbortController();
+  readonly #lang: string;
+
+  constructor(config: CourseConfig) {
+    super();
+    this.#lang = courseLanguage(config);
+  }
 
   get #terminated(): boolean {
     return this.#termination.signal.aborted;
@@ -429,12 +436,17 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
-    if (text) definition.description = { 'en-US': text };
+    if (text) definition.description = { [this.#lang]: text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     for (const [list, options] of Object.entries(optionLists(interaction))) {
       if (options == null || (Array.isArray(options) && options.length === 0))
         continue;
-      const components = interactionComponents(questionId, list, options);
+      const components = interactionComponents(
+        questionId,
+        list,
+        options,
+        this.#lang,
+      );
       if (components) definition[list] = components;
     }
     const result: Record<string, unknown> = {};

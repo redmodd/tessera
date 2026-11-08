@@ -28,6 +28,23 @@ export function courseIdentity(config: { id?: unknown }): string {
   return (typeof config.id === 'string' && config.id.trim()) || '';
 }
 
+// Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
+// plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
+const BCP47_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+
+export function isPlausibleLanguageTag(value: unknown): value is string {
+  return typeof value === 'string' && BCP47_RE.test(value);
+}
+
+/**
+ * The course's language tag for `<html lang>`, the package manifests and the
+ * LMS/LRS records. A missing or malformed `language` (the validator warns)
+ * falls back to 'en', so no record ships a tag an LRS rejects.
+ */
+export function courseLanguage(config: { language?: unknown }): string {
+  return isPlausibleLanguageTag(config.language) ? config.language : 'en';
+}
+
 interface SuccessSource {
   completion?: { mode?: string; requireSuccessStatus?: Verdict };
   success?: SuccessConfig;
