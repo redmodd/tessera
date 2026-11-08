@@ -376,7 +376,7 @@ function validateBranding(
       );
     } else if (!isPlausibleColor(primaryColor)) {
       d.warn(
-        `course.config.js: "branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color — the theme will fall back to its default shades if the browser can't parse it`,
+        `course.config.js: "branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color. If the browser can't parse it, the course keeps the default primary color`,
       );
     } else {
       // Rule 1.7: primaryColor is used both as links on the default white page

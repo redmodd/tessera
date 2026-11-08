@@ -41,9 +41,14 @@
       gap: var(--tessera-spacing-md);
       padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
       border-radius: 8px;
-      border-left: 4px solid;
+      border-left: 4px solid var(--callout-color);
       margin-bottom: var(--tessera-spacing-lg);
       color: var(--tessera-text);
+      background-color: color-mix(
+        in srgb,
+        var(--callout-color) 8%,
+        var(--tessera-bg)
+      );
     }
 
     .tessera-callout-icon {
@@ -62,39 +67,19 @@
     }
 
     .tessera-callout-info {
-      background-color: color-mix(
-        in srgb,
-        var(--tessera-primary) 8%,
-        transparent
-      );
-      border-left-color: var(--tessera-primary);
+      --callout-color: var(--tessera-primary);
     }
 
     .tessera-callout-warning {
-      background-color: color-mix(
-        in srgb,
-        var(--tessera-warning) 8%,
-        transparent
-      );
-      border-left-color: var(--tessera-warning);
+      --callout-color: var(--tessera-warning);
     }
 
     .tessera-callout-tip {
-      background-color: color-mix(
-        in srgb,
-        var(--tessera-success) 8%,
-        transparent
-      );
-      border-left-color: var(--tessera-success);
+      --callout-color: var(--tessera-success);
     }
 
     .tessera-callout-important {
-      background-color: color-mix(
-        in srgb,
-        var(--tessera-error) 8%,
-        transparent
-      );
-      border-left-color: var(--tessera-error);
+      --callout-color: var(--tessera-error);
     }
   }
 </style>

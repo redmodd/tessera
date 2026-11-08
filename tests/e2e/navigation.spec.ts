@@ -203,6 +203,29 @@ test.describe('Navigation — Free Mode', () => {
     await expect(nextBtn).toBeDisabled();
   });
 
+  test('the current page shades follow the primary color on <html>', async ({
+    page,
+  }) => {
+    const expected = await page.evaluate(() => {
+      document.documentElement.style.setProperty(
+        '--tessera-primary',
+        '#b91c1c',
+      );
+      const probe = document.body.appendChild(document.createElement('div'));
+      probe.style.backgroundColor = 'color-mix(in srgb, #b91c1c 15%, white)';
+      probe.style.color = 'color-mix(in srgb, #b91c1c 70%, black)';
+      const { backgroundColor, color } = getComputedStyle(probe);
+      probe.remove();
+      return { backgroundColor, color };
+    });
+    const current = page.locator('.tessera-nav-page[aria-current="page"]');
+    await expect(current).toHaveCSS(
+      'background-color',
+      expected.backgroundColor,
+    );
+    await expect(current).toHaveCSS('color', expected.color);
+  });
+
   test('current page is highlighted in sidebar', async ({ page }) => {
     // The first page should have aria-current
     const activePage = page.locator('.tessera-nav-page[aria-current="page"]');

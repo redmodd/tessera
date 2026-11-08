@@ -2,7 +2,8 @@ export function applyBranding(
   el: HTMLElement,
   branding: { primaryColor?: string; fontFamily?: string } | undefined,
 ): void {
-  if (branding?.primaryColor) {
+  // An unparseable color would also break the -light/-dark shades mixed from it.
+  if (branding?.primaryColor && CSS.supports('color', branding.primaryColor)) {
     el.style.setProperty('--tessera-primary', branding.primaryColor);
   }
   if (branding?.fontFamily) {
