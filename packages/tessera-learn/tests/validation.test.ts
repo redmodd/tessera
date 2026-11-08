@@ -3592,7 +3592,7 @@ describe('a11y rule 1.8 — language tag', () => {
     expect(has(warnings, 'tessera/lang')).toBe(true);
   });
 
-  it('warns on an implausible BCP-47 tag', () => {
+  it('warns on a malformed BCP-47 tag', () => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,

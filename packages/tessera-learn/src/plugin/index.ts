@@ -14,7 +14,6 @@ import {
   generateManifest,
   pageSourcePaths,
   walkPages,
-  type CourseConfigRead,
   type Manifest,
 } from './manifest.js';
 import {
@@ -168,7 +167,7 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
           const read = ctx.validatedConfig();
           writeFileSync(
             resolve(ctx.root, 'index.html'),
-            generateIndexHtml(readLanguage(read), cspMeta(read)),
+            generateIndexHtml(courseLanguage(read.config), cspMeta(read)),
             'utf-8',
           );
         }
@@ -185,7 +184,10 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           if (req.url === '/' || req.url === '/index.html') {
-            const html = generateIndexHtml(readLanguage(ctx.readConfig()));
+            const read = ctx.readConfig();
+            const html = generateIndexHtml(
+              courseLanguage(read.ok ? read.config : {}),
+            );
             const transformed = await server.transformIndexHtml(req.url, html);
             res.setHeader('Content-Type', 'text/html');
             res.statusCode = 200;
@@ -197,10 +199,6 @@ function tesseraIndexHtmlPlugin(ctx: BuildContext): Plugin {
       };
     },
   };
-}
-
-function readLanguage(read: CourseConfigRead): string {
-  return courseLanguage(read.ok ? read.config : {});
 }
 
 // Web export only — never on LMS packages (whose iframe JS bridges a meta CSP

@@ -40,6 +40,28 @@ describe('SCORM2004Adapter against scorm-again', () => {
     expect(lms.errors).toEqual([]);
   });
 
+  it.each([
+    ['fr-CA', 'fr-CA'],
+    ['zh-Hant-TW', 'zh-Hant-TW'],
+    ['ca-ES-valencia', 'ca-ES'],
+  ])('stores the tagged description of a %s course', async (language, tag) => {
+    lms = createReal2004Lms();
+    adapter = new SCORM2004Adapter(lms.api, createConfig({ language }));
+    await adapter.init();
+    const text = 'é'.repeat(260);
+    adapter.reportInteraction(
+      'q1',
+      { type: 'true-false', response: true },
+      null,
+      text,
+    );
+    await flush();
+    expect(lms.errors).toEqual([]);
+    expect(lms.raw.GetValue('cmi.interactions.0.description')).toBe(
+      `{lang=${tag}}${text.slice(0, 250)}`,
+    );
+  });
+
   it('stores raw/min/max/scaled score the runtime reads back', async () => {
     await start();
     adapter.setScore(85);

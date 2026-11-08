@@ -21,7 +21,7 @@ import {
   SUCCESS_SOURCES,
   VERDICTS,
   courseIdentity,
-  isPlausibleLanguageTag,
+  isLanguageTag,
   isRecord,
   isStringArray,
   oneOf,
@@ -143,14 +143,14 @@ export function parseConfig(
     d.warn(
       tag(
         A11Y_IDS.lang,
-        `course.config.js: "language" is not set — defaulting <html lang> to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
+        `course.config.js: "language" is not set, so <html lang> and the course text in LMS/LRS records default to "en". Set it to the course's language (BCP-47, e.g. "en", "fr-CA") for WCAG 3.1.1.`,
       ),
     );
-  } else if (!isPlausibleLanguageTag(config.language)) {
+  } else if (!isLanguageTag(config.language)) {
     d.warn(
       tag(
         A11Y_IDS.lang,
-        `course.config.js: "language" (${formatValue(config.language)}) is not a plausible BCP-47 tag — use e.g. "en", "es", or "fr-CA"`,
+        `course.config.js: "language" (${formatValue(config.language)}) is not a valid BCP-47 tag, so "en" is used. Use e.g. "en", "es", or "fr-CA"`,
       ),
     );
   }

@@ -28,21 +28,29 @@ export function courseIdentity(config: { id?: unknown }): string {
   return (typeof config.id === 'string' && config.id.trim()) || '';
 }
 
-// Heuristic, not a full BCP-47 grammar: a 2–3 letter primary subtag (any case)
-// plus any number of 1–8 alphanumeric subtags (script/region/variant/singleton).
-const BCP47_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
-
-export function isPlausibleLanguageTag(value: unknown): value is string {
-  return typeof value === 'string' && BCP47_RE.test(value);
+/**
+ * A well-formed BCP-47 tag (as `Intl` parses it) with a 2-3 letter primary
+ * language, the only kind SCORM 2004 and Moodle take. `zh-cmn` and `i-klingon`
+ * forms fail.
+ */
+export function isLanguageTag(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^[A-Za-z]{2,3}(-|$)/.test(value))
+    return false;
+  try {
+    Intl.getCanonicalLocales(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * The course's language tag for `<html lang>`, the package manifests and the
  * LMS/LRS records. A missing or malformed `language` (the validator warns)
- * falls back to 'en', so no record ships a tag an LRS rejects.
+ * falls back to 'en'.
  */
 export function courseLanguage(config: { language?: unknown }): string {
-  return isPlausibleLanguageTag(config.language) ? config.language : 'en';
+  return isLanguageTag(config.language) ? config.language : 'en';
 }
 
 interface SuccessSource {
@@ -141,7 +149,8 @@ export interface CourseConfig {
   /** Resume policy. 'auto' (default) restores saved progress unless the page
    * structure changed since it was saved; 'never' always starts fresh. */
   resume?: (typeof RESUME_POLICIES)[number];
-  /** BCP-47 language tag for <html lang>. Defaults to 'en'. WCAG 3.1.1. */
+  /** BCP-47 language tag for <html lang> (WCAG 3.1.1) and the course text in
+   * manifests and LMS/LRS records. Defaults to 'en'. */
   language?: string;
   /** Accessibility checker configuration. */
   a11y?: A11yConfig;

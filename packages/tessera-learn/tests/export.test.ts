@@ -428,10 +428,26 @@ describe('generateTincanXml', () => {
     expect(xml).toContain('<launch lang="fr">index.html</launch>');
   });
 
-  it('falls back to en for a malformed language', () => {
-    const xml = generateTincanXml({ title: 'T', language: 'en_US' } as any);
+  it.each([
+    'en_US',
+    'en-x',
+    'en-a',
+    'en-US-US',
+    'de-1',
+    'zh-cmn-Hans',
+    'abcde',
+  ])('falls back to en for the malformed language %s', (language) => {
+    const xml = generateTincanXml({ title: 'T', language } as any);
     expect(xml).toContain('<name lang="en">T</name>');
   });
+
+  it.each(['es-419', 'sr-Latn-RS', 'ca-ES-valencia', 'en-US-x-twain'])(
+    'keeps the well-formed language %s',
+    (language) => {
+      const xml = generateTincanXml({ title: 'T', language } as any);
+      expect(xml).toContain(`<name lang="${language}">T</name>`);
+    },
+  );
 
   it('emits a tincan.xml with a stable activity id and the title', () => {
     const xml = generateTincanXml({ title: 'My Course' } as any);

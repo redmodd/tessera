@@ -1,6 +1,6 @@
 import { BaseXAPILaunchAdapter } from './xapi-launch-base.js';
 import { STANDARDS, XAPI_COURSE_TYPE } from '../standards.js';
-import { courseLanguage, type CourseConfig } from '../types.js';
+import type { CourseConfig } from '../types.js';
 
 /**
  * Plain xAPI ("Tin Can") launch adapter. Reads launch params straight off the
@@ -20,12 +20,11 @@ export class XAPIAdapter extends BaseXAPILaunchAdapter {
 
   constructor(config: CourseConfig) {
     super(config);
-    const lang = courseLanguage(config);
     this.#activityDefinition = {
       type: XAPI_COURSE_TYPE,
-      name: { [lang]: config.title },
+      name: { [this.lang]: config.title },
       ...(config.description && {
-        description: { [lang]: config.description },
+        description: { [this.lang]: config.description },
       }),
     };
   }

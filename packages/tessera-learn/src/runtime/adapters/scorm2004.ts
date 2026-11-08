@@ -30,6 +30,19 @@ export interface SCORM2004API {
   GetDiagnostic(errorCode: string): string;
 }
 
+// Moodle rejects the whole description when more than 8 characters follow the
+// primary language, so drop subtags from the end (RFC 4647 lookup) until it
+// fits: `ca-ES-valencia` → `ca-ES`.
+function descriptionLang(lang: string): string {
+  const subtags = lang.split('-');
+  while (
+    subtags.length > 1 &&
+    (subtags.slice(1).join('-').length > 8 || subtags.at(-1)!.length === 1)
+  )
+    subtags.pop();
+  return subtags.join('-');
+}
+
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   profile: STANDARDS.scorm2004,
   apiName: 'API_1484_11',
@@ -47,7 +60,9 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
     // localized_string_type, SPM 250 after the tag. Text starting with `{lang=` is rejected even after a tag.
     description: (text, lang) =>
-      text.startsWith('{lang=') ? null : `{lang=${lang}}${cutText(text, 250)}`,
+      text.startsWith('{lang=')
+        ? null
+        : `{lang=${descriptionLang(lang)}}${cutText(text, 250)}`,
   },
   initialize: (api) => api.Initialize(''),
   terminate: (api) => api.Terminate(''),

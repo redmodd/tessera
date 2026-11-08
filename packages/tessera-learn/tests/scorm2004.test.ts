@@ -379,6 +379,33 @@ describe('SCORM2004Adapter', () => {
       );
     });
 
+    it.each([
+      ['fr-CA', 'fr-CA'],
+      ['zh-Hant-TW', 'zh-Hant-TW'],
+      ['de-CH-1901', 'de-CH-1901'],
+      ['ca-ES-valencia', 'ca-ES'],
+      ['en-US-x-twain', 'en-US'],
+      ['en-u-ca-gregory', 'en-u-ca'],
+    ])(
+      'tags the description of a %s course with {lang=%s}, which Moodle accepts',
+      async (language, tag) => {
+        adapter = new SCORM2004Adapter(api, createConfig({ language }));
+        adapter.reportInteraction(
+          'q1',
+          { type: 'true-false', response: true },
+          null,
+          'Vrai?',
+        );
+        await flush();
+        const { description } = interaction0();
+        expect(description).toBe(`{lang=${tag}}Vrai?`);
+        // Moodle's SCORM 2004 CMILangString250, anchored.
+        expect(description).toMatch(
+          /^\{lang=[a-zA-Z]{2,3}(-[a-zA-Z0-9-]{2,8})?\}[^{].{0,250}$/,
+        );
+      },
+    );
+
     it('replaces whitespace in the interaction id', async () => {
       adapter.reportInteraction(
         'my question',

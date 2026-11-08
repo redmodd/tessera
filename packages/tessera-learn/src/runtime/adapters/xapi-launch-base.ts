@@ -192,11 +192,11 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
   #stateSeq = 0;
   #stateSaved = true;
   #termination = new AbortController();
-  readonly #lang: string;
+  protected readonly lang: string;
 
   constructor(config: CourseConfig) {
     super();
-    this.#lang = courseLanguage(config);
+    this.lang = courseLanguage(config);
   }
 
   get #terminated(): boolean {
@@ -436,7 +436,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       type: CMI_INTERACTION_TYPE,
       interactionType: interaction.type,
     };
-    if (text) definition.description = { [this.#lang]: text };
+    if (text) definition.description = { [this.lang]: text };
     if (patterns !== null) definition.correctResponsesPattern = patterns;
     for (const [list, options] of Object.entries(optionLists(interaction))) {
       if (options == null || (Array.isArray(options) && options.length === 0))
@@ -445,7 +445,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         questionId,
         list,
         options,
-        this.#lang,
+        this.lang,
       );
       if (components) definition[list] = components;
     }
