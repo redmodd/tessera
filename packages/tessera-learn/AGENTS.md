@@ -504,8 +504,8 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
 | `--tessera-primary`                            | `#2563eb`                             |
-| `--tessera-primary-light`                      | `#dbeafe`                             |
-| `--tessera-primary-dark`                       | `#1e40af`                             |
+| `--tessera-primary-light`                      | the primary at 15% over white         |
+| `--tessera-primary-dark`                       | the primary at 70% over black         |
 | `--tessera-text`                               | `#1f2937`                             |
 | `--tessera-text-light`                         | `#6b7280`                             |
 | `--tessera-bg`                                 | `#ffffff`                             |
@@ -539,7 +539,7 @@ Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-s
 }
 ```
 
-**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` (and its `-light` / `-dark` shades) and `--tessera-font-family`. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
+**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-light` and `-dark` shades mix from the `:root` value of `--tessera-primary`, so override it on `:root` for them to follow. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
 
 ---
 

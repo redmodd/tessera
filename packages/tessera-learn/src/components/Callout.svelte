@@ -43,6 +43,7 @@
       border-radius: 8px;
       border-left: 4px solid;
       margin-bottom: var(--tessera-spacing-lg);
+      color: var(--tessera-text);
     }
 
     .tessera-callout-icon {
@@ -61,27 +62,39 @@
     }
 
     .tessera-callout-info {
-      background-color: #eff6ff;
+      background-color: color-mix(
+        in srgb,
+        var(--tessera-primary) 8%,
+        transparent
+      );
       border-left-color: var(--tessera-primary);
-      color: var(--tessera-text);
     }
 
     .tessera-callout-warning {
-      background-color: #fffbeb;
+      background-color: color-mix(
+        in srgb,
+        var(--tessera-warning) 8%,
+        transparent
+      );
       border-left-color: var(--tessera-warning);
-      color: var(--tessera-text);
     }
 
     .tessera-callout-tip {
-      background-color: #f0fdf4;
+      background-color: color-mix(
+        in srgb,
+        var(--tessera-success) 8%,
+        transparent
+      );
       border-left-color: var(--tessera-success);
-      color: var(--tessera-text);
     }
 
     .tessera-callout-important {
-      background-color: #fef2f2;
+      background-color: color-mix(
+        in srgb,
+        var(--tessera-error) 8%,
+        transparent
+      );
       border-left-color: var(--tessera-error);
-      color: var(--tessera-text);
     }
   }
 </style>

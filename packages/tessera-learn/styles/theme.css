@@ -2,8 +2,16 @@
   :root {
     /* Colors */
     --tessera-primary: #2563eb;
-    --tessera-primary-light: #dbeafe;
-    --tessera-primary-dark: #1e40af;
+    --tessera-primary-light: color-mix(
+      in srgb,
+      var(--tessera-primary) 15%,
+      white
+    );
+    --tessera-primary-dark: color-mix(
+      in srgb,
+      var(--tessera-primary) 70%,
+      black
+    );
     --tessera-text: #1f2937;
     --tessera-text-light: #6b7280;
     --tessera-bg: #ffffff;
