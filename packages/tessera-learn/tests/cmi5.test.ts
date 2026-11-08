@@ -1496,7 +1496,7 @@ describe('CMI5Adapter', () => {
       expect(exitPut?.[1].keepalive).toBe(true);
     });
 
-    it('when the final save fails, sends a large exit state with keepalive and waits for it before Terminated', async () => {
+    const exitAfterFailedSave = async (notesBytes: number) => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const adapter = await initAdapter();
       await adapter.loadState();
@@ -1508,7 +1508,7 @@ describe('CMI5Adapter', () => {
         .mockReturnValueOnce(exitPut.promise);
       adapter.saveState({
         b: 1,
-        u: { notes: 'x'.repeat(64 * 1024 - 256) },
+        u: { notes: 'x'.repeat(notesBytes) },
       } as never);
       const exiting = adapter.exit(noDeadline);
       await flush();
@@ -1516,13 +1516,24 @@ describe('CMI5Adapter', () => {
       exitPut.resolve(respond(204));
       await exiting;
 
-      const sent = mockFetch.mock.calls.map(([url, init]: any[]) => [
+      return mockFetch.mock.calls.map(([url, init]: any[]) => [
         new URL(url).searchParams.get('stateId') ?? 'statements',
         init.keepalive,
       ]);
-      expect(sent).toEqual([
+    };
+
+    it('when the final save fails, sends the exit state with keepalive and waits for it before Terminated', async () => {
+      expect(await exitAfterFailedSave(32 * 1024)).toEqual([
         ['tessera-state', false],
         ['tessera-state-exit', true],
+        ['statements', true],
+      ]);
+    });
+
+    it('when the final save fails, sends an exit state too large to share the quota without keepalive, leaving it to Terminated', async () => {
+      expect(await exitAfterFailedSave(64 * 1024 - 256)).toEqual([
+        ['tessera-state', false],
+        ['tessera-state-exit', false],
         ['statements', true],
       ]);
     });

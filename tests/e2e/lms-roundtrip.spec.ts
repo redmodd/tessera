@@ -906,6 +906,62 @@ test.describe.serial('LMS round-trip — CMI5', () => {
     expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
   });
 
+  test('Exit course after a failed save stores a large exit state, then sends Terminated with keepalive before returning', async ({
+    page,
+  }) => {
+    const documents = new Map<string, string>();
+    await installCmi5Mock(page, { documents });
+    await page.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(page);
+    await navigateToPage(page, 'Accordion & Carousel');
+    await expect
+      .poll(() => JSON.parse(documents.get('tessera-state') ?? '{}').b)
+      .toBeGreaterThan(0);
+    const saved = withNearKeepaliveQuota(documents.get('tessera-state')!);
+
+    const RETURN_URL = 'http://cmi5-mock.test/return';
+    const resumed = await page.context().newPage();
+    const resumedDocuments = new Map([['tessera-state', saved]]);
+    const statements = await installCmi5Mock(resumed, {
+      documents: resumedDocuments,
+      launchData: { returnURL: RETURN_URL },
+    });
+    await resumed.route(
+      (url) => url.searchParams.get('stateId') === 'tessera-state',
+      (route) =>
+        route.request().method() === 'PUT'
+          ? route.fulfill({ status: 500 })
+          : route.fallback(),
+    );
+    let exitStateBeforeTerminated = false;
+    let terminatedBeforeReturn = false;
+    resumed.on('request', (req) => {
+      if (
+        req.url().includes('/statements') &&
+        req.postData()?.includes('/terminated')
+      ) {
+        exitStateBeforeTerminated = resumedDocuments.has('tessera-state-exit');
+      }
+    });
+    await resumed.route(RETURN_URL, async (route) => {
+      terminatedBeforeReturn = !!findStatement(statements, 'terminated');
+      await route.fulfill({ contentType: 'text/html', body: '<h1>LMS</h1>' });
+    });
+    const warnings = keepaliveWarnings(resumed);
+    await resumed.goto(cmi5LaunchURL(BASE));
+    await waitForTesseraContent(resumed);
+
+    await clickExitCourse(resumed);
+    await resumed.waitForURL(RETURN_URL);
+
+    expect(resumedDocuments.get('tessera-state-exit')?.length).toBeGreaterThan(
+      KEEPALIVE_QUOTA - 2048,
+    );
+    expect(exitStateBeforeTerminated).toBe(true);
+    expect(terminatedBeforeReturn).toBe(true);
+    expect(warnings).toEqual([expect.stringContaining('xAPI PUT')]);
+  });
+
   test('a page restored from the back/forward cache ends the session and stops sending', async ({
     page,
   }) => {

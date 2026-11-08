@@ -308,12 +308,17 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     });
   }
 
-  async #putState(state: SavedState, stateId?: string): Promise<boolean> {
+  async #putState(
+    state: SavedState,
+    stateId?: string,
+    keepalive?: boolean,
+  ): Promise<boolean> {
     try {
       const resp = await this.xapiFetch(this.buildStateUrl(stateId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...state, n: ++this.#stateSeq }),
+        keepalive,
       });
       if (!resp.ok) {
         console.warn(
@@ -474,22 +479,13 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     this.#termination.abort();
     if (!this.publisher) return;
     if (unloading) this.publisher.markUnloading();
+    // Started ahead of Terminated, since a cmi5 LMS rejects the session's
+    // token once Terminated is stored. Unload can't wait, so it may land second.
+    if (unloading && this.state)
+      void this.#putExitState(this.publisher, this.state);
     this.#finalSend = this.#report(
       'Terminated',
-      this.publisher.sendFinal(
-        {
-          verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
-          result: durationOf(this.terminatedSeconds),
-          context: this.buildContext(),
-        },
-        // Started ahead of Terminated, since a cmi5 LMS rejects the session's
-        // token once Terminated is stored. Unload can't wait, so it may land second.
-        () => {
-          if (unloading && this.state) {
-            void this.#putState(this.state, EXIT_STATE_ID);
-          }
-        },
-      ),
+      this.publisher.sendFinal(this.#terminatedStatement()),
     );
   }
 
@@ -501,13 +497,29 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         !this.publisher || (await settles(this.publisher.drained()));
       // Past the deadline, terminate(true) sends the exit state beside
       // Terminated instead, as on pagehide.
-      if (drained && !this.#stateSaved && this.state) {
-        this.publisher?.markUnloading();
-        await settles(this.#putState(this.state, EXIT_STATE_ID));
+      if (drained && this.publisher && !this.#stateSaved && this.state) {
+        await settles(this.#putExitState(this.publisher, this.state));
       }
       this.terminate(!drained);
     }
     if (this.#finalSend) await settles(this.#finalSend);
+  }
+
+  #terminatedStatement(): PartialStatement {
+    return {
+      verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
+      result: durationOf(this.terminatedSeconds),
+      context: this.buildContext(),
+    };
+  }
+
+  /** Sent with keepalive only when it leaves the closing batch its share of the quota. */
+  #putExitState(publisher: XAPIPublisher, state: SavedState): Promise<boolean> {
+    let put!: Promise<boolean>;
+    publisher.holdClosingQuota(this.#terminatedStatement(), () => {
+      put = this.#putState(state, EXIT_STATE_ID, true);
+    });
+    return put;
   }
 
   override returnToLMS(): boolean {
@@ -596,7 +608,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     return lrsFetch(url, {
       ...options,
       headers,
-      keepalive: this.publisher?.isUnloading() ?? false,
+      keepalive: options.keepalive ?? this.publisher?.isUnloading() ?? false,
     });
   }
 

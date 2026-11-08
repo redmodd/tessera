@@ -512,26 +512,26 @@ export class XAPIPublisher {
   }
 
   /**
-   * `sendFirst` runs just before the closing batch is sent, with the batch's
-   * bytes already counted against the keepalive quota when it fits beside the
-   * keepalive requests in flight, so its requests go out first without taking
-   * the batch's share.
+   * Runs `fn` with the bytes of the closing batch `sendFinal(partial)` would
+   * send counted against the keepalive quota, when it fits beside the
+   * keepalive requests in flight, so the requests `fn` starts leave the batch
+   * its share.
    */
-  sendFinal(
-    partial: PartialStatement,
-    sendFirst?: () => void,
-  ): Promise<DestinationOutcome> {
+  holdClosingQuota(partial: PartialStatement, fn: () => void): void {
+    const body = this.#closingBody(this.buildStatement(partial));
+    withKeepaliveHeld(byteLength(body), fn);
+  }
+
+  sendFinal(partial: PartialStatement): Promise<DestinationOutcome> {
     if (this.#unavailableReason) {
       return Promise.reject(this.#unavailableReason());
     }
+    const final = this.buildStatement(partial);
+    const body = this.#closingBody(final);
     const flushed = this.#unsent;
     this.#unsent = [];
     this.#closed = true;
     for (const e of flushed) e.taken = true;
-    const final = this.buildStatement(partial);
-    const batch = [...flushed.flatMap((e) => e.body), final];
-    const body = JSON.stringify(flushed.length ? batch : final);
-    if (sendFirst) withKeepaliveHeld(byteLength(body), sendFirst);
     return this.#sendClosing(body).then(async (outcome) => {
       if (!flushed.length || !isClientError(outcome.status)) {
         for (const e of flushed) this.#settle(e, outcome);
@@ -595,6 +595,11 @@ export class XAPIPublisher {
       attempts: options?.retry === false ? 1 : RETRY_ATTEMPTS,
       stop: taken,
     }).then((outcome) => (taken() ? null : outcome));
+  }
+
+  #closingBody(final: Statement): string {
+    if (!this.#unsent.length) return JSON.stringify(final);
+    return JSON.stringify([...this.#unsent.flatMap((e) => e.body), final]);
   }
 
   #sendClosing(body: string): Promise<SendOutcome> {

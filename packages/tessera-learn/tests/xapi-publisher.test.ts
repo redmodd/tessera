@@ -564,19 +564,18 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     expect(mockFetch.mock.calls[0][1].keepalive).toBe(false);
   });
 
-  it('sendFinal holds no quota for a closing batch too large for keepalive', async () => {
+  it('holdClosingQuota holds nothing for a closing batch too large for keepalive', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockFetch.mockResolvedValue(respond(204));
     const pub = await initPublisher();
     pub.markUnloading();
+    const final = {
+      verb: { id: 'http://verb/final' },
+      result: { response: 'x'.repeat(64 * 1024) },
+    };
 
-    await pub.sendFinal(
-      {
-        verb: { id: 'http://verb/final' },
-        result: { response: 'x'.repeat(64 * 1024) },
-      },
-      () => void lrsFetch(stateUrl, keepalivePut(1)),
-    );
+    pub.holdClosingQuota(final, () => void lrsFetch(stateUrl, keepalivePut(1)));
+    await pub.sendFinal(final);
 
     expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
       true,
@@ -584,7 +583,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     ]);
   });
 
-  it('sendFinal holds no quota for a closing batch that cannot fit beside keepalive requests in flight', async () => {
+  it('holdClosingQuota holds nothing for a closing batch that cannot fit beside keepalive requests in flight', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const inFlight = Promise.withResolvers<Response>();
     mockFetch
@@ -593,14 +592,13 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     const pub = await initPublisher();
     pub.markUnloading();
     const held = lrsFetch(stateUrl, keepalivePut(40));
+    const final = {
+      verb: { id: 'http://verb/final' },
+      result: { response: 'x'.repeat(30 * 1024) },
+    };
 
-    await pub.sendFinal(
-      {
-        verb: { id: 'http://verb/final' },
-        result: { response: 'x'.repeat(30 * 1024) },
-      },
-      () => void lrsFetch(stateUrl, keepalivePut(1)),
-    );
+    pub.holdClosingQuota(final, () => void lrsFetch(stateUrl, keepalivePut(1)));
+    await pub.sendFinal(final);
     inFlight.resolve(respond(204));
     await held;
 
