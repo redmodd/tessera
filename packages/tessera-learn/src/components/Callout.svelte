@@ -37,6 +37,7 @@
 <style>
   @layer tessera {
     .tessera-callout {
+      --callout-color: var(--tessera-primary);
       display: flex;
       gap: var(--tessera-spacing-md);
       padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
@@ -64,10 +65,6 @@
 
     .tessera-callout-content :global(p:last-child) {
       margin-bottom: 0;
-    }
-
-    .tessera-callout-info {
-      --callout-color: var(--tessera-primary);
     }
 
     .tessera-callout-warning {

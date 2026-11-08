@@ -1,4 +1,12 @@
 @layer tessera {
+  /* Registered so an unparseable value falls back to the default instead of
+     blanking every color mixed from it. */
+  @property --tessera-primary {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #2563eb;
+  }
+
   :root {
     /* Colors */
     --tessera-primary: #2563eb;

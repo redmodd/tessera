@@ -203,28 +203,36 @@ test.describe('Navigation — Free Mode', () => {
     await expect(nextBtn).toBeDisabled();
   });
 
-  test('the current page shades follow the primary color on <html>', async ({
-    page,
-  }) => {
-    const expected = await page.evaluate(() => {
-      document.documentElement.style.setProperty(
-        '--tessera-primary',
-        '#b91c1c',
+  for (const [name, primary, shadedFrom] of [
+    ['follow the primary color on <html>', '#b91c1c', '#b91c1c'],
+    ['keep the default for an unparseable primary color', '#12345', '#2563eb'],
+  ]) {
+    test(`the current page shades ${name}`, async ({ page }) => {
+      const expected = await page.evaluate(
+        ([primary, shadedFrom]) => {
+          document.documentElement.style.setProperty(
+            '--tessera-primary',
+            primary,
+          );
+          const probe = document.body.appendChild(
+            document.createElement('div'),
+          );
+          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, white)`;
+          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, black)`;
+          const { backgroundColor, color } = getComputedStyle(probe);
+          probe.remove();
+          return { backgroundColor, color };
+        },
+        [primary, shadedFrom],
       );
-      const probe = document.body.appendChild(document.createElement('div'));
-      probe.style.backgroundColor = 'color-mix(in srgb, #b91c1c 15%, white)';
-      probe.style.color = 'color-mix(in srgb, #b91c1c 70%, black)';
-      const { backgroundColor, color } = getComputedStyle(probe);
-      probe.remove();
-      return { backgroundColor, color };
+      const current = page.locator('.tessera-nav-page[aria-current="page"]');
+      await expect(current).toHaveCSS(
+        'background-color',
+        expected.backgroundColor,
+      );
+      await expect(current).toHaveCSS('color', expected.color);
     });
-    const current = page.locator('.tessera-nav-page[aria-current="page"]');
-    await expect(current).toHaveCSS(
-      'background-color',
-      expected.backgroundColor,
-    );
-    await expect(current).toHaveCSS('color', expected.color);
-  });
+  }
 
   test('current page is highlighted in sidebar', async ({ page }) => {
     // The first page should have aria-current
