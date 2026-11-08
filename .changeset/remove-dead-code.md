@@ -1,5 +1,5 @@
 ---
-'tessera-learn': minor
+'tessera-learn': patch
 ---
 
-**Breaking:** the xAPI client from `useXAPI()` no longer has the undocumented `getPublishers()` method. To upgrade, remove calls to it and use the client's own methods, such as `getActor()`.
+Internal simplifications.
