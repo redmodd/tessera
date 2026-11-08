@@ -222,9 +222,8 @@ test.describe('Component — Callout', () => {
     const before = await colors();
     expect(before).toHaveLength(4);
     await page.addStyleTag({
-      content: `:root { ${['bg', 'success', 'error', 'warning']
-        .map((token) => `--tessera-${token}: #12345;`)
-        .join(' ')} }`,
+      content:
+        ':root { --tessera-bg: #12345; --tessera-success: #12345; --tessera-error: #12345; --tessera-warning: #12345; }',
     });
     await expect.poll(colors).toEqual(before);
   });

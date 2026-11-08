@@ -1,6 +1,6 @@
 @layer tessera {
-  /* Theme colors are registered so an unparseable value falls back to the
-     default instead of blanking every color mixed from it. */
+  /* Registered so an unparseable theme color falls back to its default
+     instead of blanking the colors mixed from it. */
   @property --tessera-primary {
     syntax: '<color>';
     inherits: true;
