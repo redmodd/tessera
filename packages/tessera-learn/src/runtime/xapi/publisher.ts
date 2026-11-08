@@ -114,9 +114,20 @@ export function lrsFetch(
     return fetch(url, { ...init, keepalive: false });
   }
   keepaliveBytesInFlight += bytes;
-  return fetch(url, { ...init, keepalive: true }).finally(() => {
+  const release = () => {
     keepaliveBytesInFlight -= bytes;
-  });
+  };
+  return fetch(url, { ...init, keepalive: true }).then(
+    (response) => {
+      // Browsers count the request until its response body ends, not at the headers.
+      void response.clone().arrayBuffer().then(release, release);
+      return response;
+    },
+    (err: unknown) => {
+      release();
+      throw err;
+    },
+  );
 }
 
 const isActivity = (a: unknown): a is { id: string } =>

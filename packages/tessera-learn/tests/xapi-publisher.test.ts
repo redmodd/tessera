@@ -533,6 +533,7 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     await lrsFetch(url, put, true);
     first.resolve(respond(204));
     await held;
+    await flush();
     await lrsFetch(url, put, true);
 
     expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
@@ -541,6 +542,33 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
       true,
     ]);
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('counts a keepalive request against the quota until its response body ends', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let endBody!: () => void;
+    const body = new ReadableStream({
+      start: (controller) => {
+        endBody = () => controller.close();
+      },
+    });
+    mockFetch
+      .mockResolvedValueOnce(new Response(body))
+      .mockResolvedValue(respond(204));
+    const put = { method: 'PUT', body: 'x'.repeat(40 * 1024) };
+    const url = 'https://lrs.example.com/xapi/activities/state';
+
+    await lrsFetch(url, put, true);
+    await lrsFetch(url, put, true);
+    endBody();
+    await flush();
+    await lrsFetch(url, put, true);
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      false,
+      true,
+    ]);
   });
 
   it('counts the keepalive quota in UTF-8 bytes', async () => {

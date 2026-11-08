@@ -482,8 +482,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
           result: durationOf(this.terminatedSeconds),
           context: this.buildContext(),
         },
-        // Ahead of Terminated: a cmi5 LMS rejects the session's token once
-        // Terminated is stored.
+        // Started ahead of Terminated, since a cmi5 LMS rejects the session's
+        // token once Terminated is stored. Unload can't wait, so it may land second.
         () => {
           if (unloading && this.state) {
             void this.#putState(this.state, EXIT_STATE_ID);
