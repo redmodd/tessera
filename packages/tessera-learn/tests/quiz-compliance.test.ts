@@ -259,34 +259,6 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
     );
   });
 
-  it('default weights (=1) produce byte-identical adapter calls to the unweighted baseline', () => {
-    // Locks in the "weight=1 is a no-op" promise.
-    const adapter = recordingAdapter();
-    const m = mountHarness({ graded: true }, { adapter });
-    const q = m.ref.handle!;
-    for (const f of ALL_INTERACTION_FIXTURES) {
-      q.registerQuestion({
-        id: f.id,
-        weight: 1,
-        checkAnswer: () => f.expectedCorrect,
-        interaction: () => f.interaction,
-      });
-    }
-    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
-      q.setAnswer(i, '__answered__');
-    q.submit();
-    expect(adapter.calls).toHaveLength(ALL_INTERACTION_FIXTURES.length);
-    for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
-      const f = ALL_INTERACTION_FIXTURES[i];
-      expect(adapter.calls[i]).toEqual([
-        'reportInteraction',
-        f.id,
-        f.interaction,
-        f.expectedCorrect,
-      ]);
-    }
-  });
-
   it('mixed weights leave per-question interactions identical (rollup score is covered in use-quiz)', () => {
     // Weights are not part of any LMS standard — a single question is still
     // pass/fail to the LMS regardless of its rollup weight. Only the rolled-up

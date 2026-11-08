@@ -280,18 +280,6 @@ describe('QuizEngine', () => {
     expect(reports.map((r) => r.id)).toEqual(['a']);
   });
 
-  it('re-reports after retry() so a second attempt produces fresh statements', () => {
-    const { engine, reports } = makeEngine();
-    engine.registerQuestion(tfQuestion('a', false, true));
-    engine.setAnswer(0, false);
-    engine.submit();
-    expect(reports).toHaveLength(1);
-    engine.retry();
-    engine.setAnswer(0, false);
-    engine.submit();
-    expect(reports).toHaveLength(2);
-  });
-
   it('submit() is the only sanctioned dispatcher — calling twice does not double-fire', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));

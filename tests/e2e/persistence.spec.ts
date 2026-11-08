@@ -82,21 +82,7 @@ test.describe('Persistence — localStorage', () => {
     await ctx2.close();
   });
 
-  test('localStorage contains compact serialized state', async ({ page }) => {
-    await navigateToPage(page, 'Objectives');
-    await navigateToPage(page, 'Callouts & Images');
-
-    const storageData = await readSavedState(page);
-
-    expect(storageData).not.toBeNull();
-    expect(storageData).toHaveProperty('b'); // bookmark
-    expect(storageData).toHaveProperty('v'); // visited
-    expect(storageData).toHaveProperty('d'); // duration
-    expect(Array.isArray(storageData.v)).toBe(true);
-    expect(storageData.v.length).toBeGreaterThanOrEqual(2);
-  });
-
-  test('state includes duration tracking', async ({ page }) => {
+  test('saves the bookmark, visited pages and duration', async ({ page }) => {
     // Persistence is event-driven: a save fires on each page change. Navigate
     // once to seed the store, fast-forward past the 1-second tick, then navigate
     // again to flush the updated duration. This avoids polling for a value
@@ -106,9 +92,9 @@ test.describe('Persistence — localStorage', () => {
     await navigateToPage(page, 'Callouts & Images');
 
     const storageData = await readSavedState(page);
-    expect(storageData).toHaveProperty('d');
     expect(storageData.d).toBeGreaterThanOrEqual(1);
-    expect(storageData.b).toBeGreaterThanOrEqual(0);
+    expect(storageData.b).toBe(2);
+    expect(storageData.v).toEqual([0, 1, 2]);
   });
 
   test('a page restored from the back/forward cache saves again when the learner leaves', async ({

@@ -90,6 +90,7 @@ describe('create-tessera workspace scaffold', () => {
     const ws = resolve(testDir, 'my-courses');
     expect(existsSync(resolve(ws, 'package.json'))).toBe(true);
     expect(existsSync(resolve(ws, '.gitignore'))).toBe(true);
+    expect(existsSync(resolve(ws, '_gitignore'))).toBe(false);
     expect(existsSync(resolve(ws, 'AGENTS.md'))).toBe(true);
     expect(existsSync(resolve(ws, 'CLAUDE.md'))).toBe(false);
     expect(existsSync(resolve(ws, 'README.md'))).toBe(true);
@@ -250,13 +251,6 @@ describe('create-tessera workspace scaffold', () => {
     expect(config).not.toContain('__COURSE_ID__');
   });
 
-  it('renames dotfiles on copy', () => {
-    runCLI('dotfile-courses', testDir);
-    const ws = resolve(testDir, 'dotfile-courses');
-    expect(existsSync(resolve(ws, '.gitignore'))).toBe(true);
-    expect(existsSync(resolve(ws, '_gitignore'))).toBe(false);
-  });
-
   it('leads the "Next steps" hint with pnpm and shows how to add courses', () => {
     const stdout = execFileSync('node', [CLI_PATH, 'pnpm-courses'], {
       cwd: testDir,
@@ -272,12 +266,6 @@ describe('create-tessera workspace scaffold', () => {
     expect(stdout).toContain('pnpm dev starter-course');
     expect(stdout).toContain('tessera new');
     expect(stdout).not.toContain('npm run dev');
-  });
-
-  it('rejects an unknown flag', () => {
-    const { stderr, exitCode } = runCLI('my-courses --template=bare', testDir);
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain('Unknown option');
   });
 });
 

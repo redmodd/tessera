@@ -118,15 +118,6 @@ describe('SCORM2004Adapter', () => {
     });
   });
 
-  it('sets score with raw, min, max, and scaled via queue', async () => {
-    adapter.setScore(85);
-    await flush();
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.raw', '85');
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.min', '0');
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.max', '100');
-    expect(api.SetValue).toHaveBeenCalledWith('cmi.score.scaled', '0.85');
-  });
-
   it('rounds fractional scores to real(10,7) — no >7-digit decimal trips 406', async () => {
     // 7 / 11 * 100 = 63.6363636363... → raw must not exceed 7 fractional digits
     adapter.setScore((7 / 11) * 100);

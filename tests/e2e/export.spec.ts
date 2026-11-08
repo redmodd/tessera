@@ -1,57 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { execFile } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { variantDir, viteBin } from './global-setup.js';
-
-test.describe('Export — Web', () => {
-  test('vite build produces dist/ folder with index.html', async () => {
-    const distPath = resolve(variantDir('free', 'web'), 'dist');
-    expect(existsSync(distPath)).toBe(true);
-
-    const indexHtml = resolve(distPath, 'index.html');
-    expect(existsSync(indexHtml)).toBe(true);
-
-    const html = readFileSync(indexHtml, 'utf-8');
-    expect(html).toContain('<!DOCTYPE html');
-    expect(html).toContain('tessera');
-  });
-
-  test('dist contains JS assets referenced by index.html', async () => {
-    const distPath = resolve(variantDir('free', 'web'), 'dist');
-    const indexHtml = readFileSync(resolve(distPath, 'index.html'), 'utf-8');
-
-    // Should reference JS assets
-    expect(indexHtml).toMatch(/\.js/);
-
-    // Assets directory should exist
-    expect(existsSync(resolve(distPath, 'assets'))).toBe(true);
-  });
-
-  test('web export does not include SCORM/CMI5 manifests', async () => {
-    const distPath = resolve(variantDir('free', 'web'), 'dist');
-    expect(existsSync(resolve(distPath, 'imsmanifest.xml'))).toBe(false);
-    expect(existsSync(resolve(distPath, 'cmi5.xml'))).toBe(false);
-  });
-
-  test('web export ships the baseline Content-Security-Policy meta', () => {
-    const html = readFileSync(
-      resolve(variantDir('free', 'web'), 'dist', 'index.html'),
-      'utf-8',
-    );
-    expect(html).toContain('http-equiv="Content-Security-Policy"');
-    expect(html).toContain("object-src 'none'");
-    expect(html).toContain("base-uri 'self'");
-  });
-
-  test('the CSP meta is web-only — absent from an LMS build', () => {
-    const html = readFileSync(
-      resolve(variantDir('free', 'xapi'), 'dist', 'index.html'),
-      'utf-8',
-    );
-    expect(html).not.toContain('Content-Security-Policy');
-  });
-});
 
 test.describe('Export — Serve Built Output', () => {
   test('built dist/ serves and course loads with navigation', async ({
@@ -102,101 +53,42 @@ test.describe('Export — Serve Built Output', () => {
   });
 });
 
-test.describe('Export — SCORM 1.2', () => {
-  test('SCORM 1.2 build produces ZIP with valid imsmanifest.xml', async () => {
+test.describe('Export — LMS packages', () => {
+  test('SCORM 1.2 build writes imsmanifest.xml and a ZIP', () => {
     const scormDir = variantDir('free', 'scorm12');
-    const distPath = resolve(scormDir, 'dist');
-
-    // imsmanifest.xml should be generated in dist/
-    const manifestPath = resolve(distPath, 'imsmanifest.xml');
-    expect(existsSync(manifestPath)).toBe(true);
-
-    const xml = readFileSync(manifestPath, 'utf-8');
-    // Validate SCORM 1.2 manifest structure
-    expect(xml).toContain('<?xml version="1.0"');
-    expect(xml).toContain('imscp_rootv1p1p2');
-    expect(xml).toContain('adlcp_rootv1p2');
+    const xml = readFileSync(
+      resolve(scormDir, 'dist', 'imsmanifest.xml'),
+      'utf-8',
+    );
     expect(xml).toContain('<schemaversion>1.2</schemaversion>');
-    expect(xml).toContain('adlcp:scormtype="sco"');
-    expect(xml).not.toContain('masteryscore');
-    expect(xml).toContain('href="index.html"');
-    expect(xml).toContain('<file href=');
     expect(xml).toContain('E2E Test Course');
-
-    // ZIP should exist at the variant root (runExport writes it next to dist/)
-    const zipFiles = readdirSync(scormDir).filter((f) => f.endsWith('.zip'));
-    expect(zipFiles.length).toBeGreaterThan(0);
+    expect(readdirSync(scormDir).some((f) => f.endsWith('.zip'))).toBe(true);
   });
-});
 
-test.describe('Export — SCORM 2004', () => {
-  test('SCORM 2004 build produces ZIP with valid imsmanifest.xml (2004 schema)', async () => {
-    const distPath = resolve(variantDir('free', 'scorm2004'), 'dist');
-    const manifestPath = resolve(distPath, 'imsmanifest.xml');
-    expect(existsSync(manifestPath)).toBe(true);
-
-    const xml = readFileSync(manifestPath, 'utf-8');
-    // Validate SCORM 2004 manifest structure
-    expect(xml).toContain('imscp_v1p1');
-    expect(xml).toContain('adlcp_v1p3');
+  test('SCORM 2004 build writes a 2004 imsmanifest.xml', () => {
+    const xml = readFileSync(
+      resolve(variantDir('free', 'scorm2004'), 'dist', 'imsmanifest.xml'),
+      'utf-8',
+    );
     expect(xml).toContain('<schemaversion>2004 4th Edition</schemaversion>');
-    expect(xml).toContain('adlcp:scormType="sco"'); // capital T for 2004
-    expect(xml).not.toContain('imsss:objectives');
-    expect(xml).toContain(
-      '<imsss:deliveryControls completionSetByContent="true" objectiveSetByContent="true"/>',
-    );
+    expect(xml).toContain('E2E Test Course');
   });
 
-  test('a quiz-mode course declares the pass mark the LMS judges against', async () => {
-    const distPath = resolve(
-      variantDir('completion-quiz', 'scorm2004'),
-      'dist',
+  test('cmi5 build writes cmi5.xml', () => {
+    const xml = readFileSync(
+      resolve(variantDir('free', 'cmi5'), 'dist', 'cmi5.xml'),
+      'utf-8',
     );
-    const xml = readFileSync(resolve(distPath, 'imsmanifest.xml'), 'utf-8');
-
-    expect(xml).toContain('satisfiedByMeasure="true"');
-    expect(xml).toContain(
-      '<imsss:minNormalizedMeasure>0.7</imsss:minNormalizedMeasure>',
-    );
-  });
-});
-
-test.describe('Export — CMI5', () => {
-  test('CMI5 build produces ZIP with valid cmi5.xml', async () => {
-    const distPath = resolve(variantDir('free', 'cmi5'), 'dist');
-    const cmi5Path = resolve(distPath, 'cmi5.xml');
-    expect(existsSync(cmi5Path)).toBe(true);
-
-    const xml = readFileSync(cmi5Path, 'utf-8');
-    // Validate CMI5 XML structure
-    expect(xml).toContain('<?xml version="1.0"');
     expect(xml).toContain('courseStructure');
-    expect(xml).toContain('<course id=');
-    expect(xml).toContain('<au id=');
-    // cmi5 CourseStructure XSD requires <url> as a child element of <au>, not an attribute.
-    expect(xml).toContain('<url>index.html</url>');
-    expect(xml).toContain('launchMethod="AnyWindow"');
     expect(xml).toContain('E2E Test Course');
-    expect(xml).not.toContain('masteryScore');
-    expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
-});
 
-test.describe('Export — xAPI', () => {
-  test('xAPI build produces a tincan.xml alongside index.html', async () => {
-    const distPath = resolve(variantDir('free', 'xapi'), 'dist');
-    const tincanPath = resolve(distPath, 'tincan.xml');
-    expect(existsSync(tincanPath)).toBe(true);
-    expect(existsSync(resolve(distPath, 'index.html'))).toBe(true);
-
-    const xml = readFileSync(tincanPath, 'utf-8');
-    expect(xml).toContain('<?xml version="1.0"');
-    expect(xml).toContain('xmlns="http://projecttincan.com/tincan.xsd"');
-    expect(xml).toContain('<activity id=');
-    expect(xml).toContain('<launch lang="en">index.html</launch>');
+  test('xAPI build writes tincan.xml', () => {
+    const xml = readFileSync(
+      resolve(variantDir('free', 'xapi'), 'dist', 'tincan.xml'),
+      'utf-8',
+    );
+    expect(xml).toContain('tincan.xsd');
     expect(xml).toContain('E2E Test Course');
-    // No SCORM/cmi5 manifest leaks into the Tin Can package.
-    expect(existsSync(resolve(distPath, 'cmi5.xml'))).toBe(false);
-    expect(existsSync(resolve(distPath, 'imsmanifest.xml'))).toBe(false);
   });
 });

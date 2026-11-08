@@ -115,8 +115,11 @@ describe('xapi config validation — endpoint: lms', () => {
 
 describe('xapi config validation — explicit endpoint', () => {
   it('accepts a fully-formed explicit destination under web', () => {
-    const { errors } = validate(destination(), 'web');
+    const { errors, warnings } = validate(destination(), 'web');
     expect(errors.filter((e) => e.includes('xapi'))).toEqual([]);
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('unknown field "xapi"'),
+    );
   });
 
   it('errors when endpoint is not a URL', () => {
@@ -382,15 +385,6 @@ describe('xapi config validation — array form (fan-out)', () => {
     expect(
       warnings.find((w) => w.includes('copy-paste mistake')),
     ).toBeDefined();
-  });
-});
-
-describe('xapi config — unknown-field warning', () => {
-  it('does NOT warn on the xapi field (it was added to KNOWN_CONFIG_FIELDS)', () => {
-    const { warnings } = validate(destination(), 'web');
-    expect(
-      warnings.find((w) => w.includes('unknown field "xapi"')),
-    ).toBeUndefined();
   });
 });
 
