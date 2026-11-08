@@ -578,6 +578,37 @@ describe('XAPIPublisher — chainTask + markUnloading', () => {
     ]);
   });
 
+  it('sendFinal holds no quota for a closing batch that cannot fit beside keepalive requests in flight', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const inFlight = Promise.withResolvers<Response>();
+    mockFetch
+      .mockReturnValueOnce(inFlight.promise)
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher();
+    pub.markUnloading();
+    const url = 'https://lrs.example.com/xapi/activities/state';
+    const held = keepaliveFetch(url, {
+      method: 'PUT',
+      body: 'x'.repeat(40 * 1024),
+    });
+
+    await pub.sendFinal(
+      {
+        verb: { id: 'http://verb/final' },
+        result: { response: 'x'.repeat(30 * 1024) },
+      },
+      () => void keepaliveFetch(url, { method: 'PUT', body: 'x'.repeat(1024) }),
+    );
+    inFlight.resolve(respond(204));
+    await held;
+
+    expect(mockFetch.mock.calls.map(([, init]) => init.keepalive)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+
   it('sendFinal posts in-flight and unstarted statements and the final one as one keepalive batch before returning', async () => {
     mockFetch
       .mockReturnValueOnce(new Promise(() => {}))

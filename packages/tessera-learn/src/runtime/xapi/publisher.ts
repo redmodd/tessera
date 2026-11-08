@@ -484,8 +484,9 @@ export class XAPIPublisher {
 
   /**
    * `sendFirst` runs just before the closing batch is sent, with the batch's
-   * bytes already counted against the keepalive quota when it fits, so its
-   * requests go out first without taking the batch's share.
+   * bytes already counted against the keepalive quota when it fits beside the
+   * keepalive requests in flight, so its requests go out first without taking
+   * the batch's share.
    */
   sendFinal(
     partial: PartialStatement,
@@ -502,7 +503,8 @@ export class XAPIPublisher {
     const batch = [...flushed.flatMap((e) => e.body), final];
     const closing = flushed.length ? batch : final;
     const bytes = byteLength(JSON.stringify(closing));
-    const held = bytes <= KEEPALIVE_BODY_LIMIT_BYTES ? bytes : 0;
+    const held =
+      keepaliveBytesInFlight + bytes <= KEEPALIVE_BODY_LIMIT_BYTES ? bytes : 0;
     keepaliveBytesInFlight += held;
     try {
       sendFirst?.();
@@ -554,7 +556,7 @@ export class XAPIPublisher {
     this.#unloading = false;
   }
 
-  /** Whether the publisher is in unloading mode (for tests). */
+  /** Whether the publisher is in unloading mode. */
   isUnloading(): boolean {
     return this.#unloading;
   }
@@ -652,7 +654,7 @@ export class XAPIPublisher {
     const init = { method: 'POST', headers: this.#buildHeaders(token), body };
     return keepalive
       ? keepaliveFetch(this.#statementsUrl, init)
-      : fetch(this.#statementsUrl, { ...init, keepalive });
+      : fetch(this.#statementsUrl, { ...init, keepalive: false });
   }
 
   #fetchWithToken(
