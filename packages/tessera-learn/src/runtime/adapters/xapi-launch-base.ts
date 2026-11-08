@@ -499,7 +499,8 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (!this.#terminated) {
       const drained =
         !this.publisher || (await settles(this.publisher.drained()));
-      // Past the deadline, the exit state goes beside Terminated, as on pagehide.
+      // Past the deadline, terminate(true) sends the exit state beside
+      // Terminated instead, as on pagehide.
       if (drained && !this.#stateSaved && this.state) {
         this.publisher?.markUnloading();
         await settles(this.#putState(this.state, EXIT_STATE_ID));
