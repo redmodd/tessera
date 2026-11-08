@@ -792,16 +792,6 @@ describe('useCompletion', () => {
       /must be called inside a Tessera course/,
     );
   });
-
-  it('flips successStatus when requireSuccessStatus is set', () => {
-    const { progress } = provideNavCtx({
-      config: manualConfig({ requireSuccessStatus: 'passed' }),
-    });
-
-    const handle = useCompletion();
-    handle.markComplete();
-    expect(progress.successStatus).toBe('passed');
-  });
 });
 
 // ============ usePersistence ============

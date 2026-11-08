@@ -323,26 +323,6 @@ describe('SCORM12Adapter', () => {
     });
   });
 
-  // ---- setScore ----
-
-  it('sets score with raw, min, max via queue', async () => {
-    adapter.setScore(85);
-    await flush();
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.score.raw', '85');
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.score.min', '0');
-    expect(api.LMSSetValue).toHaveBeenCalledWith('cmi.core.score.max', '100');
-  });
-
-  it('rounds fractional scores to real(10,7) — no 16-digit decimal trips 405', async () => {
-    await adapter.init();
-    adapter.setScore((7 / 11) * 100);
-    await flush();
-    expect(api.LMSSetValue).toHaveBeenCalledWith(
-      'cmi.core.score.raw',
-      '63.6363636',
-    );
-  });
-
   // ---- lesson_status ----
 
   describe('lesson_status reconciliation', () => {

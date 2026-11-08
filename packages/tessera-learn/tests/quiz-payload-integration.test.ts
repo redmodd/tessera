@@ -79,6 +79,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       ],
     });
     expect(reg.id).toBe('q1');
+    expect(reg.text()).toBe('Pick one');
   });
 
   it('MultipleChoice reports numeric options as text', () => {
@@ -118,6 +119,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       caseMatters: false,
     });
     expect(reg.id).toBe('q3');
+    expect(reg.text()).toBe('Capital of France');
   });
 
   it('Matching → { type: "matching", response: pairs, correct: pairs }', () => {
@@ -158,6 +160,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       },
     });
     expect(reg.id).toBe('q4');
+    expect(reg.text()).toBe('Match these');
   });
 
   it('Sorting → { type: "matching", response: [item,target] pairs, correct: pairs }', () => {
@@ -197,6 +200,7 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
       },
     });
     expect(reg.id).toBe('q5');
+    expect(reg.text()).toBe('Sort these');
   });
 
   it('Sorting maps each item to its own target, not to its own index', () => {
@@ -223,48 +227,6 @@ describe('Built-in question components emit Interaction payloads in quiz mode', 
         ['3', '2'],
       ],
     });
-  });
-
-  it('A Quiz-like round-trip: four built-ins all register with useful interaction payloads', () => {
-    const { quiz, registrations } = makeQuizCtx();
-    mountInQuiz(
-      MultipleChoice,
-      { id: 'q7', question: 'Pick', options: ['a'], correct: 0 },
-      quiz,
-    );
-    mountInQuiz(
-      FillInTheBlank,
-      { id: 'q8', question: 'Fill', answers: ['x'] },
-      quiz,
-    );
-    mountInQuiz(
-      Matching,
-      { id: 'q9', question: 'Match', pairs: [{ left: 'a', right: 'A' }] },
-      quiz,
-    );
-    mountInQuiz(
-      Sorting,
-      {
-        id: 'q10',
-        question: 'Sort',
-        items: ['x'],
-        targets: ['T'],
-        correct: [0],
-      },
-      quiz,
-    );
-
-    expect(registrations).toHaveLength(4);
-    expect(registrations[0].interaction().type).toBe('choice');
-    expect(registrations[1].interaction().type).toBe('fill-in');
-    expect(registrations[2].interaction().type).toBe('matching');
-    expect(registrations[3].interaction().type).toBe('matching');
-    expect(registrations.map((r) => r.text())).toEqual([
-      'Pick',
-      'Fill',
-      'Match',
-      'Sort',
-    ]);
   });
 });
 

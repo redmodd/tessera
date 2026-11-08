@@ -5,9 +5,8 @@ import { createServer, type ViteDevServer } from 'vite';
 import { buildInlineConfig } from '../src/plugin/inline-config.js';
 import { tempDir } from './helpers.js';
 
-// Unlike dev-server-fs.test.ts (hand-rolled config), this boots the real
-// buildInlineConfig and serves a $shared asset from outside the course root.
-// tmpdir is deliberate: an ancestor pnpm-lock.yaml/.git would let Vite widen
+// Boots the real buildInlineConfig and serves a $shared asset from outside
+// the course root. tmpdir is deliberate: an ancestor pnpm-lock.yaml/.git would let Vite widen
 // fs.allow on its own and mask a regression. Svelte render is left to e2e.
 
 let ws: string;

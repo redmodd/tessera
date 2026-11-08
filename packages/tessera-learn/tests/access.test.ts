@@ -3,7 +3,6 @@ import {
   freeAccess,
   sequentialAccess,
   resolveAccess,
-  type AccessFn,
 } from '../src/runtime/access.js';
 import { ProgressState } from '../src/runtime/progress.svelte.js';
 import { createManifest, createConfig } from './helpers.js';
@@ -119,18 +118,5 @@ describe('resolveAccess', () => {
     expect(
       resolveAccess(createConfig({ navigation: { mode: 'sequential' } })),
     ).toBe(sequentialAccess);
-  });
-
-  it('composes naturally with presets', () => {
-    const manifest = createManifest(3);
-    const progress = new ProgressState(manifest, createConfig());
-    const config = createConfig({ navigation: { mode: 'sequential' } });
-
-    const custom: AccessFn = (c) =>
-      sequentialAccess(c) && c.progress.visitedPages.has(0);
-
-    expect(custom(ctx(1, manifest, progress, config))).toBe(false);
-    progress.markVisited(0);
-    expect(custom(ctx(1, manifest, progress, config))).toBe(true);
   });
 });

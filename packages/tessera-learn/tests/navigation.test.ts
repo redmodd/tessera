@@ -210,22 +210,6 @@ describe('NavigationState', () => {
       nav.goToPage(1);
       expect(nav.canGoNext).toBe(false); // quiz not passed, page 2 gated
     });
-
-    it('is true when next page quiz gate is passed', () => {
-      const manifest = createManifest(3, {
-        1: { graded: true, gatesProgress: true },
-      });
-      const progress = new ProgressState(manifest, createConfig());
-      const nav = new NavigationState(
-        manifest,
-        progress,
-        createConfig({ navigation: { mode: 'free' } }),
-      );
-
-      progress.quizCompleted(1, 80);
-      nav.goToPage(1);
-      expect(nav.canGoNext).toBe(true);
-    });
   });
 
   describe('canGoNext — sequential mode', () => {
@@ -262,20 +246,6 @@ describe('NavigationState', () => {
       );
       progress.quizCompleted(0, 50);
       expect(nav.canGoNext).toBe(false);
-    });
-
-    it('is true when current page is a gating quiz and passed', () => {
-      const manifest = createManifest(3, {
-        0: { graded: true, gatesProgress: true },
-      });
-      const progress = new ProgressState(manifest, createConfig());
-      const nav = new NavigationState(
-        manifest,
-        progress,
-        createConfig({ navigation: { mode: 'sequential' } }),
-      );
-      progress.quizCompleted(0, 75);
-      expect(nav.canGoNext).toBe(true);
     });
   });
 

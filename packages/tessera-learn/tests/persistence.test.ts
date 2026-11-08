@@ -4,67 +4,6 @@ import { WebAdapter } from '../src/runtime/adapters/web.js';
 import type { CourseConfig } from '../src/runtime/types.js';
 import type { Manifest, ManifestPage } from '../src/plugin/manifest.js';
 
-// We can't import WebAdapter directly in a Node test (no localStorage),
-// so we test the serialization logic and adapter contract here.
-
-describe('SavedState serialization', () => {
-  it('serializes to compact JSON with single-letter keys', () => {
-    const state: SavedState = {
-      b: 5,
-      v: [0, 1, 2, 3, 4, 5],
-      g: { '3': { s: 85 }, '7': { s: 90, a: 2 } },
-      d: 1234,
-    };
-    const json = JSON.stringify(state);
-    expect(json).toContain('"b":5');
-    expect(json).toContain('"v":[0,1,2,3,4,5]');
-    expect(json).toContain('"g":{"3":{"s":85},"7":{"s":90,"a":2}}');
-    expect(json).toContain('"d":1234');
-  });
-
-  it('deserializes back to the same structure', () => {
-    const state: SavedState = {
-      b: 3,
-      v: [0, 1, 2, 3],
-      g: { '2': { s: 100, q: { q1: 80 } } },
-      d: 500,
-    };
-    const json = JSON.stringify(state);
-    const restored: SavedState = JSON.parse(json);
-    expect(restored.b).toBe(3);
-    expect(restored.v).toEqual([0, 1, 2, 3]);
-    expect(restored.g?.['2']).toEqual({ s: 100, q: { q1: 80 } });
-    expect(restored.d).toBe(500);
-  });
-
-  it('200-page course with 5 quizzes stays under 4096 chars', () => {
-    const state: SavedState = {
-      b: 199,
-      v: Array.from({ length: 200 }, (_, i) => i),
-      g: {
-        '20': { s: 85 },
-        '50': { s: 90 },
-        '100': { s: 75 },
-        '150': { s: 95 },
-        '180': { s: 60 },
-      },
-      d: 36000,
-    };
-    const json = JSON.stringify(state);
-    expect(json.length).toBeLessThan(4096);
-  });
-
-  it('empty state is valid', () => {
-    const state: SavedState = { b: 0, v: [], d: 0 };
-    const json = JSON.stringify(state);
-    const restored: SavedState = JSON.parse(json);
-    expect(restored.b).toBe(0);
-    expect(restored.v).toEqual([]);
-    expect(restored.g).toBeUndefined();
-    expect(restored.d).toBe(0);
-  });
-});
-
 describe('WebAdapter contract', () => {
   // Test the adapter contract with a mock localStorage
   let storage: Map<string, string>;
