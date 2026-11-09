@@ -41,7 +41,6 @@
     >
       <source src={resolvedSrc} />
       <MediaTracks {tracks} />
-      Your browser does not support the video element.
     </video>
   {/if}
 </div>
@@ -55,7 +54,6 @@
     }
 
     .tessera-video-embed {
-      display: block;
       width: 100%;
       aspect-ratio: 16 / 9;
       border: none;
@@ -66,7 +64,6 @@
       width: 100%;
       aspect-ratio: auto 16 / 9;
       border-radius: 8px;
-      display: block;
     }
   }
 </style>

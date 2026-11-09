@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-`Video` lazy-loads with the browser's native `loading="lazy"` and `preload="none"` and no longer shows a placeholder box before it loads. A native video holds a 16:9 player with no preview frame until it plays. The `Sorting` card is a native `<button>`.
+`Video` uses the browser's native lazy loading and no longer shows a placeholder; a native video holds a 16:9 box with no preview frame until played. The `Sorting` card is a native `<button>`.

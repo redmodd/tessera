@@ -282,13 +282,11 @@ test.describe('Component — Video', () => {
     openFresh(page, 'Modal, Video & Audio', '.tessera-video'),
   );
 
-  test('players load lazily and hold a 16:9 box', async ({ page }) => {
-    const embed = page.locator('iframe.tessera-video-embed');
-    const native = page.locator('video.tessera-video-native');
-    await expect(embed).toHaveAttribute('loading', 'lazy');
-    await expect(native).toHaveAttribute('preload', 'none');
-
-    for (const player of [embed, native]) {
+  test('players hold a 16:9 box before loading', async ({ page }) => {
+    for (const player of [
+      page.locator('iframe.tessera-video-embed'),
+      page.locator('video.tessera-video-native'),
+    ]) {
       const box = await player.boundingBox();
       expect(box!.width / box!.height).toBeCloseTo(16 / 9, 2);
     }

@@ -170,13 +170,6 @@
     dragOver = null;
     placeCard(targetIdx);
   }
-
-  // --- Click / tap handlers ---
-
-  function onCardClick() {
-    if (q.locked || currentItemIdx === null) return;
-    cardSelected = !cardSelected;
-  }
 </script>
 
 <QuestionShell {q} class="tessera-sorting" aria-label={question}>
@@ -198,7 +191,7 @@
             aria-describedby={hintId}
             ondragstart={onDragStart}
             ondragend={onDragEnd}
-            onclick={onCardClick}
+            onclick={() => (cardSelected = !cardSelected)}
           >
             {items[currentItemIdx]}
           </button>

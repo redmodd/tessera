@@ -15,10 +15,6 @@
 
   const accordion = getAccordionContext();
   let isOpen = $derived(accordion.openId === id);
-
-  function toggle() {
-    accordion.toggle(id);
-  }
 </script>
 
 <div class="tessera-accordion-item">
@@ -27,7 +23,7 @@
     id={headerId}
     aria-expanded={isOpen}
     aria-controls={panelId}
-    onclick={toggle}
+    onclick={() => accordion.toggle(id)}
   >
     <span class="tessera-accordion-trigger-text">{title}</span>
     <svg
