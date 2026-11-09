@@ -22,7 +22,7 @@
   let embedUrl = $derived(resolveVideoEmbedUrl(src));
 </script>
 
-<div class="tessera-video" aria-label={title || 'Video'}>
+<div class="tessera-video">
   {#if embedUrl !== null}
     <iframe
       class="tessera-video-embed"
@@ -64,6 +64,7 @@
 
     .tessera-video-native {
       width: 100%;
+      aspect-ratio: auto 16 / 9;
       border-radius: 8px;
       display: block;
     }
