@@ -1,11 +1,20 @@
-import { describe, it, expect } from 'vitest';
-import { rgbToHsl } from '../src/runtime/branding.js';
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from 'vitest';
+import { applyBranding } from '../src/runtime/branding.js';
 
-describe('rgbToHsl', () => {
-  it('converts primary blue', () => {
-    expect(rgbToHsl(0, 102, 204)).toEqual({ h: 210, s: 100, l: 40 });
+describe('applyBranding', () => {
+  it('sets a parseable primary color', () => {
+    const el = document.createElement('div');
+    applyBranding(el, { primaryColor: '#b91c1c' });
+    expect(el.style.getPropertyValue('--tessera-primary')).toBe('#b91c1c');
   });
-  it('greyscale has zero saturation', () => {
-    expect(rgbToHsl(128, 128, 128)).toEqual({ h: 0, s: 0, l: 50 });
+
+  it('skips and reports a primary color the browser cannot parse', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('div');
+    applyBranding(el, { primaryColor: 'rgb(1,2)' });
+    expect(el.style.getPropertyValue('--tessera-primary')).toBe('');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('rgb(1,2)'));
+    warn.mockRestore();
   });
 });

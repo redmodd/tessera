@@ -37,12 +37,19 @@
 <style>
   @layer tessera {
     .tessera-callout {
+      --callout-color: var(--tessera-primary);
       display: flex;
       gap: var(--tessera-spacing-md);
       padding: var(--tessera-spacing-md) var(--tessera-spacing-lg);
       border-radius: 8px;
-      border-left: 4px solid;
+      border-left: 4px solid var(--callout-color);
       margin-bottom: var(--tessera-spacing-lg);
+      color: var(--tessera-text);
+      background-color: color-mix(
+        in srgb,
+        var(--callout-color) 8%,
+        var(--tessera-bg)
+      );
     }
 
     .tessera-callout-icon {
@@ -60,28 +67,16 @@
       margin-bottom: 0;
     }
 
-    .tessera-callout-info {
-      background-color: #eff6ff;
-      border-left-color: var(--tessera-primary);
-      color: var(--tessera-text);
-    }
-
     .tessera-callout-warning {
-      background-color: #fffbeb;
-      border-left-color: var(--tessera-warning);
-      color: var(--tessera-text);
+      --callout-color: var(--tessera-warning);
     }
 
     .tessera-callout-tip {
-      background-color: #f0fdf4;
-      border-left-color: var(--tessera-success);
-      color: var(--tessera-text);
+      --callout-color: var(--tessera-success);
     }
 
     .tessera-callout-important {
-      background-color: #fef2f2;
-      border-left-color: var(--tessera-error);
-      color: var(--tessera-text);
+      --callout-color: var(--tessera-error);
     }
   }
 </style>

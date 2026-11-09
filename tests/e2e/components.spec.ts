@@ -203,6 +203,32 @@ test.describe('Component — Carousel', () => {
   });
 });
 
+test.describe('Component — Callout', () => {
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Callouts & Images', '.tessera-callout'),
+  );
+
+  test('keeps its colors when a theme color in course CSS is unparseable', async ({
+    page,
+  }) => {
+    const callouts = page.locator('.tessera-callout');
+    const colors = () =>
+      callouts.evaluateAll((els) =>
+        els.map((el) => {
+          const { backgroundColor, borderLeftColor } = getComputedStyle(el);
+          return { backgroundColor, borderLeftColor };
+        }),
+      );
+    const before = await colors();
+    expect(before).toHaveLength(4);
+    await page.addStyleTag({
+      content:
+        ':root { --tessera-bg: #12345; --tessera-success: #12345; --tessera-error: #12345; --tessera-warning: #12345; }',
+    });
+    await expect.poll(colors).toEqual(before);
+  });
+});
+
 test.describe('Component — RevealModal', () => {
   test.beforeEach(({ page }) =>
     openFresh(page, 'Modal, Video & Audio', '.tessera-reveal-trigger'),
