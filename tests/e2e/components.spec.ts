@@ -234,17 +234,21 @@ test.describe('Component — RevealModal', () => {
     openFresh(page, 'Modal, Video & Audio', '.tessera-reveal-trigger'),
   );
 
-  test('clicking trigger opens modal', async ({ page }) => {
+  test('clicking trigger opens modal and locks page scroll', async ({
+    page,
+  }) => {
     await page.locator('.tessera-reveal-trigger').click();
     await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
   });
 
-  test('Escape closes modal', async ({ page }) => {
+  test('Escape closes modal and unlocks page scroll', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.locator('html')).toHaveCSS('overflow', 'visible');
   });
 
   test('focus is trapped inside modal', async ({ page }) => {
@@ -333,6 +337,19 @@ test.describe('Component — Sorting', () => {
       .first()
       .click();
     await expect(counter).toHaveText('2 of 3 to sort');
+    await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
+  });
+
+  test('dragging the card onto a target places it', async ({ page }) => {
+    const sorting = page.locator('.tessera-sorting');
+    const fruit = sorting.locator('.tessera-sorting-target').first();
+
+    // The page can't scroll mid-drag, so start with the target on screen.
+    await fruit.scrollIntoViewIfNeeded();
+    await sorting.locator('.tessera-sorting-card').dragTo(fruit);
+    await expect(sorting.locator('.tessera-sorting-counter')).toHaveText(
+      '2 of 3 to sort',
+    );
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
   });
 

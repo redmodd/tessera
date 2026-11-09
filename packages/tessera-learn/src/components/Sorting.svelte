@@ -177,13 +177,6 @@
     if (q.locked || currentItemIdx === null) return;
     cardSelected = !cardSelected;
   }
-
-  function onCardKeydown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onCardClick();
-    }
-  }
 </script>
 
 <QuestionShell {q} class="tessera-sorting" aria-label={question}>
@@ -194,23 +187,21 @@
     <div class="tessera-sorting-deck" aria-live="polite" aria-atomic="false">
       {#if currentItemIdx !== null}
         <div class="tessera-sorting-deck-inner">
-          <div
+          <button
             bind:this={cardEl}
+            type="button"
             class="tessera-sorting-card"
             class:selected={cardSelected}
             class:dragging={isDragging}
-            draggable={true}
-            role="button"
-            tabindex="0"
+            draggable="true"
             aria-pressed={cardSelected}
             aria-describedby={hintId}
             ondragstart={onDragStart}
             ondragend={onDragEnd}
             onclick={onCardClick}
-            onkeydown={onCardKeydown}
           >
             {items[currentItemIdx]}
-          </div>
+          </button>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
           </p>
