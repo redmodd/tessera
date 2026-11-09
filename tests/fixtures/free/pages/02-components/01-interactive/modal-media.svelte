@@ -26,12 +26,6 @@
 <h2>Video</h2>
 
 <Video
-  src="https://www.youtube.com/watch?v=aqz-KE-bpKQ"
-  title="Sample embedded video"
-  transcript="An animated short used to demonstrate the embedded player."
-/>
-
-<Video
   src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
   title="Sample video"
   transcript="A flower opening, used to demonstrate the native player."

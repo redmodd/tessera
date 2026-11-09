@@ -19,6 +19,7 @@
 
 <div class="tessera-accordion-item">
   <button
+    type="button"
     class="tessera-accordion-trigger"
     id={headerId}
     aria-expanded={isOpen}
