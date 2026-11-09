@@ -12,15 +12,10 @@
 
   function openModal() {
     dialogRef?.showModal();
-    document.body.style.overflow = 'hidden';
   }
 
   function closeModal() {
     dialogRef?.close();
-  }
-
-  function handleClose() {
-    document.body.style.overflow = '';
   }
 
   // A click whose target is the dialog element itself (not its content) is a
@@ -41,7 +36,6 @@
   bind:this={dialogRef}
   aria-label={title || 'Modal'}
   onclick={handleClick}
-  onclose={handleClose}
 >
   <div class="tessera-modal-content">
     {#if title}
@@ -62,6 +56,10 @@
 
 <style>
   @layer tessera {
+    :global(html:has(dialog.tessera-modal[open])) {
+      overflow: hidden;
+    }
+
     .tessera-reveal-trigger {
       display: inline-block;
       cursor: pointer;

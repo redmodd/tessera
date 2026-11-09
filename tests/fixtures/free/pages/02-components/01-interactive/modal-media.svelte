@@ -3,7 +3,7 @@
 </script>
 
 <script>
-  import { RevealModal, Audio, Sorting } from 'tessera-learn';
+  import { RevealModal, Video, Audio, Sorting } from 'tessera-learn';
 </script>
 
 <h1>Modal, Video & Audio</h1>
@@ -22,6 +22,14 @@
     <p>Focus should be trapped inside this modal.</p>
   {/snippet}
 </RevealModal>
+
+<h2>Video</h2>
+
+<Video
+  src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+  title="Sample video"
+  transcript="A flower opening, used to demonstrate the native player."
+/>
 
 <h2>Audio</h2>
 

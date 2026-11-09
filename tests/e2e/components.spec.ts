@@ -234,17 +234,21 @@ test.describe('Component — RevealModal', () => {
     openFresh(page, 'Modal, Video & Audio', '.tessera-reveal-trigger'),
   );
 
-  test('clicking trigger opens modal', async ({ page }) => {
+  test('clicking trigger opens modal and locks page scroll', async ({
+    page,
+  }) => {
     await page.locator('.tessera-reveal-trigger').click();
     await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
   });
 
-  test('Escape closes modal', async ({ page }) => {
+  test('Escape closes modal and unlocks page scroll', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.locator('html')).toHaveCSS('overflow', 'visible');
   });
 
   test('focus is trapped inside modal', async ({ page }) => {
@@ -270,6 +274,19 @@ test.describe('Component — RevealModal', () => {
     // there lands on the ::backdrop, whose target is the dialog element.
     await page.mouse.click(5, 5);
     await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+});
+
+test.describe('Component — Video', () => {
+  test.beforeEach(({ page }) =>
+    openFresh(page, 'Modal, Video & Audio', '.tessera-video'),
+  );
+
+  test('the native player holds a 16:9 box before loading', async ({
+    page,
+  }) => {
+    const box = await page.locator('video.tessera-video-native').boundingBox();
+    expect(box!.width / box!.height).toBeCloseTo(16 / 9, 2);
   });
 });
 
@@ -334,6 +351,41 @@ test.describe('Component — Sorting', () => {
       .click();
     await expect(counter).toHaveText('2 of 3 to sort');
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
+  });
+
+  test('dragging the card onto a target places it', async ({ page }) => {
+    const sorting = page.locator('.tessera-sorting');
+    const fruit = sorting.locator('.tessera-sorting-target').first();
+
+    // The page can't scroll mid-drag, so start with the target on screen.
+    await fruit.scrollIntoViewIfNeeded();
+    await sorting.locator('.tessera-sorting-card').dragTo(fruit);
+    await expect(sorting.locator('.tessera-sorting-counter')).toHaveText(
+      '2 of 3 to sort',
+    );
+    await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
+  });
+
+  test('the label fills the card inside its border', async ({ page }) => {
+    // Firefox before 147 starts a drag only from a button's content.
+    const card = page.locator('.tessera-sorting-card');
+    await card.scrollIntoViewIfNeeded();
+    const onLabel = await card.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      return [
+        [r.left + 3, cy],
+        [r.right - 3, cy],
+        [cx, r.top + 3],
+        [cx, r.bottom - 3],
+      ].map(([x, y]) =>
+        document
+          .elementFromPoint(x, y)!
+          .classList.contains('tessera-sorting-card-label'),
+      );
+    });
+    expect(onLabel).toEqual([true, true, true, true]);
   });
 
   test('checked results pass axe audit', async ({ page }) => {

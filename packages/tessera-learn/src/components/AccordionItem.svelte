@@ -15,27 +15,16 @@
 
   const accordion = getAccordionContext();
   let isOpen = $derived(accordion.openId === id);
-
-  function toggle() {
-    accordion.toggle(id);
-  }
-
-  function handleKeydown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      toggle();
-    }
-  }
 </script>
 
 <div class="tessera-accordion-item">
   <button
+    type="button"
     class="tessera-accordion-trigger"
     id={headerId}
     aria-expanded={isOpen}
     aria-controls={panelId}
-    onclick={toggle}
-    onkeydown={handleKeydown}
+    onclick={() => accordion.toggle(id)}
   >
     <span class="tessera-accordion-trigger-text">{title}</span>
     <svg

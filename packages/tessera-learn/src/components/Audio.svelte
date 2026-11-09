@@ -31,7 +31,6 @@
   >
     <source src={resolvedSrc} />
     <MediaTracks {tracks} />
-    Your browser does not support the audio element.
   </audio>
   <Transcript text={transcript} />
 </div>
@@ -51,7 +50,6 @@
 
     .tessera-audio-player {
       width: 100%;
-      display: block;
     }
   }
 </style>

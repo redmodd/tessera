@@ -170,20 +170,6 @@
     dragOver = null;
     placeCard(targetIdx);
   }
-
-  // --- Click / tap handlers ---
-
-  function onCardClick() {
-    if (q.locked || currentItemIdx === null) return;
-    cardSelected = !cardSelected;
-  }
-
-  function onCardKeydown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onCardClick();
-    }
-  }
 </script>
 
 <QuestionShell {q} class="tessera-sorting" aria-label={question}>
@@ -194,23 +180,23 @@
     <div class="tessera-sorting-deck" aria-live="polite" aria-atomic="false">
       {#if currentItemIdx !== null}
         <div class="tessera-sorting-deck-inner">
-          <div
+          <button
             bind:this={cardEl}
+            type="button"
             class="tessera-sorting-card"
             class:selected={cardSelected}
             class:dragging={isDragging}
-            draggable={true}
-            role="button"
-            tabindex="0"
+            draggable="true"
             aria-pressed={cardSelected}
             aria-describedby={hintId}
             ondragstart={onDragStart}
             ondragend={onDragEnd}
-            onclick={onCardClick}
-            onkeydown={onCardKeydown}
+            onclick={() => (cardSelected = !cardSelected)}
           >
-            {items[currentItemIdx]}
-          </div>
+            <span class="tessera-sorting-card-label"
+              >{items[currentItemIdx]}</span
+            >
+          </button>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
           </p>
@@ -349,9 +335,7 @@
 
     .tessera-sorting-card {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--tessera-spacing-md) var(--tessera-spacing-xl);
+      padding: 0;
       min-width: 140px;
       min-height: 64px;
       background: var(--tessera-bg);
@@ -370,6 +354,16 @@
         box-shadow 0.15s;
       text-align: center;
       user-select: none;
+    }
+
+    /* Firefox before 147 starts a drag only from a button's content, not its
+       padding, so the label fills the card. */
+    .tessera-sorting-card-label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--tessera-spacing-md) var(--tessera-spacing-xl);
     }
 
     .tessera-sorting-card:hover {
