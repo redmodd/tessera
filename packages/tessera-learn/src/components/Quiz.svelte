@@ -16,18 +16,16 @@
 
   // The button the learner pressed is disabled or gone once the question or
   // phase changes, so focus moves to what replaced it. Arrow keys stay in the
-  // quiz from there, even on what a page change focused first.
-  async function focusProgress() {
+  // quiz from there, even on what a page change focused first. `el` is a
+  // getter because the new element is bound only after the tick.
+  async function focusAfterTick(el) {
     await tick();
-    progressEl?.removeAttribute('data-tessera-page-focus');
-    progressEl?.focus();
+    el()?.removeAttribute('data-tessera-page-focus');
+    el()?.focus();
   }
 
-  async function focusResults() {
-    await tick();
-    resultsEl?.removeAttribute('data-tessera-page-focus');
-    resultsEl?.focus();
-  }
+  const focusProgress = () => focusAfterTick(() => progressEl);
+  const focusResults = () => focusAfterTick(() => resultsEl);
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
@@ -133,6 +131,18 @@
   >
     Back
   </button>
+{/snippet}
+
+{#snippet scoreCard(caption, value, passed)}
+  <div class="tessera-quiz-score" class:paired={caption}>
+    {#if caption}
+      <span class="tessera-quiz-score-caption">{caption}</span>
+    {/if}
+    <span class="tessera-quiz-score-value">{value}%</span>
+    <span class="tessera-quiz-score-label" class:passed class:failed={!passed}>
+      {passed ? 'Passed' : 'Not Passed'}
+    </span>
+  </div>
 {/snippet}
 
 {#snippet questionList(activeIndex)}
@@ -256,45 +266,10 @@
               Your answers have been submitted.
             </p>
           {:else if bestBeaten}
-            <div
-              class="tessera-quiz-score paired"
-              data-testid="quiz-attempt-score"
-            >
-              <span class="tessera-quiz-score-caption">This attempt</span>
-              <span class="tessera-quiz-score-value">{handle.score}%</span>
-              <span
-                class="tessera-quiz-score-label"
-                class:passed={attemptPassed}
-                class:failed={!attemptPassed}
-              >
-                {attemptPassed ? 'Passed' : 'Not Passed'}
-              </span>
-            </div>
-            <div
-              class="tessera-quiz-score paired"
-              data-testid="quiz-best-score"
-            >
-              <span class="tessera-quiz-score-caption">On record</span>
-              <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
-              <span
-                class="tessera-quiz-score-label"
-                class:passed
-                class:failed={!passed}
-              >
-                {passed ? 'Passed' : 'Not Passed'}
-              </span>
-            </div>
+            {@render scoreCard('This attempt', handle.score, attemptPassed)}
+            {@render scoreCard('On record', handle.bestScore, passed)}
           {:else}
-            <div class="tessera-quiz-score">
-              <span class="tessera-quiz-score-value">{handle.score}%</span>
-              <span
-                class="tessera-quiz-score-label"
-                class:passed
-                class:failed={!passed}
-              >
-                {passed ? 'Passed' : 'Not Passed'}
-              </span>
-            </div>
+            {@render scoreCard('', handle.score, passed)}
           {/if}
           {#if handle.restored}
             <p class="tessera-quiz-results-detail">Your previous result.</p>

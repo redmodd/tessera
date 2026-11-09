@@ -1,8 +1,14 @@
 <script>
-  import { onMount, tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { indexOptions, savedIndex, shuffle } from './util.js';
+  import {
+    indexOptions,
+    initQuestion,
+    questionOptions,
+    savedIndex,
+    shuffle,
+  } from './util.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
@@ -57,52 +63,38 @@
   // Sorting is semantically a categorization (each item → one target) and maps
   // cleanly to SCORM 2004's `matching` interaction. We emit [itemIdx, targetIdx]
   // pairs as stringified ids.
-  const q = useQuestion({
-    get id() {
-      return id;
-    },
-    get text() {
-      return question;
-    },
-    graded: untrack(() => graded),
-    weight: untrack(() => weight),
-    maxRetries: untrack(() => maxRetries),
-    complete: () => placements.size === items.length,
-    response: () => {
-      const left = indexOptions(items);
-      return {
-        type: 'matching',
-        response: [...placements.entries()].map(([i, t]) => [
-          String(i),
-          String(t),
-        ]),
-        correct: left.map(({ id }, i) => [id, String(correct[i])]),
-        optionPairs: {
-          left,
-          right: indexOptions(targets),
-        },
-      };
-    },
-    reset: resetState,
-    restore: (response) => {
-      const saved = response.map(([item, target]) => [
-        savedIndex(item, items),
-        savedIndex(target, targets),
-      ]);
-      for (const [item, target] of saved) placements.set(item, target);
-      return new Map(placements);
-    },
-  });
+  const q = useQuestion(
+    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+      complete: () => placements.size === items.length,
+      response: () => {
+        const left = indexOptions(items);
+        return {
+          type: 'matching',
+          response: [...placements.entries()].map(([i, t]) => [
+            String(i),
+            String(t),
+          ]),
+          correct: left.map(({ id }, i) => [id, String(correct[i])]),
+          optionPairs: {
+            left,
+            right: indexOptions(targets),
+          },
+        };
+      },
+      reset: resetState,
+      restore: (response) => {
+        const saved = response.map(([item, target]) => [
+          savedIndex(item, items),
+          savedIndex(target, targets),
+        ]);
+        for (const [item, target] of saved) placements.set(item, target);
+        return new Map(placements);
+      },
+    }),
+  );
 
-  // `q.mode` is fixed for the lifetime of the widget; capture it once so
-  // setup-time branches don't trip Svelte's "state_referenced_locally" warning.
   const inQuiz = q.mode === 'quiz';
-
-  if (!inQuiz) {
-    initQueue();
-  } else {
-    onMount(initQueue);
-  }
+  initQuestion(q, initQueue);
 
   let currentItemIdx = $derived(queue.length > 0 ? queue[0] : null);
 

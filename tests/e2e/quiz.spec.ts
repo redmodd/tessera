@@ -593,17 +593,20 @@ test.describe('Quiz — Practice', () => {
   test('a weaker retry shows its own score alongside the best attempt', async ({
     page,
   }) => {
+    const score = (caption: string) =>
+      page.locator('.tessera-quiz-score', { hasText: caption });
+    const attempt = score('This attempt');
+    const record = score('On record');
+
     await completePracticeQuiz(page, { mc: 1, fill: 'H2O' });
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
-    await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
+    await expect(record).toHaveCount(0);
 
     await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
     await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
 
     // The attempt and the record are labelled separately, so a failing retry
     // cannot label a quiz the LMS has recorded as passed "Not Passed".
-    const attempt = page.getByTestId('quiz-attempt-score');
-    const record = page.getByTestId('quiz-best-score');
     await expect(attempt).toContainText('0%');
     await expect(attempt).toContainText('Not Passed');
     await expect(record).toContainText('100%');
@@ -614,12 +617,12 @@ test.describe('Quiz — Practice', () => {
     await page.reload();
     await waitForTesseraContent(page);
     await expect(page.locator('.tessera-quiz-score-value')).toHaveText('100%');
-    await expect(page.getByTestId('quiz-best-score')).toHaveCount(0);
+    await expect(record).toHaveCount(0);
 
     // A weaker retry of the restored result must not lower the record either.
     await page.locator('.tessera-quiz-btn', { hasText: 'Retry' }).click();
     await completePracticeQuiz(page, { mc: 0, fill: 'wrong' });
-    await expect(page.getByTestId('quiz-best-score')).toContainText('100%');
+    await expect(record).toContainText('100%');
     const units = Object.values<{ s: number; a?: number }>(
       (await readSavedState(page)).g,
     );

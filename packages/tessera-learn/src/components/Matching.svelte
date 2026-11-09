@@ -1,10 +1,11 @@
 <script>
-  import { onMount, untrack } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import {
     MATCH_PAIR_COLORS,
     indexOptions,
+    initQuestion,
+    questionOptions,
     rovingIndex,
     savedIndex,
     shuffle,
@@ -37,8 +38,6 @@
 
   let shuffledRight = $state([]);
   const matches = new SvelteMap();
-  // Reverse index (right.originalIndex → left index) for O(1) right-column lookups.
-  const rightToLeft = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
   let leftFocus = $state(0);
@@ -57,60 +56,42 @@
 
   function resetState() {
     matches.clear();
-    rightToLeft.clear();
     selectedLeft = null;
     selectedRight = null;
     initShuffle();
   }
 
-  const q = useQuestion({
-    get id() {
-      return id;
-    },
-    get text() {
-      return question;
-    },
-    graded: untrack(() => graded),
-    weight: untrack(() => weight),
-    maxRetries: untrack(() => maxRetries),
-    complete: () => matches.size === pairs.length,
-    response: () => {
-      const left = indexOptions(pairs.map((p) => p.left));
-      return {
-        type: 'matching',
-        response: [...matches.entries()].map(([l, r]) => [
-          String(l),
-          String(r),
-        ]),
-        correct: left.map(({ id }) => [id, id]),
-        optionPairs: {
-          left,
-          right: indexOptions(pairs.map((p) => p.right)),
-        },
-      };
-    },
-    reset: resetState,
-    restore: (response) => {
-      const saved = response.map((pair) =>
-        pair.map((index) => savedIndex(index, pairs)),
-      );
-      for (const [left, right] of saved) {
-        matches.set(left, right);
-        rightToLeft.set(right, left);
-      }
-      return new Map(matches);
-    },
-  });
+  const q = useQuestion(
+    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+      complete: () => matches.size === pairs.length,
+      response: () => {
+        const left = indexOptions(pairs.map((p) => p.left));
+        return {
+          type: 'matching',
+          response: [...matches.entries()].map(([l, r]) => [
+            String(l),
+            String(r),
+          ]),
+          correct: left.map(({ id }) => [id, id]),
+          optionPairs: {
+            left,
+            right: indexOptions(pairs.map((p) => p.right)),
+          },
+        };
+      },
+      reset: resetState,
+      restore: (response) => {
+        const saved = response.map((pair) =>
+          pair.map((index) => savedIndex(index, pairs)),
+        );
+        for (const [left, right] of saved) matches.set(left, right);
+        return new Map(matches);
+      },
+    }),
+  );
 
-  // `q.mode` is fixed for the lifetime of the widget; capture it once so
-  // setup-time branches don't trip Svelte's "state_referenced_locally" warning.
   const inQuiz = q.mode === 'quiz';
-
-  if (!inQuiz) {
-    initShuffle();
-  } else {
-    onMount(initShuffle);
-  }
+  initQuestion(q, initShuffle);
 
   function handleLeftClick(leftIndex) {
     if (q.locked) return;
@@ -133,18 +114,9 @@
   }
 
   function createMatch(leftIndex, rightOriginalIndex) {
-    // Free any prior partner on either side so both maps stay consistent.
-    const priorRightForLeft = matches.get(leftIndex);
-    if (priorRightForLeft !== undefined) {
-      rightToLeft.delete(priorRightForLeft);
-    }
-    const priorLeftForRight = rightToLeft.get(rightOriginalIndex);
-    if (priorLeftForRight !== undefined) {
-      matches.delete(priorLeftForRight);
-    }
-
+    const priorLeft = leftFor(rightOriginalIndex);
+    if (priorLeft !== undefined) matches.delete(priorLeft);
     matches.set(leftIndex, rightOriginalIndex);
-    rightToLeft.set(rightOriginalIndex, leftIndex);
     selectedLeft = null;
     selectedRight = null;
 
@@ -153,10 +125,14 @@
 
   function removeMatch(leftIndex) {
     if (q.locked) return;
-    const right = matches.get(leftIndex);
     matches.delete(leftIndex);
-    if (right !== undefined) rightToLeft.delete(right);
     q.setAnswer(new Map(matches));
+  }
+
+  function leftFor(rightOriginalIndex) {
+    for (const [left, right] of matches) {
+      if (right === rightOriginalIndex) return left;
+    }
   }
 
   function getMatchColor(leftIndex) {
@@ -271,7 +247,7 @@
         Match to
       </div>
       {#each shuffledRight as item, pos (item.originalIndex)}
-        {@const leftIdx = rightToLeft.get(item.originalIndex)}
+        {@const leftIdx = leftFor(item.originalIndex)}
         {@const matched = leftIdx !== undefined}
         {@const color = getMatchColor(leftIdx)}
         {@const isSelected = selectedRight === item.originalIndex}
