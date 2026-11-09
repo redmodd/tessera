@@ -366,6 +366,28 @@ test.describe('Component — Sorting', () => {
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(1);
   });
 
+  test('the label fills the card inside its border', async ({ page }) => {
+    // Firefox before 147 starts a drag only from a button's content.
+    const card = page.locator('.tessera-sorting-card');
+    await card.scrollIntoViewIfNeeded();
+    const onLabel = await card.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      return [
+        [r.left + 3, cy],
+        [r.right - 3, cy],
+        [cx, r.top + 3],
+        [cx, r.bottom - 3],
+      ].map(([x, y]) =>
+        document
+          .elementFromPoint(x, y)!
+          .classList.contains('tessera-sorting-card-label'),
+      );
+    });
+    expect(onLabel).toEqual([true, true, true, true]);
+  });
+
   test('checked results pass axe audit', async ({ page }) => {
     const sorting = page.locator('.tessera-sorting');
     const fruit = sorting.getByRole('button', { name: /^Fruit/ });

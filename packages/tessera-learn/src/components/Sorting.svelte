@@ -193,7 +193,9 @@
             ondragend={onDragEnd}
             onclick={() => (cardSelected = !cardSelected)}
           >
-            {items[currentItemIdx]}
+            <span class="tessera-sorting-card-label"
+              >{items[currentItemIdx]}</span
+            >
           </button>
           <p class="tessera-sorting-counter">
             {queue.length} of {items.length} to sort
@@ -333,9 +335,7 @@
 
     .tessera-sorting-card {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--tessera-spacing-md) var(--tessera-spacing-xl);
+      padding: 0;
       min-width: 140px;
       min-height: 64px;
       background: var(--tessera-bg);
@@ -354,6 +354,16 @@
         box-shadow 0.15s;
       text-align: center;
       user-select: none;
+    }
+
+    /* Firefox before 147 starts a drag only from a button's content, not its
+       padding, so the label fills the card. */
+    .tessera-sorting-card-label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--tessera-spacing-md) var(--tessera-spacing-xl);
     }
 
     .tessera-sorting-card:hover {
