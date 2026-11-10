@@ -134,13 +134,11 @@ export function isCorrect(i: Interaction): boolean | null {
     }
     case 'matching':
       return pairSetEqual(i.response, i.correct);
-    case 'sequencing': {
-      const correct = i.correct;
+    case 'sequencing':
       return (
-        i.response.length === correct.length &&
-        i.response.every((item, k) => item === correct[k])
+        i.response.length === i.correct.length &&
+        i.correct.every((item, k) => item === i.response[k])
       );
-    }
     case 'numeric':
       return inRange(i.response, i.correct);
     case 'performance': {

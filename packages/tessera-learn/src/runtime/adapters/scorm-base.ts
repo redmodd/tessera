@@ -28,23 +28,34 @@ import {
 } from '../standards.js';
 
 interface ScormCalls {
-  initialize: [''];
-  terminate: [''];
-  getValue: [key: string];
-  setValue: [key: string, value: string];
-  commit: [''];
-  getLastError: [];
-  getErrorString: [code: string];
-  getDiagnostic: [code: string];
+  initialize: { args: ['']; name: 'LMSInitialize' | 'Initialize' };
+  terminate: { args: ['']; name: 'LMSFinish' | 'Terminate' };
+  getValue: { args: [key: string]; name: 'LMSGetValue' | 'GetValue' };
+  setValue: {
+    args: [key: string, value: string];
+    name: 'LMSSetValue' | 'SetValue';
+  };
+  commit: { args: ['']; name: 'LMSCommit' | 'Commit' };
+  getLastError: { args: []; name: 'LMSGetLastError' | 'GetLastError' };
+  getErrorString: {
+    args: [code: string];
+    name: 'LMSGetErrorString' | 'GetErrorString';
+  };
+  getDiagnostic: {
+    args: [code: string];
+    name: 'LMSGetDiagnostic' | 'GetDiagnostic';
+  };
 }
 
 type ScormMethod = keyof ScormCalls;
+type ScormArgs<M extends ScormMethod> = ScormCalls[M]['args'];
 
 type ApiMethod<TApi, M extends ScormMethod> = {
-  [K in keyof TApi]: TApi[K] extends (...args: ScormCalls[M]) => string
+  [K in keyof TApi]: TApi[K] extends (...args: ScormArgs<M>) => string
     ? K
     : never;
-}[keyof TApi];
+}[keyof TApi] &
+  ScormCalls[M]['name'];
 
 /**
  * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.
@@ -93,11 +104,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   protected call<M extends ScormMethod>(
     method: M,
-    ...args: ScormCalls[M]
+    ...args: ScormArgs<M>
   ): string {
     const api = this.api as Record<
       keyof TApi,
-      (...args: ScormCalls[M]) => string
+      (...args: ScormArgs<M>) => string
     >;
     return api[this.dialect.methods[method]](...args);
   }
