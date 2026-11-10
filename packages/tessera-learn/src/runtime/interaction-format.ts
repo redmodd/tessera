@@ -611,8 +611,6 @@ export interface ScormInteractionFields {
   timestamp(): string;
   typeValue(type: Interaction['type']): string;
   resultLabels: { correct: string; incorrect: string };
-  /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
-  description?(text: string, lang: string): string | null;
 }
 
 /**

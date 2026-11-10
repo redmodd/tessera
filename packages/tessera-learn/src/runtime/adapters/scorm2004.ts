@@ -63,12 +63,12 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
     // SCORM 2004 accepts the canonical interaction `type` strings unchanged.
     typeValue: (t) => t,
     resultLabels: { correct: 'correct', incorrect: 'incorrect' },
-    // localized_string_type, SPM 250 after the tag. Text starting with `{lang=` is rejected even after a tag.
-    description: (text, lang) =>
-      text.startsWith('{lang=')
-        ? null
-        : `{lang=${descriptionLang(lang)}}${cutText(text, 250)}`,
   },
+  // localized_string_type, SPM 250 after the tag. Text starting with `{lang=` is rejected even after a tag.
+  interactionDescription: (text, lang) =>
+    text.startsWith('{lang=')
+      ? null
+      : `{lang=${descriptionLang(lang)}}${cutText(text, 250)}`,
 };
 
 /** SCORM 2004 4E §4.2.1.5 cmi.mode vocabulary. */

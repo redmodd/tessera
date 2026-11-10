@@ -61,6 +61,8 @@ export interface ScormDialect<TApi> {
   masteryRange: readonly [number, number];
   formatDuration(seconds: number): string;
   interactionFields: ScormInteractionFields;
+  /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
+  interactionDescription?(text: string, lang: string): string | null;
 }
 
 export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
@@ -238,7 +240,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   ): void {
     if (!this.canWrite()) return;
     const description = text
-      ? this.dialect.interactionFields.description?.(text, this.#lang)
+      ? this.dialect.interactionDescription?.(text, this.#lang)
       : undefined;
     if (description === null) {
       console.warn(

@@ -14,7 +14,7 @@ export class XAPIConfigError extends Error {
   }
 }
 
-/** Thrown synchronously by `sendStatement` for partial-statement misuse. */
+/** `sendStatement` rejects with this for partial-statement misuse. */
 export class XAPIStatementError extends Error {
   statement: PartialStatement;
   constructor(message: string, statement: PartialStatement) {

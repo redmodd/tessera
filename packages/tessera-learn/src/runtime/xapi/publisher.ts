@@ -189,22 +189,16 @@ function isClientError(status: number | undefined): boolean {
  * carries the first 500 characters of the LRS body (e.g. "Forbidden cmi5
  * defined statement: ...") or the bare status when the body can't be read.
  */
-function outcomeOf(resp: Response): SendOutcome | Promise<SendOutcome> {
+async function outcomeOf(resp: Response): Promise<SendOutcome> {
   if (resp.ok || resp.status === 409) return { ok: true, status: resp.status };
-  return resp.text().then(
-    (respBody): SendOutcome => ({
-      ok: false,
-      status: resp.status,
-      error: new Error(
-        `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
-      ),
-    }),
-    (): SendOutcome => ({
-      ok: false,
-      status: resp.status,
-      error: new Error(`LRS responded ${resp.status}`),
-    }),
-  );
+  const respBody = await resp.text().catch(() => '');
+  return {
+    ok: false,
+    status: resp.status,
+    error: new Error(
+      `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
+    ),
+  };
 }
 
 /**
@@ -429,30 +423,17 @@ export class XAPIPublisher {
    * class is single-destination — the fan-out wrapper combines them).
    *
    * Validation failures (verb.id missing, object.id missing when supplied,
-   * score.scaled out of range) throw synchronously — the returned promise
-   * rejects before any HTTP traffic happens.
+   * score.scaled out of range) reject before any HTTP traffic happens.
    */
-  sendStatement(
+  async sendStatement(
     partial: PartialStatement,
     options?: SendStatementOptions & { id?: string },
   ): Promise<SendStatementResult> {
-    if (this.#unavailableReason) {
-      return Promise.reject(this.#unavailableReason());
-    }
-    try {
-      validatePartialStatement(partial);
-    } catch (err) {
-      // Caller-friendly: surface validation errors as a rejected promise
-      // so both `await sendStatement(...)` and
-      // `sendStatement(...).catch(...)` paths see them. The rejection
-      // happens before any HTTP traffic — no LRS round-trip is started.
-      return Promise.reject(err);
-    }
+    if (this.#unavailableReason) throw this.#unavailableReason();
+    validatePartialStatement(partial);
     if (!this.#cachedActor) {
-      return Promise.reject(
-        new XAPIConfigError(
-          'XAPIPublisher.sendStatement() called before init() resolved.',
-        ),
+      throw new XAPIConfigError(
+        'XAPIPublisher.sendStatement() called before init() resolved.',
       );
     }
     const statement = this.buildStatement(partial, { id: options?.id });
@@ -717,7 +698,7 @@ export class XAPIPublisher {
     resp: Response,
     body: string,
     keepalive: boolean,
-  ): Promise<SendOutcome> | SendOutcome {
+  ): Promise<SendOutcome> {
     // 401 with a function-form auth: invalidate cache, re-resolve once,
     // retry the same request.
     if (

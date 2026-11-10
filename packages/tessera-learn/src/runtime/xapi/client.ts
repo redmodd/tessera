@@ -38,8 +38,8 @@ export class XAPIClient {
    *
    * Validation failures reject before any HTTP traffic. The first
    * destination's built statement is returned as the canonical `statement`:
-   * other destinations may differ in actor or grouping, but the
-   * author-supplied verb, object, result and timestamp are identical.
+   * other destinations may differ in actor, grouping or timestamp, but the
+   * id and the author-supplied verb, object and result are identical.
    */
   async sendStatement(
     partial: PartialStatement,
