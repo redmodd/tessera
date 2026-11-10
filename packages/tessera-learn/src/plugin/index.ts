@@ -49,6 +49,7 @@ import { LMS_BUILD, runExport } from './export.js';
 import { tesseraLayoutPlugin } from './layout.js';
 import { tesseraQuizPlugin } from './quiz.js';
 import { tesseraCourseRuntimePlugin } from './course-runtime.js';
+import { errorMessage } from '../runtime/errors.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
 import {
@@ -410,7 +411,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
     } catch (error) {
       result = new Diagnostics();
       result.partial = true;
-      result.error(`validation could not run: ${(error as Error).message}`);
+      result.error(`validation could not run: ${errorMessage(error)}`);
     }
     const unreported = (notice: string) => !reported.has(notice);
     const infos = result.infos.filter(unreported);

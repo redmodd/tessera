@@ -27,15 +27,24 @@ import {
   type STANDARDS,
 } from '../standards.js';
 
-type ScormMethod =
-  | 'initialize'
-  | 'terminate'
-  | 'getValue'
-  | 'setValue'
-  | 'commit'
-  | 'getLastError'
-  | 'getErrorString'
-  | 'getDiagnostic';
+interface ScormCalls {
+  initialize: [''];
+  terminate: [''];
+  getValue: [key: string];
+  setValue: [key: string, value: string];
+  commit: [''];
+  getLastError: [];
+  getErrorString: [code: string];
+  getDiagnostic: [code: string];
+}
+
+type ScormMethod = keyof ScormCalls;
+
+type ApiMethod<TApi, M extends ScormMethod> = {
+  [K in keyof TApi]: TApi[K] extends (...args: ScormCalls[M]) => string
+    ? K
+    : never;
+}[keyof TApi];
 
 /**
  * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.
@@ -46,7 +55,7 @@ type ScormMethod =
 export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
   apiName: string;
-  methods: Record<ScormMethod, keyof TApi>;
+  methods: { [M in ScormMethod]: ApiMethod<TApi, M> };
   sessionTimeKey: string;
   masteryKey: string;
   masteryRange: readonly [number, number];
@@ -80,8 +89,14 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.queue.errorReporter = this.errorReporter;
   }
 
-  protected call(method: ScormMethod, ...args: string[]): string {
-    const api = this.api as Record<keyof TApi, (...args: string[]) => string>;
+  protected call<M extends ScormMethod>(
+    method: M,
+    ...args: ScormCalls[M]
+  ): string {
+    const api = this.api as Record<
+      keyof TApi,
+      (...args: ScormCalls[M]) => string
+    >;
     return api[this.dialect.methods[method]](...args);
   }
 
