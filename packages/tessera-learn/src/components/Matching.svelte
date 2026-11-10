@@ -4,12 +4,11 @@
   import {
     MATCH_PAIR_COLORS,
     indexOptions,
-    initQuestion,
-    questionOptions,
     rovingIndex,
     savedIndex,
     shuffle,
   } from './util.js';
+  import { initQuestion, questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 

@@ -2,13 +2,8 @@
   import { tick } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import {
-    indexOptions,
-    initQuestion,
-    questionOptions,
-    savedIndex,
-    shuffle,
-  } from './util.js';
+  import { indexOptions, savedIndex, shuffle } from './util.js';
+  import { initQuestion, questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 

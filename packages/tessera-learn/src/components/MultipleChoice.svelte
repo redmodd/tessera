@@ -1,6 +1,7 @@
 <script>
   import { useQuestion } from '../runtime/hooks.svelte.js';
-  import { indexOptions, questionOptions, savedIndex } from './util.js';
+  import { indexOptions, savedIndex } from './util.js';
+  import { questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
