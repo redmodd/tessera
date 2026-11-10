@@ -17,16 +17,11 @@
   // The button the learner pressed is disabled or gone once the question or
   // phase changes, so focus moves to what replaced it. Arrow keys stay in the
   // quiz from there, even on what a page change focused first.
-  async function focusProgress() {
+  async function focusPhase() {
     await tick();
-    progressEl?.removeAttribute('data-tessera-page-focus');
-    progressEl?.focus();
-  }
-
-  async function focusResults() {
-    await tick();
-    resultsEl?.removeAttribute('data-tessera-page-focus');
-    resultsEl?.focus();
+    const node = handle.state === 'submitted' ? resultsEl : progressEl;
+    node?.removeAttribute('data-tessera-page-focus');
+    node?.focus();
   }
 
   let totalQuestions = $derived(handle.questions.length);
@@ -61,7 +56,7 @@
     }
     if (currentQuestionIndex < totalQuestions - 1) {
       currentQuestionIndex++;
-      focusProgress();
+      focusPhase();
     }
   }
 
@@ -73,43 +68,43 @@
   function goPrevQuestion() {
     if (currentQuestionIndex === 0) return;
     currentQuestionIndex--;
-    focusProgress();
+    focusPhase();
   }
 
   function goNextReview() {
     if (reviewIndex === totalQuestions - 1) return;
     reviewIndex++;
-    focusProgress();
+    focusPhase();
   }
 
   function goPrevReview() {
     if (reviewIndex === 0) return;
     reviewIndex--;
-    focusProgress();
+    focusPhase();
   }
 
   function handleSubmit() {
     if (!handle.canSubmit) return;
     handle.submit();
-    focusResults();
+    focusPhase();
   }
 
   function handleStartReview() {
     reviewIndex = 0;
     handle.startReview();
-    focusProgress();
+    focusPhase();
   }
 
   function handleExitReview() {
     handle.exitReview();
-    focusResults();
+    focusPhase();
   }
 
   function handleRetry() {
     handle.retry();
     currentQuestionIndex = 0;
     reviewIndex = 0;
-    focusProgress();
+    focusPhase();
   }
 </script>
 
@@ -133,6 +128,22 @@
   >
     Back
   </button>
+{/snippet}
+
+{#snippet scoreCard(value, met, caption)}
+  <div class="tessera-quiz-score" class:paired={caption}>
+    {#if caption}
+      <span class="tessera-quiz-score-caption">{caption}</span>
+    {/if}
+    <span class="tessera-quiz-score-value">{value}%</span>
+    <span
+      class="tessera-quiz-score-label"
+      class:passed={met}
+      class:failed={!met}
+    >
+      {met ? 'Passed' : 'Not Passed'}
+    </span>
+  </div>
 {/snippet}
 
 {#snippet questionList(activeIndex)}
@@ -256,45 +267,10 @@
               Your answers have been submitted.
             </p>
           {:else if bestBeaten}
-            <div
-              class="tessera-quiz-score paired"
-              data-testid="quiz-attempt-score"
-            >
-              <span class="tessera-quiz-score-caption">This attempt</span>
-              <span class="tessera-quiz-score-value">{handle.score}%</span>
-              <span
-                class="tessera-quiz-score-label"
-                class:passed={attemptPassed}
-                class:failed={!attemptPassed}
-              >
-                {attemptPassed ? 'Passed' : 'Not Passed'}
-              </span>
-            </div>
-            <div
-              class="tessera-quiz-score paired"
-              data-testid="quiz-best-score"
-            >
-              <span class="tessera-quiz-score-caption">On record</span>
-              <span class="tessera-quiz-score-value">{handle.bestScore}%</span>
-              <span
-                class="tessera-quiz-score-label"
-                class:passed
-                class:failed={!passed}
-              >
-                {passed ? 'Passed' : 'Not Passed'}
-              </span>
-            </div>
+            {@render scoreCard(handle.score, attemptPassed, 'This attempt')}
+            {@render scoreCard(handle.bestScore, passed, 'On record')}
           {:else}
-            <div class="tessera-quiz-score">
-              <span class="tessera-quiz-score-value">{handle.score}%</span>
-              <span
-                class="tessera-quiz-score-label"
-                class:passed
-                class:failed={!passed}
-              >
-                {passed ? 'Passed' : 'Not Passed'}
-              </span>
-            </div>
+            {@render scoreCard(handle.score, passed)}
           {/if}
           {#if handle.restored}
             <p class="tessera-quiz-results-detail">Your previous result.</p>

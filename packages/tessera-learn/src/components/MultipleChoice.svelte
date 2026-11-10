@@ -1,22 +1,17 @@
 <script>
-  import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { indexOptions, savedIndex } from './util.js';
+  import { questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
-   * @type {{
-   *   id: string;
-   *   question: string;
+   * @type {import('./question.js').QuestionProps & {
    *   options: string[];
    *   correct: number;
    *   optionFeedback?: string[];
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
-   *   graded?: boolean;
-   *   maxRetries?: number;
-   *   weight?: number;
    * }}
    */
   let {
@@ -29,7 +24,7 @@
     optionFeedback = [],
     graded,
     maxRetries,
-    weight = 1,
+    weight,
   } = $props();
 
   let selectedOption = $state(null);
@@ -38,30 +33,23 @@
   const componentId = $props.id();
   const groupId = `mc-${componentId}`;
 
-  const q = useQuestion({
-    get id() {
-      return id;
-    },
-    get text() {
-      return question;
-    },
-    graded: untrack(() => graded),
-    weight: untrack(() => weight),
-    maxRetries: untrack(() => maxRetries),
-    response: () => ({
-      type: 'choice',
-      response: selectedOption !== null ? [String(selectedOption)] : [],
-      correct: [String(correct)],
-      options: indexOptions(options),
+  const q = useQuestion(
+    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+      response: () => ({
+        type: 'choice',
+        response: selectedOption !== null ? [String(selectedOption)] : [],
+        correct: [String(correct)],
+        options: indexOptions(options),
+      }),
+      reset: () => {
+        selectedOption = null;
+      },
+      restore: (response) => {
+        selectedOption = savedIndex(response[0], options);
+        return selectedOption;
+      },
     }),
-    reset: () => {
-      selectedOption = null;
-    },
-    restore: (response) => {
-      selectedOption = savedIndex(response[0], options);
-      return selectedOption;
-    },
-  });
+  );
 
   function handleSelect(optIndex) {
     if (q.locked) return;

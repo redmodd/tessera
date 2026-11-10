@@ -1,21 +1,16 @@
 <script>
-  import { untrack } from 'svelte';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { fillInAnswers } from './util.js';
+  import { questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
-   * @type {{
-   *   id: string;
-   *   question: string;
+   * @type {import('./question.js').QuestionProps & {
    *   answers: string | string[];
    *   caseSensitive?: boolean;
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
-   *   graded?: boolean;
-   *   maxRetries?: number;
-   *   weight?: number;
    * }}
    */
   let {
@@ -27,7 +22,7 @@
     incorrectFeedback = '',
     graded,
     maxRetries,
-    weight = 1,
+    weight,
   } = $props();
 
   const answerList = $derived(fillInAnswers(answers));
@@ -36,33 +31,25 @@
   const componentId = $props.id();
   const inputId = `fitb-${componentId}`;
 
-  const q = useQuestion({
-    get id() {
-      return id;
-    },
-    get text() {
-      return question;
-    },
-    graded: untrack(() => graded),
-    weight: untrack(() => weight),
-    maxRetries: untrack(() => maxRetries),
-    complete: () => inputValue.trim() !== '',
-    response: () => ({
-      type: 'fill-in',
-      response: inputValue.trim(),
-      correct: answerList,
-      caseMatters: !!caseSensitive,
+  const q = useQuestion(
+    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+      complete: () => inputValue.trim() !== '',
+      response: () => ({
+        type: 'fill-in',
+        response: inputValue.trim(),
+        correct: answerList,
+        caseMatters: !!caseSensitive,
+      }),
+      reset: () => {
+        inputValue = '';
+      },
+      restore: (response) => {
+        inputValue = String(response);
+        return inputValue;
+      },
     }),
-    reset: () => {
-      inputValue = '';
-    },
-    restore: (response) => {
-      inputValue = String(response);
-      return inputValue;
-    },
-  });
+  );
 
-  // `q.mode` is fixed for the lifetime of the widget; capture once.
   const inQuiz = q.mode === 'quiz';
 
   function handleInput(e) {

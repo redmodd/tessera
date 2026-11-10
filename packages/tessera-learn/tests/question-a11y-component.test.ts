@@ -230,6 +230,21 @@ describe('Matching accessible names', () => {
       'All pairs matched. Submit your answer below.',
     );
   });
+
+  it('rematching a right item unmatches its old left item', () => {
+    const { target, button, name, click } = mountWidget(Matching, { pairs });
+    click(button('A'));
+    click(button('Alpha'));
+    click(button('1 Alpha'));
+    click(button('B'));
+
+    expect(name(button('A'))).toBe('A');
+    expect(name(button('2 B'))).toBe(
+      '2 B (matched with Alpha, activate to unmatch)',
+    );
+    expect(name(button('2 Alpha'))).toBe('2 Alpha (matched with B)');
+    expect(target.querySelectorAll('.matched')).toHaveLength(2);
+  });
 });
 
 type Widget = ReturnType<typeof mountWidget>;
