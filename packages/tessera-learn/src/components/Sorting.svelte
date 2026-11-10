@@ -3,22 +3,17 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { useQuestion } from '../runtime/hooks.svelte.js';
   import { indexOptions, savedIndex, shuffle } from './util.js';
-  import { initQuestion, questionOptions } from './question.js';
+  import { questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
-   * @type {{
-   *   id: string;
-   *   question: string;
+   * @type {import('./question.js').QuestionProps & {
    *   items: string[];
    *   targets: string[];
    *   correct: number[];
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
-   *   graded?: boolean;
-   *   maxRetries?: number;
-   *   weight?: number;
    * }}
    */
   let {
@@ -31,7 +26,7 @@
     incorrectFeedback = '',
     graded,
     maxRetries,
-    weight = 1,
+    weight,
   } = $props();
 
   let queue = $state([]); // item indices not yet placed; queue[0] is current
@@ -89,7 +84,7 @@
   );
 
   const inQuiz = q.mode === 'quiz';
-  initQuestion(q, initQueue);
+  initQueue();
 
   let currentItemIdx = $derived(queue.length > 0 ? queue[0] : null);
 

@@ -1,11 +1,8 @@
-import { onMount, untrack } from 'svelte';
-import type {
-  UseQuestionHandle,
-  UseQuestionOptions,
-} from '../runtime/hooks.svelte.js';
+import { untrack } from 'svelte';
+import type { UseQuestionOptions } from '../runtime/hooks.svelte.js';
 
 /** The props every built-in question widget takes. */
-interface QuestionProps {
+export interface QuestionProps {
   id: string;
   question: string;
   graded?: boolean;
@@ -34,10 +31,4 @@ export function questionOptions(
     maxRetries,
     ...own,
   };
-}
-
-/** Runs `init` now when standalone, or on mount inside a quiz. */
-export function initQuestion(q: UseQuestionHandle, init: () => void): void {
-  if (q.mode === 'quiz') onMount(init);
-  else init();
 }

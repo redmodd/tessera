@@ -20,8 +20,9 @@
   // getter because the new element is bound only after the tick.
   async function focusAfterTick(el) {
     await tick();
-    el()?.removeAttribute('data-tessera-page-focus');
-    el()?.focus();
+    const node = el();
+    node?.removeAttribute('data-tessera-page-focus');
+    node?.focus();
   }
 
   const focusProgress = () => focusAfterTick(() => progressEl);
@@ -133,14 +134,18 @@
   </button>
 {/snippet}
 
-{#snippet scoreCard(caption, value, passed)}
+{#snippet scoreCard(value, met, caption)}
   <div class="tessera-quiz-score" class:paired={caption}>
     {#if caption}
       <span class="tessera-quiz-score-caption">{caption}</span>
     {/if}
     <span class="tessera-quiz-score-value">{value}%</span>
-    <span class="tessera-quiz-score-label" class:passed class:failed={!passed}>
-      {passed ? 'Passed' : 'Not Passed'}
+    <span
+      class="tessera-quiz-score-label"
+      class:passed={met}
+      class:failed={!met}
+    >
+      {met ? 'Passed' : 'Not Passed'}
     </span>
   </div>
 {/snippet}
@@ -266,10 +271,10 @@
               Your answers have been submitted.
             </p>
           {:else if bestBeaten}
-            {@render scoreCard('This attempt', handle.score, attemptPassed)}
-            {@render scoreCard('On record', handle.bestScore, passed)}
+            {@render scoreCard(handle.score, attemptPassed, 'This attempt')}
+            {@render scoreCard(handle.bestScore, passed, 'On record')}
           {:else}
-            {@render scoreCard('', handle.score, passed)}
+            {@render scoreCard(handle.score, passed)}
           {/if}
           {#if handle.restored}
             <p class="tessera-quiz-results-detail">Your previous result.</p>

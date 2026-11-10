@@ -6,17 +6,12 @@
   import QuestionReview from './QuestionReview.svelte';
 
   /**
-   * @type {{
-   *   id: string;
-   *   question: string;
+   * @type {import('./question.js').QuestionProps & {
    *   options: string[];
    *   correct: number;
    *   optionFeedback?: string[];
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
-   *   graded?: boolean;
-   *   maxRetries?: number;
-   *   weight?: number;
    * }}
    */
   let {
@@ -29,7 +24,7 @@
     optionFeedback = [],
     graded,
     maxRetries,
-    weight = 1,
+    weight,
   } = $props();
 
   let selectedOption = $state(null);

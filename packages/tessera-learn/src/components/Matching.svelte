@@ -8,20 +8,15 @@
     savedIndex,
     shuffle,
   } from './util.js';
-  import { initQuestion, questionOptions } from './question.js';
+  import { questionOptions } from './question.js';
   import QuestionShell from './QuestionShell.svelte';
   import QuestionReview from './QuestionReview.svelte';
 
   /**
-   * @type {{
-   *   id: string;
-   *   question: string;
+   * @type {import('./question.js').QuestionProps & {
    *   pairs: { left: string; right: string }[];
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
-   *   graded?: boolean;
-   *   maxRetries?: number;
-   *   weight?: number;
    * }}
    */
   let {
@@ -32,10 +27,10 @@
     incorrectFeedback = '',
     graded,
     maxRetries,
-    weight = 1,
+    weight,
   } = $props();
 
-  let shuffledRight = $state([]);
+  let shuffledRight = $state(shuffledPairs());
   const matches = new SvelteMap();
   let selectedLeft = $state(null);
   let selectedRight = $state(null);
@@ -47,17 +42,15 @@
   const hintId = `matching-${componentId}-hint`;
   const startHintId = `matching-${componentId}-start-hint`;
 
-  function initShuffle() {
-    shuffledRight = shuffle(
-      pairs.map((p, i) => ({ text: p.right, originalIndex: i })),
-    );
+  function shuffledPairs() {
+    return shuffle(pairs.map((p, i) => ({ text: p.right, originalIndex: i })));
   }
 
   function resetState() {
     matches.clear();
     selectedLeft = null;
     selectedRight = null;
-    initShuffle();
+    shuffledRight = shuffledPairs();
   }
 
   const q = useQuestion(
@@ -90,7 +83,6 @@
   );
 
   const inQuiz = q.mode === 'quiz';
-  initQuestion(q, initShuffle);
 
   function handleLeftClick(leftIndex) {
     if (q.locked) return;

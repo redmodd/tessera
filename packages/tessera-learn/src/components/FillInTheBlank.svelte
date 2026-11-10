@@ -6,16 +6,11 @@
   import QuestionReview from './QuestionReview.svelte';
 
   /**
-   * @type {{
-   *   id: string;
-   *   question: string;
+   * @type {import('./question.js').QuestionProps & {
    *   answers: string | string[];
    *   caseSensitive?: boolean;
    *   correctFeedback?: string;
    *   incorrectFeedback?: string;
-   *   graded?: boolean;
-   *   maxRetries?: number;
-   *   weight?: number;
    * }}
    */
   let {
@@ -27,7 +22,7 @@
     incorrectFeedback = '',
     graded,
     maxRetries,
-    weight = 1,
+    weight,
   } = $props();
 
   const answerList = $derived(fillInAnswers(answers));
@@ -55,7 +50,6 @@
     }),
   );
 
-  // `q.mode` is fixed for the lifetime of the widget; capture once.
   const inQuiz = q.mode === 'quiz';
 
   function handleInput(e) {
