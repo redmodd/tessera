@@ -231,7 +231,7 @@ describe('Matching accessible names', () => {
     );
   });
 
-  it('moves a matched right item to the left item it is matched with next', () => {
+  it('rematching a right item unmatches its old left item', () => {
     const { target, button, name, click } = mountWidget(Matching, { pairs });
     click(button('A'));
     click(button('Alpha'));

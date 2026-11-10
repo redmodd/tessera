@@ -16,17 +16,13 @@
 
   // The button the learner pressed is disabled or gone once the question or
   // phase changes, so focus moves to what replaced it. Arrow keys stay in the
-  // quiz from there, even on what a page change focused first. `el` is a
-  // getter because the new element is bound only after the tick.
-  async function focusAfterTick(el) {
+  // quiz from there, even on what a page change focused first.
+  async function focusPhase() {
     await tick();
-    const node = el();
+    const node = handle.state === 'submitted' ? resultsEl : progressEl;
     node?.removeAttribute('data-tessera-page-focus');
     node?.focus();
   }
-
-  const focusProgress = () => focusAfterTick(() => progressEl);
-  const focusResults = () => focusAfterTick(() => resultsEl);
 
   let totalQuestions = $derived(handle.questions.length);
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
@@ -60,7 +56,7 @@
     }
     if (currentQuestionIndex < totalQuestions - 1) {
       currentQuestionIndex++;
-      focusProgress();
+      focusPhase();
     }
   }
 
@@ -72,43 +68,43 @@
   function goPrevQuestion() {
     if (currentQuestionIndex === 0) return;
     currentQuestionIndex--;
-    focusProgress();
+    focusPhase();
   }
 
   function goNextReview() {
     if (reviewIndex === totalQuestions - 1) return;
     reviewIndex++;
-    focusProgress();
+    focusPhase();
   }
 
   function goPrevReview() {
     if (reviewIndex === 0) return;
     reviewIndex--;
-    focusProgress();
+    focusPhase();
   }
 
   function handleSubmit() {
     if (!handle.canSubmit) return;
     handle.submit();
-    focusResults();
+    focusPhase();
   }
 
   function handleStartReview() {
     reviewIndex = 0;
     handle.startReview();
-    focusProgress();
+    focusPhase();
   }
 
   function handleExitReview() {
     handle.exitReview();
-    focusResults();
+    focusPhase();
   }
 
   function handleRetry() {
     handle.retry();
     currentQuestionIndex = 0;
     reviewIndex = 0;
-    focusProgress();
+    focusPhase();
   }
 </script>
 
