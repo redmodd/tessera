@@ -1,4 +1,5 @@
 import type { PartialStatement } from './types.js';
+import { errorMessage } from '../errors.js';
 export {
   validateAgent,
   validateAuthCredential,
@@ -83,7 +84,7 @@ export function validatePartialStatement(partial: PartialStatement): void {
     JSON.stringify(partial);
   } catch (err) {
     throw new XAPIStatementError(
-      `sendStatement: statement must be JSON-serializable (${err instanceof Error ? err.message : String(err)})`,
+      `sendStatement: statement must be JSON-serializable (${errorMessage(err)})`,
       partial,
     );
   }

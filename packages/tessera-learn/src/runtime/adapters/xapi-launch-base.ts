@@ -32,6 +32,7 @@ import type {
   PartialStatement,
   DestinationOutcome,
 } from '../xapi/types.js';
+import { errorMessage } from '../errors.js';
 
 export const VERBS = {
   initialized: 'http://adlnet.gov/expapi/verbs/initialized',
@@ -369,7 +370,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (scaled === null || scaled === this.#lastScoreEmitted) return;
     this.#lastScoreEmitted = scaled;
     this.dispatch('Scored', {
-      verb: { id: VERBS.scored, display: { 'en-US': 'scored' } },
+      verb: { id: VERBS.scored },
       result: {
         score: { scaled },
         ...durationOf(this.totalSeconds),
@@ -405,7 +406,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (this.#completion !== 'complete' || this.#completedEmitted) return;
     this.#completedEmitted = true;
     this.dispatch('Completed', {
-      verb: { id: VERBS.completed, display: { 'en-US': 'completed' } },
+      verb: { id: VERBS.completed },
       result: { completion: true, ...durationOf(this.totalSeconds) },
       context: this.buildContext({ moveOn: true }),
     });
@@ -425,7 +426,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       this.#lastScoreEmitted = scaled;
     }
     this.dispatch(status === 'passed' ? 'Passed' : 'Failed', {
-      verb: { id: VERBS[status], display: { 'en-US': status } },
+      verb: { id: VERBS[status] },
       result,
       context: this.buildContext({ moveOn: true, mastery: true }),
     });
@@ -462,7 +463,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
     if (response !== null) result.response = response;
     if (correct !== null) result.success = correct;
     this.dispatch('Answered', {
-      verb: { id: VERBS.answered, display: { 'en-US': 'answered' } },
+      verb: { id: VERBS.answered },
       object: {
         id: `${this.#activityId}#${encodeURIComponent(questionId.replace(/\p{Cs}/gu, '\uFFFD'))}`,
         objectType: 'Activity',
@@ -507,7 +508,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
 
   #terminatedStatement(): PartialStatement {
     return {
-      verb: { id: VERBS.terminated, display: { 'en-US': 'terminated' } },
+      verb: { id: VERBS.terminated },
       result: durationOf(this.terminatedSeconds),
       context: this.buildContext(),
     };
@@ -541,7 +542,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
       return actor;
     } catch (err) {
       throw new Error(
-        `Tessera ${this.logName}: launch parameter 'actor' is malformed (${err instanceof Error ? err.message : String(err)}). The LMS did not send a valid Identified Agent JSON.`,
+        `Tessera ${this.logName}: launch parameter 'actor' is malformed (${errorMessage(err)}). The LMS did not send a valid Identified Agent JSON.`,
         { cause: err },
       );
     }
@@ -554,7 +555,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
    */
   #sendInitialized(): void {
     this.dispatch('Initialized', {
-      verb: { id: VERBS.initialized, display: { 'en-US': 'initialized' } },
+      verb: { id: VERBS.initialized },
       context: this.buildContext(),
     });
   }
@@ -655,7 +656,7 @@ export abstract class BaseXAPILaunchAdapter extends BaseAdapter {
         this.#stateRead = true;
         return;
       } catch (err) {
-        lastDetail = err instanceof Error ? err.message : String(err);
+        lastDetail = errorMessage(err);
         if (request.signal.aborted) break;
       } finally {
         request.abort();

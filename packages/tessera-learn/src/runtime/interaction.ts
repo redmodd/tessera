@@ -118,41 +118,33 @@ export function restoreResponse(
  *  - `null`  — `correct` was not provided; the author will decide externally
  */
 export function isCorrect(i: Interaction): boolean | null {
+  if (i.correct === undefined) return null;
   switch (i.type) {
     case 'choice':
-      if (i.correct === undefined) return null;
       return setEqual(i.response, i.correct);
     case 'true-false':
-      if (i.correct === undefined) return null;
+    case 'likert':
+    case 'other':
       return i.response === i.correct;
     case 'fill-in':
     case 'long-fill-in': {
-      if (i.correct === undefined) return null;
       const matters = !!i.caseMatters;
       const actual = matters ? i.response : i.response.toLowerCase();
       return i.correct.some((c) => (matters ? c : c.toLowerCase()) === actual);
     }
-    case 'matching': {
-      if (i.correct === undefined) return null;
+    case 'matching':
       return pairSetEqual(i.response, i.correct);
-    }
     case 'sequencing': {
-      if (i.correct === undefined) return null;
-      if (i.response.length !== i.correct.length) return false;
-      for (let k = 0; k < i.response.length; k++) {
-        if (i.response[k] !== i.correct[k]) return false;
-      }
-      return true;
+      const correct = i.correct;
+      return (
+        i.response.length === correct.length &&
+        i.response.every((item, k) => item === correct[k])
+      );
     }
     case 'numeric':
-      if (i.correct === undefined) return null;
       return inRange(i.response, i.correct);
-    case 'likert':
-      if (i.correct === undefined) return null;
-      return i.response === i.correct;
     case 'performance': {
       const correct = i.correct;
-      if (correct === undefined) return null;
       // Steps grade in order, as `order_matters` defaults to true.
       return (
         i.response.length === correct.length &&
@@ -162,9 +154,6 @@ export function isCorrect(i: Interaction): boolean | null {
         )
       );
     }
-    case 'other':
-      if (i.correct === undefined) return null;
-      return i.response === i.correct;
   }
 }
 

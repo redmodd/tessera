@@ -42,7 +42,16 @@ function descriptionLang(lang: string): string {
 const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
   profile: STANDARDS.scorm2004,
   apiName: 'API_1484_11',
-  initializeMethod: 'Initialize',
+  methods: {
+    initialize: 'Initialize',
+    terminate: 'Terminate',
+    getValue: 'GetValue',
+    setValue: 'SetValue',
+    commit: 'Commit',
+    getLastError: 'GetLastError',
+    getErrorString: 'GetErrorString',
+    getDiagnostic: 'GetDiagnostic',
+  },
   sessionTimeKey: 'cmi.session_time',
   masteryKey: 'cmi.scaled_passing_score',
   masteryRange: [-1, 1],
@@ -60,14 +69,6 @@ const SCORM2004_DIALECT: ScormDialect<SCORM2004API> = {
         ? null
         : `{lang=${descriptionLang(lang)}}${cutText(text, 250)}`,
   },
-  initialize: (api) => api.Initialize(''),
-  terminate: (api) => api.Terminate(''),
-  getValue: (api, key) => api.GetValue(key),
-  setValue: (api, key, value) => api.SetValue(key, value),
-  commit: (api) => api.Commit(''),
-  getLastError: (api) => api.GetLastError(),
-  getErrorString: (api, code) => api.GetErrorString(code),
-  getDiagnostic: (api, code) => api.GetDiagnostic(code),
 };
 
 /** SCORM 2004 4E §4.2.1.5 cmi.mode vocabulary. */
@@ -139,7 +140,7 @@ export class SCORM2004Adapter extends BaseScormAdapter<SCORM2004API> {
   override exit(deadline: Promise<unknown>): Promise<void> {
     const request = this.#exitMode === 'suspend' ? 'suspendAll' : 'exitAll';
     this.queue.enqueue(
-      () => this.dialect.setValue(this.api, 'adl.nav.request', request),
+      () => this.call('setValue', 'adl.nav.request', request),
       'adl.nav.request',
     );
     return super.exit(deadline);

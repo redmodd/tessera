@@ -388,6 +388,18 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
     expect(r.destinations[0].ok).toBe(true);
   });
 
+  it('surfaces the LRS response body when the retry after a 401 fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce(respond(401))
+      .mockResolvedValue(respond(403, 'Forbidden for this agent'));
+    const pub = await initPublisher({ auth: vi.fn().mockResolvedValue('tok') });
+    const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
+    expect(r.destinations[0]).toMatchObject({ ok: false, status: 403 });
+    expect(r.destinations[0].error?.message).toBe(
+      'LRS responded 403: Forbidden for this agent',
+    );
+  });
+
   it('on two consecutive 401s, marks auth dead', async () => {
     mockFetch.mockResolvedValue(respond(401));
     const resolver = vi.fn().mockResolvedValue('tok');

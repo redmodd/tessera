@@ -20,6 +20,7 @@ import {
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 import { httpOrigin } from '../standards.js';
 import { isRecord } from '../types.js';
+import { errorMessage, toError } from '../errors.js';
 
 /** cmi5 §9.6.3.1: the cmi5 session id context extension IRI. */
 export const CMI5_SESSIONID_EXT =
@@ -184,6 +185,29 @@ function isClientError(status: number | undefined): boolean {
 }
 
 /**
+ * A 409 means the LRS already holds the statement id. On failure, the error
+ * carries the first 500 characters of the LRS body (e.g. "Forbidden cmi5
+ * defined statement: ...") or the bare status when the body can't be read.
+ */
+function outcomeOf(resp: Response): SendOutcome | Promise<SendOutcome> {
+  if (resp.ok || resp.status === 409) return { ok: true, status: resp.status };
+  return resp.text().then(
+    (respBody): SendOutcome => ({
+      ok: false,
+      status: resp.status,
+      error: new Error(
+        `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
+      ),
+    }),
+    (): SendOutcome => ({
+      ok: false,
+      status: resp.status,
+      error: new Error(`LRS responded ${resp.status}`),
+    }),
+  );
+}
+
+/**
  * Single-destination xAPI publisher. Builds and sends statements with
  * sequential queue ordering, retry on 5xx/network errors, and 401-driven
  * auth re-resolution.
@@ -286,7 +310,7 @@ export class XAPIPublisher {
         resolved = await this.#actorValue();
       } catch (err) {
         throw new XAPIConfigError(
-          `xapi.actor resolver threw: ${err instanceof Error ? err.message : String(err)}`,
+          `xapi.actor resolver threw: ${errorMessage(err)}`,
         );
       }
       const err = validateAgent(resolved);
@@ -655,7 +679,7 @@ export class XAPIPublisher {
       .then((token) => this.#fetchWithToken(token, body, keepalive))
       .catch((err) => ({
         ok: false,
-        error: err instanceof Error ? err : new Error(String(err)),
+        error: toError(err),
       }));
   }
 
@@ -685,7 +709,7 @@ export class XAPIPublisher {
       .then((resp) => this.#handleResponse(resp, body, keepalive))
       .catch((err) => ({
         ok: false,
-        error: err instanceof Error ? err : new Error(String(err)),
+        error: toError(err),
       }));
   }
 
@@ -694,9 +718,6 @@ export class XAPIPublisher {
     body: string,
     keepalive: boolean,
   ): Promise<SendOutcome> | SendOutcome {
-    if (resp.ok || resp.status === 409) {
-      return { ok: true, status: resp.status };
-    }
     // 401 with a function-form auth: invalidate cache, re-resolve once,
     // retry the same request.
     if (
@@ -707,49 +728,24 @@ export class XAPIPublisher {
       this.#cachedAuth = null;
       return this.#resolveAuth()
         .then((newToken) => this.#post(newToken, body, keepalive))
-        .then((retryResp): SendOutcome => {
-          if (retryResp.ok || retryResp.status === 409) {
-            return { ok: true, status: retryResp.status };
-          }
-          if (retryResp.status === 401) {
-            this.#authDead = true;
-            return {
-              ok: false,
-              status: 401,
-              error: new Error(
-                'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
-              ),
-            };
-          }
+        .then((retryResp) => {
+          if (retryResp.status !== 401) return outcomeOf(retryResp);
+          this.#authDead = true;
           return {
             ok: false,
-            status: retryResp.status,
-            error: new Error(`LRS responded ${retryResp.status}`),
+            status: 401,
+            error: new Error(
+              'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
+            ),
           };
         })
         .catch((err): SendOutcome => ({
           ok: false,
           status: 401,
-          error: err instanceof Error ? err : new Error(String(err)),
+          error: toError(err),
         }));
     }
-    // Append the LRS body to the error message so callers see the
-    // specific reason (e.g. "Forbidden cmi5 defined statement: ...").
-    // Cap at 500 chars; on read failure, fall back to bare status.
-    return resp.text().then(
-      (respBody): SendOutcome => ({
-        ok: false,
-        status: resp.status,
-        error: new Error(
-          `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
-        ),
-      }),
-      (): SendOutcome => ({
-        ok: false,
-        status: resp.status,
-        error: new Error(`LRS responded ${resp.status}`),
-      }),
-    );
+    return outcomeOf(resp);
   }
 
   /** Only reached with function-form auth; the constructor caches static auth. */
@@ -770,7 +766,7 @@ export class XAPIPublisher {
       .catch((err) => {
         if (err instanceof XAPIConfigError) throw err;
         throw new XAPIConfigError(
-          `xapi.auth resolver threw: ${err instanceof Error ? err.message : String(err)}`,
+          `xapi.auth resolver threw: ${errorMessage(err)}`,
         );
       });
   }

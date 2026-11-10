@@ -31,7 +31,16 @@ export interface SCORM12API {
 const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
   profile: STANDARDS.scorm12,
   apiName: 'API',
-  initializeMethod: 'LMSInitialize',
+  methods: {
+    initialize: 'LMSInitialize',
+    terminate: 'LMSFinish',
+    getValue: 'LMSGetValue',
+    setValue: 'LMSSetValue',
+    commit: 'LMSCommit',
+    getLastError: 'LMSGetLastError',
+    getErrorString: 'LMSGetErrorString',
+    getDiagnostic: 'LMSGetDiagnostic',
+  },
   sessionTimeKey: 'cmi.core.session_time',
   masteryKey: 'cmi.student_data.mastery_score',
   masteryRange: [0, 100],
@@ -43,14 +52,6 @@ const SCORM12_DIALECT: ScormDialect<SCORM12API> = {
     typeValue: scorm12Type,
     resultLabels: { correct: 'correct', incorrect: 'wrong' },
   },
-  initialize: (api) => api.LMSInitialize(''),
-  terminate: (api) => api.LMSFinish(''),
-  getValue: (api, key) => api.LMSGetValue(key),
-  setValue: (api, key, value) => api.LMSSetValue(key, value),
-  commit: (api) => api.LMSCommit(''),
-  getLastError: (api) => api.LMSGetLastError(),
-  getErrorString: (api, code) => api.LMSGetErrorString(code),
-  getDiagnostic: (api, code) => api.LMSGetDiagnostic(code),
 };
 
 /**
