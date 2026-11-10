@@ -2,12 +2,11 @@ import { untrack } from 'svelte';
 import type { UseQuestionOptions } from '../runtime/hooks.svelte.js';
 
 /** The props every built-in question widget takes. */
-export interface QuestionProps {
-  id: string;
+export interface QuestionProps extends Pick<
+  UseQuestionOptions,
+  'id' | 'graded' | 'weight' | 'maxRetries'
+> {
   question: string;
-  graded?: boolean;
-  weight?: number;
-  maxRetries?: number;
 }
 
 /**
