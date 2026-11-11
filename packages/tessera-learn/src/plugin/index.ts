@@ -46,12 +46,10 @@ import {
 import { ChangeBurst } from './change-burst.js';
 import { buildCsp } from './csp.js';
 import { LMS_BUILD, runExport } from './export.js';
-import { tesseraLayoutPlugin } from './layout.js';
-import { tesseraQuizPlugin } from './quiz.js';
-import { tesseraCourseRuntimePlugin } from './course-runtime.js';
 import { errorMessage } from '../runtime/errors.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
+import { createOverridePlugin } from './override-plugin.js';
 import {
   BuildContext,
   isInside,
@@ -119,9 +117,28 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraConfigPlugin(ctx),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(ctx),
-    tesseraLayoutPlugin(ctx),
-    tesseraQuizPlugin(ctx),
-    tesseraCourseRuntimePlugin(ctx),
+    createOverridePlugin(ctx, {
+      name: 'tessera:layout',
+      virtualId: 'virtual:tessera-layout',
+      projectFile: 'layout.svelte',
+    }),
+    createOverridePlugin(ctx, {
+      name: 'tessera:quiz',
+      virtualId: 'virtual:tessera-quiz',
+      projectFile: 'quiz.svelte',
+      builtinFile: resolve(
+        resolvePackageRoot(),
+        'src',
+        'components',
+        'Quiz.svelte',
+      ),
+    }),
+    createOverridePlugin(ctx, {
+      name: 'tessera:course-runtime',
+      virtualId: 'virtual:tessera-course-runtime',
+      projectFile: 'course.runtime.js',
+      namespace: true,
+    }),
     tesseraAdapterPlugin(ctx),
     tesseraXAPISetupPlugin(ctx),
     tesseraFirstPagePreloadPlugin(ctx),

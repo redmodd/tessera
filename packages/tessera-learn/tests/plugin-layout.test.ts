@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath } from 'vite';
 
-import { tesseraLayoutPlugin } from '../src/plugin/layout.js';
+import { createOverridePlugin } from '../src/plugin/override-plugin.js';
 import { resolvedContext } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
@@ -15,7 +15,11 @@ describe('tessera:layout virtual module', () => {
   });
 
   function makePlugin() {
-    return tesseraLayoutPlugin(resolvedContext(projectRoot));
+    return createOverridePlugin(resolvedContext(projectRoot), {
+      name: 'tessera:layout',
+      virtualId: 'virtual:tessera-layout',
+      projectFile: 'layout.svelte',
+    });
   }
 
   it('load() returns null re-export when no layout.svelte exists', () => {

@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath } from 'vite';
 
-import { tesseraCourseRuntimePlugin } from '../src/plugin/course-runtime.js';
+import { createOverridePlugin } from '../src/plugin/override-plugin.js';
 import { resolvedContext } from './helpers/plugin.js';
 import { tempDir } from './helpers.js';
 
@@ -15,7 +15,12 @@ describe('tessera:course-runtime virtual module', () => {
   });
 
   function load(): string {
-    const plugin = tesseraCourseRuntimePlugin(resolvedContext(projectRoot));
+    const plugin = createOverridePlugin(resolvedContext(projectRoot), {
+      name: 'tessera:course-runtime',
+      virtualId: 'virtual:tessera-course-runtime',
+      projectFile: 'course.runtime.js',
+      namespace: true,
+    });
     return (plugin as any).load.handler();
   }
 

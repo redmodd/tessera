@@ -45,12 +45,12 @@ export function readRuntimeXAPIHooks(
   const runtime = readCourseRuntimeExports(readFileSync(runtimePath, 'utf-8'));
   if (!runtime) {
     d.partial = true;
-    d.error(`course.runtime.js: ${READ_FAILURE_MESSAGES['parse-error']}`);
+    d.error(READ_FAILURE_MESSAGES['parse-error']);
     return 'unknown';
   }
   if (runtime.hasDefaultExport) {
     d.error(
-      'course.runtime.js: export default is ignored. Use named exports: `export function canAccess`, `export const xapi`.',
+      'export default is ignored. Use named exports: `export function canAccess`, `export const xapi`.',
     );
   }
   return runtime.xapi;
@@ -74,13 +74,19 @@ function validateHookIds(
   d: Diagnostics,
 ): void {
   if (!(hooks instanceof Map)) return;
-  for (const id of hooks.keys()) {
-    if (!ids.has(id)) {
-      d.error(
-        `course.runtime.js: xapi[${JSON.stringify(id)}] matches no explicit xapi destination id in course.config.js`,
-      );
-    }
-  }
+  d.within(
+    COURSE_RUNTIME_FILE,
+    () => {
+      for (const id of hooks.keys()) {
+        if (!ids.has(id)) {
+          d.error(
+            `xapi[${JSON.stringify(id)}] matches no explicit xapi destination id in course.config.js`,
+          );
+        }
+      }
+    },
+    { prefix: true },
+  );
 }
 
 export function validateXAPIConfig(
@@ -101,9 +107,7 @@ export function validateXAPIConfig(
 
   if (isList) {
     if (entries.length === 0) {
-      d.error(
-        'course.config.js: xapi must contain at least one destination, or be omitted',
-      );
+      d.error('xapi must contain at least one destination, or be omitted');
       return;
     }
     const endpoints = entries.map((e) =>
@@ -112,7 +116,7 @@ export function validateXAPIConfig(
     // At most one 'lms' entry — more than one is never legitimate.
     if (endpoints.filter((ep) => ep === 'lms').length > 1) {
       d.error(
-        "course.config.js: xapi has multiple entries with endpoint: 'lms' — only one launch-inherited destination is allowed",
+        "xapi has multiple entries with endpoint: 'lms' — only one launch-inherited destination is allowed",
       );
     }
     // Warn on duplicate explicit endpoints.
@@ -125,13 +129,13 @@ export function validateXAPIConfig(
     for (const [ep, count] of seen) {
       if (count > 1) {
         d.warn(
-          `course.config.js: xapi has ${count} entries with endpoint "${ep}" — usually a copy-paste mistake; ` +
+          `xapi has ${count} entries with endpoint "${ep}" — usually a copy-paste mistake; ` +
             'fan-out to the same LRS with different actors/activityIds is supported but uncommon.',
         );
       }
     }
   } else if (!isRecord(raw)) {
-    d.error('course.config.js: xapi must be an object or an array of objects');
+    d.error('xapi must be an object or an array of objects');
     return;
   }
 
@@ -140,7 +144,7 @@ export function validateXAPIConfig(
     const entry = entries[i];
     const label = isList ? `xapi[${i}]` : 'xapi';
     if (!isRecord(entry)) {
-      d.error(`course.config.js: ${label} must be an object`);
+      d.error(`${label} must be an object`);
       continue;
     }
     validateSingleXAPIEntry(entry, label, profile, hooks, ids, d);
@@ -162,17 +166,17 @@ function validateSingleXAPIEntry(
   if (endpoint !== 'lms' && validId !== undefined) {
     if (ids.has(validId)) {
       d.error(
-        `course.config.js: xapi has more than one destination with id ${formatValue(validId)}; ids must be unique`,
+        `xapi has more than one destination with id ${formatValue(validId)}; ids must be unique`,
       );
     }
     ids.add(validId);
   }
   if (endpoint === undefined) {
-    d.error(`course.config.js: ${label}.endpoint is required`);
+    d.error(`${label}.endpoint is required`);
     return;
   }
   if (typeof endpoint !== 'string') {
-    d.error(`course.config.js: ${label}.endpoint must be a string`);
+    d.error(`${label}.endpoint must be a string`);
     return;
   }
 
@@ -182,14 +186,14 @@ function validateSingleXAPIEntry(
     // one config can still export to every standard.
     if (profile && !profile.hasLaunchLRS) {
       d.warn(
-        `course.config.js: ${label}.endpoint: 'lms' has no launch LRS under export.standard "${profile.id}" — ` +
+        `${label}.endpoint: 'lms' has no launch LRS under export.standard "${profile.id}" — ` +
           'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
       );
     }
     for (const f of LAUNCH_INHERITED_FIELDS) {
       if (entry[f] !== undefined) {
         d.error(
-          `course.config.js: ${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
+          `${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
         );
       }
     }
@@ -198,10 +202,10 @@ function validateSingleXAPIEntry(
 
   if (id === undefined) {
     d.error(
-      `course.config.js: ${label}.id is required. course.runtime.js keys its xapi resolvers by it.`,
+      `${label}.id is required. course.runtime.js keys its xapi resolvers by it.`,
     );
   } else if (validId === undefined) {
-    d.error(`course.config.js: ${label}.id must be a non-empty string`);
+    d.error(`${label}.id must be a non-empty string`);
   }
   const hookRef =
     validId !== undefined
@@ -212,24 +216,24 @@ function validateSingleXAPIEntry(
   const url = URL.parse(endpoint);
   if (!url) {
     d.error(
-      `course.config.js: ${label}.endpoint must be an absolute http(s) URL, got ${formatValue(endpoint)}`,
+      `${label}.endpoint must be an absolute http(s) URL, got ${formatValue(endpoint)}`,
     );
     return;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     d.error(
-      `course.config.js: ${label}.endpoint must use http: or https:, got ${formatValue(url.protocol)}`,
+      `${label}.endpoint must use http: or https:, got ${formatValue(url.protocol)}`,
     );
     return;
   }
   if (url.protocol === 'http:' && process.env.NODE_ENV === 'production') {
     d.warn(
-      `course.config.js: ${label}.endpoint uses http:; LRS credentials will travel in cleartext. Use https in production.`,
+      `${label}.endpoint uses http:; LRS credentials will travel in cleartext. Use https in production.`,
     );
   }
   if (!endpoint.endsWith('/')) {
     d.warn(
-      `course.config.js: ${label}.endpoint should end with a slash to avoid concatenation surprises ` +
+      `${label}.endpoint should end with a slash to avoid concatenation surprises ` +
         `(e.g. 'https://lrs.example.com/xapi/' not 'https://lrs.example.com/xapi'). Runtime normalizes regardless.`,
     );
   }
@@ -240,16 +244,14 @@ function validateSingleXAPIEntry(
   if (auth === undefined) {
     if (authHook === 'no') {
       d.error(
-        `course.config.js: ${label}.auth is required. Set a credential string, or export ${hookRef}.auth from course.runtime.js.`,
+        `${label}.auth is required. Set a credential string, or export ${hookRef}.auth from course.runtime.js.`,
       );
     }
   } else if (typeof auth !== 'string') {
-    d.error(
-      `course.config.js: ${label}.auth must be a string, got ${describeType(auth)}`,
-    );
+    d.error(`${label}.auth must be a string, got ${describeType(auth)}`);
   } else if (authHook === 'yes') {
     d.error(
-      `course.config.js: ${label}.auth is also resolved by ${hookRef}.auth in course.runtime.js. Keep one.`,
+      `${label}.auth is also resolved by ${hookRef}.auth in course.runtime.js. Keep one.`,
     );
   } else {
     const authErr = validateAuthCredential(auth);
@@ -257,12 +259,10 @@ function validateSingleXAPIEntry(
       const hint = isBearerCredential(auth)
         ? ` For OAuth, export a ${hookRef}.auth resolver from course.runtime.js that returns a Basic credential.`
         : '';
-      d.error(
-        `course.config.js: ${joinFieldError(`${label}.auth`, authErr)}${hint}`,
-      );
+      d.error(`${joinFieldError(`${label}.auth`, authErr)}${hint}`);
     } else {
       d.warn(
-        `course.config.js: ${label}.auth is a static string and will be embedded in the bundle. ` +
+        `${label}.auth is a static string and will be embedded in the bundle. ` +
           `For production, export a ${hookRef}.auth resolver from course.runtime.js that fetches a short-lived token from a server endpoint.`,
       );
     }
@@ -271,13 +271,13 @@ function validateSingleXAPIEntry(
   // activityId — required IRI.
   const activityId = entry.activityId;
   if (activityId === undefined || activityId === '') {
-    d.error(`course.config.js: ${label}.activityId is required`);
+    d.error(`${label}.activityId is required`);
   } else if (typeof activityId !== 'string') {
-    d.error(`course.config.js: ${label}.activityId must be a string`);
+    d.error(`${label}.activityId must be a string`);
   } else if (!URL.canParse(activityId)) {
     // Any absolute IRI: the URL parser accepts uncommon schemes.
     d.error(
-      `course.config.js: ${label}.activityId must be an absolute IRI, got ${formatValue(activityId)}`,
+      `${label}.activityId must be an absolute IRI, got ${formatValue(activityId)}`,
     );
   }
 
@@ -287,22 +287,22 @@ function validateSingleXAPIEntry(
   if (actor === undefined) {
     if (profile?.packaged === false && actorHook === 'no') {
       d.error(
-        `course.config.js: ${label}.actor is required for web export: there is no LMS to derive a learner identity from. ` +
+        `${label}.actor is required for web export: there is no LMS to derive a learner identity from. ` +
           `Set a static Agent object, or export ${hookRef}.actor from course.runtime.js to resolve one (e.g. from your auth system).`,
       );
     }
   } else if (!isRecord(actor)) {
     d.error(
-      `course.config.js: ${label}.actor must be an Agent object, got ${describeType(actor)}`,
+      `${label}.actor must be an Agent object, got ${describeType(actor)}`,
     );
   } else if (actorHook === 'yes') {
     d.error(
-      `course.config.js: ${label}.actor is also resolved by ${hookRef}.actor in course.runtime.js. Keep one.`,
+      `${label}.actor is also resolved by ${hookRef}.actor in course.runtime.js. Keep one.`,
     );
   } else {
     const err = validateAgent(actor);
     if (err) {
-      d.error(`course.config.js: ${joinFieldError(`${label}.actor`, err)}`);
+      d.error(joinFieldError(`${label}.actor`, err));
     }
   }
 
@@ -311,22 +311,18 @@ function validateSingleXAPIEntry(
   const aahp = entry.actorAccountHomePage;
   if (aahp !== undefined) {
     if (typeof aahp !== 'string') {
-      d.error(
-        `course.config.js: ${label}.actorAccountHomePage must be a string`,
-      );
+      d.error(`${label}.actorAccountHomePage must be a string`);
     } else if (!URL.canParse(aahp)) {
-      d.error(
-        `course.config.js: ${label}.actorAccountHomePage must be an absolute URL`,
-      );
+      d.error(`${label}.actorAccountHomePage must be an absolute URL`);
     }
     if (actor !== undefined || actorHook === 'yes') {
       d.warn(
-        `course.config.js: ${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
+        `${label}.actorAccountHomePage is ignored when ${label}.actor is supplied explicitly.`,
       );
     }
     if (profile && !profile.derivesLearnerActor) {
       d.warn(
-        `course.config.js: ${label}.actorAccountHomePage is only used under ${ACTOR_DERIVING_STANDARDS} actor synthesis; ignored under "${profile.id}".`,
+        `${label}.actorAccountHomePage is only used under ${ACTOR_DERIVING_STANDARDS} actor synthesis; ignored under "${profile.id}".`,
       );
     }
   }
@@ -342,7 +338,7 @@ function validateSingleXAPIEntry(
     aahp === undefined
   ) {
     d.error(
-      `course.config.js: ${label}.activityId is not an http(s) URL, so its origin can't be used as the SCORM actor's account.homePage. ` +
+      `${label}.activityId is not an http(s) URL, so its origin can't be used as the SCORM actor's account.homePage. ` +
         `Provide ${label}.actorAccountHomePage explicitly.`,
     );
   }
@@ -352,12 +348,12 @@ function validateSingleXAPIEntry(
   if (registration !== undefined) {
     if (typeof registration !== 'string' || !UUID_RE.test(registration)) {
       d.error(
-        `course.config.js: ${label}.registration must be a UUID v4, got ${formatValue(registration)}`,
+        `${label}.registration must be a UUID v4, got ${formatValue(registration)}`,
       );
     }
     if (profile && !profile.hasLaunchLRS) {
       d.warn(
-        `course.config.js: ${label}.registration is a cmi5 concept; the LRS will accept it under "${profile.id}" but most analytics tools won't know what to do with it.`,
+        `${label}.registration is a cmi5 concept; the LRS will accept it under "${profile.id}" but most analytics tools won't know what to do with it.`,
       );
     }
   }

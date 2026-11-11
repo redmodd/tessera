@@ -38,7 +38,12 @@ describe('toTitleCase', () => {
     expect(toTitleCase('my-awesome-course')).toBe('My Awesome Course');
   });
 
-  it('splits on dots, underscores, and spaces', () => {
-    expect(toTitleCase('a_b.c d')).toBe('A B C D');
+  it('splits on underscores and keeps version numbers whole', () => {
+    expect(toTitleCase('my_page')).toBe('My Page');
+    expect(toTitleCase('v1.2-intro')).toBe('V1.2 Intro');
+  });
+
+  it('title-cases a single word', () => {
+    expect(toTitleCase('welcome')).toBe('Welcome');
   });
 });

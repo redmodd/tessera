@@ -230,6 +230,20 @@ export function findComponents(
   return collectComponents(source, root, builtIns);
 }
 
+/** The levels of a parsed `.svelte` source's `<h1>`–`<h6>` elements, in source order. */
+export function headingLevels(source: string): number[] {
+  const { root } = parseRoot(source);
+  if (!root) return [];
+  const headings: Node[] = [];
+  walkNodes(root, (node) => {
+    if (node.type === 'RegularElement' && /^h[1-6]$/.test(node.name as string))
+      headings.push(node);
+  });
+  return headings
+    .sort((a, b) => a.start - b.start)
+    .map((node) => Number((node.name as string)[1]));
+}
+
 /** Names a page binds from its own modules, which shadow the built-in components. */
 function locallyImportedNames(root: Node): Set<string> {
   return new Set(

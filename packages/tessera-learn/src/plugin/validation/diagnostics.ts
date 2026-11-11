@@ -17,33 +17,38 @@ export class Diagnostics implements ValidationResult {
   /** Set when a page could not be parsed, so the checks on the course as a whole skipped what needs every page. */
   courseChecksSkipped = false;
   #source: string | undefined;
+  #prefix = '';
   #sources = new Map<string, string>();
 
   error(message: string): void {
-    this.errors.push(message);
-    this.#record(message);
+    this.#add(this.errors, message);
   }
   warn(message: string): void {
-    this.warnings.push(message);
-    this.#record(message);
+    this.#add(this.warnings, message);
   }
   info(message: string): void {
-    this.infos.push(message);
-    this.#record(message);
+    this.#add(this.infos, message);
   }
 
-  #record(message: string): void {
+  #add(list: string[], message: string): void {
+    // After a leading a11y rule tag, which `a11y.ignore` matches at the start.
+    message = message.replace(/^(\[[^\]]+\] )?/, `$1${this.#prefix}`);
+    list.push(message);
     if (this.#source !== undefined) this.#sources.set(message, this.#source);
   }
 
-  /** Run the checks of one source file or folder, so what they raise is known to be about it. */
-  within<T>(source: string, check: () => T): T {
-    const outer = this.#source;
+  /**
+   * Run the checks of one source file or folder, so what they raise is known to
+   * be about it. With `prefix`, each message they raise starts with `source: `.
+   */
+  within<T>(source: string, check: () => T, { prefix = false } = {}): T {
+    const outer = [this.#source, this.#prefix] as const;
     this.#source = source;
+    this.#prefix = prefix ? `${source}: ` : '';
     try {
       return check();
     } finally {
-      this.#source = outer;
+      [this.#source, this.#prefix] = outer;
     }
   }
 

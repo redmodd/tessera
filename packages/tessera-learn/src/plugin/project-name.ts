@@ -20,9 +20,10 @@ export function validateProjectName(
   return null;
 }
 
+/** Title-case a slug on "-" and "_", so "v1.2-intro" stays "V1.2 Intro". */
 export function toTitleCase(slug: string): string {
   return slug
-    .split(/[-_.\s]+/)
+    .split(/[-_]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');

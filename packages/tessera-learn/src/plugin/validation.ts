@@ -108,14 +108,22 @@ export function validateProject(
     d.error(`course.config.js: ${READ_FAILURE_MESSAGES.missing}`);
     return d;
   }
-  const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);
-  const { config, profile } = d.within(COURSE_CONFIG_FILE, () => {
-    const parsed = parseConfig(projectRoot, read, d, standardOverride);
-    if (parsed.config) {
-      validateXAPIConfig(parsed.config.xapi, parsed.profile, runtimeHooks, d);
-    }
-    return parsed;
-  });
+  const runtimeHooks = d.within(
+    COURSE_RUNTIME_FILE,
+    () => readRuntimeXAPIHooks(projectRoot, d),
+    { prefix: true },
+  );
+  const { config, profile } = d.within(
+    COURSE_CONFIG_FILE,
+    () => {
+      const parsed = parseConfig(projectRoot, read, d, standardOverride);
+      if (parsed.config) {
+        validateXAPIConfig(parsed.config.xapi, parsed.profile, runtimeHooks, d);
+      }
+      return parsed;
+    },
+    { prefix: true },
+  );
 
   const pageResults = validatePages(projectRoot, d, profile);
   d.courseChecksSkipped = pageResults.hasParseErrors;

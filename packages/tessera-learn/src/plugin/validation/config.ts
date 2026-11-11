@@ -98,7 +98,7 @@ export function parseConfig(
     if (read.reason === 'not-data') {
       reportNonDataConfig(read.source, d);
     } else {
-      d.error(`course.config.js: ${READ_FAILURE_MESSAGES[read.reason]}`);
+      d.error(READ_FAILURE_MESSAGES[read.reason]);
     }
     return { config: null, profile };
   }
@@ -106,15 +106,13 @@ export function parseConfig(
 
   for (const key of Object.keys(config)) {
     if (!KNOWN_CONFIG_FIELDS.has(key)) {
-      d.warn(`course.config.js: unknown field "${key}" — will be ignored`);
+      d.warn(`unknown field "${key}" — will be ignored`);
     }
   }
 
   for (const key of OBJECT_CONFIG_SECTIONS) {
     if (config[key] != null && !isRecord(config[key])) {
-      d.error(
-        `course.config.js: "${key}" must be an object, got ${describeType(config[key])}`,
-      );
+      d.error(`"${key}" must be an object, got ${describeType(config[key])}`);
     }
   }
 
@@ -124,16 +122,14 @@ export function parseConfig(
   // non-string is a misconfiguration — a truthy one ships as-is, a falsy one
   // falls back, but either way the author should fix it (error).
   if (config.title !== undefined && typeof config.title !== 'string') {
-    d.error(
-      `course.config.js: "title" must be a string, got ${describeType(config.title)}`,
-    );
+    d.error(`"title" must be a string, got ${describeType(config.title)}`);
   } else if (config.title === undefined || config.title === '') {
     d.warn(
-      'course.config.js: "title" is missing or empty — the course will ship as "Untitled Course"',
+      '"title" is missing or empty — the course will ship as "Untitled Course"',
     );
   } else if (config.title.trim() === '') {
     d.warn(
-      'course.config.js: "title" is only whitespace — it ships verbatim and will not fall back to "Untitled Course"',
+      '"title" is only whitespace — it ships verbatim and will not fall back to "Untitled Course"',
     );
   }
 
@@ -143,27 +139,22 @@ export function parseConfig(
 
   if (config.language === undefined) {
     d.error(
-      `course.config.js: "language" is required. It sets <html lang> and tags the course text in LMS/LRS records. ${FIND_LANGUAGE_TAG}`,
+      `"language" is required. It sets <html lang> and tags the course text in LMS/LRS records. ${FIND_LANGUAGE_TAG}`,
     );
   } else if (canonicalLanguage(config.language) === null) {
     d.error(
-      `course.config.js: "language" (${formatValue(config.language)}) is not a supported BCP-47 tag. ${FIND_LANGUAGE_TAG}`,
+      `"language" (${formatValue(config.language)}) is not a supported BCP-47 tag. ${FIND_LANGUAGE_TAG}`,
     );
   }
 
   // The file's value, not the override: a --standard run still flags a bad one.
-  checkOneOf(
-    'course.config.js: "export.standard"',
-    STANDARD_IDS,
-    config.export?.standard,
-    d,
-  );
+  checkOneOf('"export.standard"', STANDARD_IDS, config.export?.standard, d);
 
   // Identity matters for web (storage key) and cmi5/xAPI (LRS activity id);
   // SCORM identity is owned by the LMS, so only nudge for the others.
   if (profile && !profile.derivesLearnerActor && !courseIdentity(config)) {
     d.warn(
-      `course.config.js: no "id" set, so the ${profile.packaged ? `${profile.name} activity id` : 'web storage key'} falls back to a fixed value that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
+      `no "id" set, so the ${profile.packaged ? `${profile.name} activity id` : 'web storage key'} falls back to a fixed value that collides across courses. Add a unique id (e.g. "urn:uuid:…"); scaffolded courses include one.`,
     );
   }
 
@@ -171,28 +162,18 @@ export function parseConfig(
     validateA11yConfig(config.a11y, d);
   }
 
-  checkOneOf(
-    'course.config.js: "navigation.mode"',
-    NAVIGATION_MODES,
-    config.navigation?.mode,
-    d,
-  );
-  checkOneOf(
-    'course.config.js: "completion.mode"',
-    COMPLETION_MODES,
-    config.completion?.mode,
-    d,
-  );
+  checkOneOf('"navigation.mode"', NAVIGATION_MODES, config.navigation?.mode, d);
+  checkOneOf('"completion.mode"', COMPLETION_MODES, config.completion?.mode, d);
 
   if (config.completion?.trigger !== undefined) {
     if (config.completion.mode !== 'manual') {
       d.warn(
-        `course.config.js: "completion.trigger" is ignored unless completion.mode is "manual"`,
+        `"completion.trigger" is ignored unless completion.mode is "manual"`,
       );
     } else if (config.completion.trigger !== 'page') {
       d.error(
         oneOfError(
-          'course.config.js: "completion.trigger"',
+          '"completion.trigger"',
           ['page'],
           config.completion.trigger,
           ' or omitted',
@@ -205,21 +186,13 @@ export function parseConfig(
   let successAccepted = false;
   if (success !== undefined) {
     if (!isRecord(success)) {
-      d.error(
-        `course.config.js: "success" must be an object like { from: "quiz" }`,
-      );
+      d.error(`"success" must be an object like { from: "quiz" }`);
     } else if (!oneOf(SUCCESS_SOURCES, success.from)) {
-      d.error(
-        oneOfError(
-          'course.config.js: "success.from"',
-          SUCCESS_SOURCES,
-          success.from,
-        ),
-      );
+      d.error(oneOfError('"success.from"', SUCCESS_SOURCES, success.from));
     } else if (success.from === 'fixed' && !oneOf(VERDICTS, success.status)) {
       d.error(
         oneOfError(
-          'course.config.js: "success.status"',
+          '"success.status"',
           VERDICTS,
           success.status,
           ' under success.from: "fixed"',
@@ -228,9 +201,7 @@ export function parseConfig(
     } else {
       successAccepted = true;
       if (success.from !== 'fixed' && success.status !== undefined) {
-        d.warn(
-          `course.config.js: "success.status" is ignored unless success.from is "fixed"`,
-        );
+        d.warn(`"success.status" is ignored unless success.from is "fixed"`);
       }
     }
   }
@@ -240,17 +211,17 @@ export function parseConfig(
     const manual = config.completion?.mode === 'manual';
     if (successAccepted) {
       d.warn(
-        'course.config.js: "completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
+        '"completion.requireSuccessStatus" is ignored when "success" is set, which takes precedence',
       );
     } else if (!manual) {
       d.warn(
-        `course.config.js: "completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
+        `"completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
       );
     }
     if (manual && !oneOf(VERDICTS, requireStatus)) {
       d.error(
         oneOfError(
-          'course.config.js: "completion.requireSuccessStatus"',
+          '"completion.requireSuccessStatus"',
           VERDICTS,
           requireStatus,
           ' (omit for "unknown")',
@@ -259,18 +230,18 @@ export function parseConfig(
     }
   }
 
-  checkOneOf('course.config.js: "chrome"', CHROME_MODES, config.chrome, d);
-  checkOneOf('course.config.js: "resume"', RESUME_POLICIES, config.resume, d);
+  checkOneOf('"chrome"', CHROME_MODES, config.chrome, d);
+  checkOneOf('"resume"', RESUME_POLICIES, config.resume, d);
 
   if (config.export?.csp !== undefined) {
     const csp = config.export.csp;
     if (csp !== false && !isCspOverrides(csp)) {
       d.warn(
-        'course.config.js: "export.csp" must be false or an object of directive → string[]; ignoring it and using the baseline CSP',
+        '"export.csp" must be false or an object of directive → string[]; ignoring it and using the baseline CSP',
       );
     } else if (profile?.packaged) {
       d.warn(
-        `course.config.js: "export.csp" is ignored when "export.standard" is "${profile.id}" (the CSP meta is web-export only)`,
+        `"export.csp" is ignored when "export.standard" is "${profile.id}" (the CSP meta is web-export only)`,
       );
     }
   }
@@ -288,9 +259,7 @@ export function parseConfig(
 function validatePercent(key: string, value: unknown, d: Diagnostics): void {
   if (value === undefined) return;
   if (!(typeof value === 'number' && value >= 0 && value <= 100)) {
-    d.error(
-      `course.config.js: "${key}" must be 0–100, got ${formatValue(value)}`,
-    );
+    d.error(`"${key}" must be 0–100, got ${formatValue(value)}`);
   }
 }
 
@@ -298,12 +267,12 @@ function reportNonDataConfig(source: string, d: Diagnostics): void {
   const { paths, rest } = defaultExportFunctions(source);
   for (const path of paths) {
     d.error(
-      `course.config.js: "${path}" is a function, but course.config.js is data only. ` +
+      `"${path}" is a function, but course.config.js is data only. ` +
         'Export it from course.runtime.js instead (see "Runtime hooks" in the authoring guide).',
     );
   }
   if (!isJson5(rest)) {
-    d.error(`course.config.js: ${READ_FAILURE_MESSAGES['not-data']}`);
+    d.error(READ_FAILURE_MESSAGES['not-data']);
   }
 }
 
@@ -347,7 +316,7 @@ function validateBranding(
 ): void {
   if (!isRecord(branding)) {
     d.warn(
-      `course.config.js: "branding" must be an object, got ${describeType(branding)} — will be ignored`,
+      `"branding" must be an object, got ${describeType(branding)} — will be ignored`,
     );
     return;
   }
@@ -355,13 +324,11 @@ function validateBranding(
   const logo = branding.logo;
   if (logo !== undefined) {
     if (typeof logo !== 'string') {
-      d.warn(
-        `course.config.js: "branding.logo" must be a string, got ${describeType(logo)}`,
-      );
+      d.warn(`"branding.logo" must be a string, got ${describeType(logo)}`);
     } else {
       validateAssetRefs(
         logo,
-        'course.config.js "branding.logo"',
+        '"branding.logo"',
         resolve(projectRoot, 'assets'),
         d,
       );
@@ -372,11 +339,11 @@ function validateBranding(
   if (primaryColor !== undefined) {
     if (typeof primaryColor !== 'string') {
       d.warn(
-        `course.config.js: "branding.primaryColor" must be a string, got ${describeType(primaryColor)}`,
+        `"branding.primaryColor" must be a string, got ${describeType(primaryColor)}`,
       );
     } else if (!isPlausibleColor(primaryColor)) {
       d.warn(
-        `course.config.js: "branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color. If the browser can't parse it, the course ignores it`,
+        `"branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color. If the browser can't parse it, the course ignores it`,
       );
     } else {
       // Rule 1.7: primaryColor is used both as links on the default white page
@@ -387,7 +354,7 @@ function validateBranding(
         d.warn(
           tag(
             A11Y_IDS.primaryContrast,
-            `course.config.js: branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white — it's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
+            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white — it's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
           ),
         );
       }
@@ -397,7 +364,7 @@ function validateBranding(
   const fontFamily = branding.fontFamily;
   if (fontFamily !== undefined && typeof fontFamily !== 'string') {
     d.warn(
-      `course.config.js: "branding.fontFamily" must be a string, got ${describeType(fontFamily)}`,
+      `"branding.fontFamily" must be a string, got ${describeType(fontFamily)}`,
     );
   }
 }
@@ -405,22 +372,13 @@ function validateBranding(
 /** Shape-check the `a11y` block. Malformed values can't be silenced by `ignore`. */
 function validateA11yConfig(a11y: unknown, d: Diagnostics): void {
   if (!isRecord(a11y)) {
-    d.error(
-      `course.config.js: "a11y" must be an object, got ${describeType(a11y)}`,
-    );
+    d.error(`"a11y" must be an object, got ${describeType(a11y)}`);
     return;
   }
 
-  checkOneOf('course.config.js: "a11y.level"', A11Y_LEVELS, a11y.level, d);
-  checkOneOf(
-    'course.config.js: "a11y.standard"',
-    A11Y_STANDARDS,
-    a11y.standard,
-    d,
-  );
+  checkOneOf('"a11y.level"', A11Y_LEVELS, a11y.level, d);
+  checkOneOf('"a11y.standard"', A11Y_STANDARDS, a11y.standard, d);
   if (a11y.ignore !== undefined && !isStringArray(a11y.ignore)) {
-    d.error(
-      `course.config.js: "a11y.ignore" must be an array of rule-ID strings`,
-    );
+    d.error(`"a11y.ignore" must be an array of rule-ID strings`);
   }
 }

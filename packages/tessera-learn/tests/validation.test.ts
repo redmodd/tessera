@@ -3535,6 +3535,28 @@ describe('a11y rule 1.6 — heading order', () => {
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/heading-order')).toBe(false);
   });
+
+  it('counts only heading elements in the markup', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script>const html = '<h4>not markup</h4>';</script>
+<h1>Title</h1>
+<!-- <h5>commented out</h5> -->
+<p>{'<h6>text</h6>'}</p>
+{#if true}<h2>Sub</h2>{/if}
+<style>h4 { color: red; }</style>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(false);
+  });
+
+  it('warns on a skipped level inside a block', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<h1>Title</h1>\n{#if true}<h4>Deep</h4>{/if}`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(true);
+  });
 });
 
 describe('a11y rule 1.7 — primaryColor contrast', () => {
