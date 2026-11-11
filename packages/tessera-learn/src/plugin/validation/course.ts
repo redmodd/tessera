@@ -3,6 +3,7 @@ import {
   type StandardProfile,
 } from '../../runtime/standards.js';
 import { resolveSuccess } from '../../runtime/types.js';
+import { COURSE_CONFIG_FILE } from '../manifest.js';
 import type { ParsedConfig } from './config.js';
 import { quoteList, type Diagnostics } from './diagnostics.js';
 import type { PageInfo, PagesValidationResult } from './page.js';
@@ -142,8 +143,10 @@ export function crossValidate(
   }
 
   if (isManual && config.completion?.percentageThreshold !== undefined) {
-    d.warn(
-      'course.config.js: "completion.percentageThreshold" is ignored under completion.mode: "manual"',
+    d.within(COURSE_CONFIG_FILE, () =>
+      d.warn(
+        '"completion.percentageThreshold" is ignored under completion.mode: "manual"',
+      ),
     );
   }
   if (!isManual) {

@@ -592,7 +592,9 @@ describe('config validation', () => {
     );
     const logoWarning = (warnings: string[]) =>
       warnings.filter(
-        (w) => w.includes('branding.logo') && w.includes('$assets/logo.png'),
+        (w) =>
+          w ===
+          'course.config.js: "$assets/logo.png" not found in assets/ directory',
       );
     expect(logoWarning(validateProject(testRoot).warnings)).toHaveLength(1);
 
@@ -1743,9 +1745,7 @@ describe('structure validation', () => {
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining(
-        'extras.svelte: not listed in _meta.js pages array',
-      ),
+      'pages/01-section/01-lesson/_meta.js: pages array does not list extras.svelte, so it is appended at the end',
     );
   });
 });

@@ -49,7 +49,12 @@ import { LMS_BUILD, runExport } from './export.js';
 import { errorMessage } from '../runtime/errors.js';
 import { resolvePackageRoot } from './package-root.js';
 import { virtualModule } from './virtual-module.js';
-import { createOverridePlugin } from './override-plugin.js';
+import {
+  COURSE_RUNTIME_OVERRIDE,
+  LAYOUT_OVERRIDE,
+  QUIZ_OVERRIDE,
+  createOverridePlugin,
+} from './override-plugin.js';
 import {
   BuildContext,
   isInside,
@@ -117,28 +122,9 @@ export function tesseraPlugin(options: { standardOverride?: string } = {}) {
     tesseraConfigPlugin(ctx),
     tesseraPagesPlugin(),
     tesseraManifestPlugin(ctx),
-    createOverridePlugin(ctx, {
-      name: 'tessera:layout',
-      virtualId: 'virtual:tessera-layout',
-      projectFile: 'layout.svelte',
-    }),
-    createOverridePlugin(ctx, {
-      name: 'tessera:quiz',
-      virtualId: 'virtual:tessera-quiz',
-      projectFile: 'quiz.svelte',
-      builtinFile: resolve(
-        resolvePackageRoot(),
-        'src',
-        'components',
-        'Quiz.svelte',
-      ),
-    }),
-    createOverridePlugin(ctx, {
-      name: 'tessera:course-runtime',
-      virtualId: 'virtual:tessera-course-runtime',
-      projectFile: 'course.runtime.js',
-      namespace: true,
-    }),
+    createOverridePlugin(ctx, LAYOUT_OVERRIDE),
+    createOverridePlugin(ctx, QUIZ_OVERRIDE),
+    createOverridePlugin(ctx, COURSE_RUNTIME_OVERRIDE),
     tesseraAdapterPlugin(ctx),
     tesseraXAPISetupPlugin(ctx),
     tesseraFirstPagePreloadPlugin(ctx),

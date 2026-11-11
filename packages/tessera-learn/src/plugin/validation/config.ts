@@ -119,7 +119,7 @@ export function parseConfig(
   // Validate title against the runtime merge `userConfig.title || "Untitled
   // Course"`: a missing or empty string falls back to the default (warn), a
   // whitespace-only string is truthy and ships verbatim (warn), and a
-  // non-string is a misconfiguration — a truthy one ships as-is, a falsy one
+  // non-string is a misconfiguration: a truthy one ships as-is, a falsy one
   // falls back, but either way the author should fix it (error).
   if (config.title !== undefined && typeof config.title !== 'string') {
     d.error(`"title" must be a string, got ${describeType(config.title)}`);
@@ -326,12 +326,7 @@ function validateBranding(
     if (typeof logo !== 'string') {
       d.warn(`"branding.logo" must be a string, got ${describeType(logo)}`);
     } else {
-      validateAssetRefs(
-        logo,
-        '"branding.logo"',
-        resolve(projectRoot, 'assets'),
-        d,
-      );
+      validateAssetRefs(logo, resolve(projectRoot, 'assets'), d);
     }
   }
 
@@ -347,7 +342,7 @@ function validateBranding(
       );
     } else {
       // Rule 1.7: primaryColor is used both as links on the default white page
-      // background and as a button fill behind white text — symmetric, so one
+      // background and as a button fill behind white text. That is symmetric, so one
       // ratio covers both. Non-#hex valid colors return null and defer to Tier 2.
       const ratio = contrastRatio(primaryColor, '#ffffff');
       if (ratio !== null && ratio < 4.5) {

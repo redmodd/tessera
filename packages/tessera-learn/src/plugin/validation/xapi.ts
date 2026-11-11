@@ -43,17 +43,19 @@ export function readRuntimeXAPIHooks(
   const runtimePath = resolve(projectRoot, COURSE_RUNTIME_FILE);
   if (!existsSync(runtimePath)) return 'none';
   const runtime = readCourseRuntimeExports(readFileSync(runtimePath, 'utf-8'));
-  if (!runtime) {
-    d.partial = true;
-    d.error(READ_FAILURE_MESSAGES['parse-error']);
-    return 'unknown';
-  }
-  if (runtime.hasDefaultExport) {
-    d.error(
-      'export default is ignored. Use named exports: `export function canAccess`, `export const xapi`.',
-    );
-  }
-  return runtime.xapi;
+  return d.within(COURSE_RUNTIME_FILE, () => {
+    if (!runtime) {
+      d.partial = true;
+      d.error(READ_FAILURE_MESSAGES['parse-error']);
+      return 'unknown';
+    }
+    if (runtime.hasDefaultExport) {
+      d.error(
+        'export default is ignored. Use named exports: `export function canAccess`, `export const xapi`.',
+      );
+    }
+    return runtime.xapi;
+  });
 }
 
 function hookState(
@@ -74,19 +76,15 @@ function validateHookIds(
   d: Diagnostics,
 ): void {
   if (!(hooks instanceof Map)) return;
-  d.within(
-    COURSE_RUNTIME_FILE,
-    () => {
-      for (const id of hooks.keys()) {
-        if (!ids.has(id)) {
-          d.error(
-            `xapi[${JSON.stringify(id)}] matches no explicit xapi destination id in course.config.js`,
-          );
-        }
+  d.within(COURSE_RUNTIME_FILE, () => {
+    for (const id of hooks.keys()) {
+      if (!ids.has(id)) {
+        d.error(
+          `xapi[${JSON.stringify(id)}] matches no explicit xapi destination id in course.config.js`,
+        );
       }
-    },
-    { prefix: true },
-  );
+    }
+  });
 }
 
 export function validateXAPIConfig(
@@ -101,7 +99,7 @@ export function validateXAPIConfig(
   }
 
   // Normalize to array form. The single-object case is shorthand for a
-  // one-element array — same machinery, no special case in the runtime.
+  // one-element array: same machinery, no special case in the runtime.
   const isList = Array.isArray(raw);
   const entries: unknown[] = isList ? raw : [raw];
 
@@ -113,7 +111,7 @@ export function validateXAPIConfig(
     const endpoints = entries.map((e) =>
       isRecord(e) ? e.endpoint : undefined,
     );
-    // At most one 'lms' entry — more than one is never legitimate.
+    // At most one 'lms' entry: more than one is never legitimate.
     if (endpoints.filter((ep) => ep === 'lms').length > 1) {
       d.error(
         "xapi has multiple entries with endpoint: 'lms'. Only one launch-inherited destination is allowed",
@@ -181,7 +179,7 @@ function validateSingleXAPIEntry(
   }
 
   if (endpoint === 'lms') {
-    // 'lms' inherits the LRS from the launch — only the launch-based
+    // 'lms' inherits the LRS from the launch, and only the launch-based
     // standards (cmi5, plain xAPI) carry one. The runtime drops the entry, so
     // one config can still export to every standard.
     if (profile && !profile.hasLaunchLRS) {
@@ -212,7 +210,7 @@ function validateSingleXAPIEntry(
       ? `xapi[${JSON.stringify(validId)}]`
       : `xapi[<${label}.id>]`;
 
-  // Explicit endpoint — must be an absolute http(s) URL.
+  // Explicit endpoint: must be an absolute http(s) URL.
   const url = URL.parse(endpoint);
   if (!url) {
     d.error(
@@ -268,7 +266,7 @@ function validateSingleXAPIEntry(
     }
   }
 
-  // activityId — required IRI.
+  // activityId: required IRI.
   const activityId = entry.activityId;
   if (activityId === undefined || activityId === '') {
     d.error(`${label}.activityId is required`);
@@ -281,7 +279,7 @@ function validateSingleXAPIEntry(
     );
   }
 
-  // actor — required under web; optional otherwise.
+  // actor: required under web; optional otherwise.
   const actor = entry.actor;
   const actorHook = hookState(hooks, validId, 'actor');
   if (actor === undefined) {
@@ -306,7 +304,7 @@ function validateSingleXAPIEntry(
     }
   }
 
-  // actorAccountHomePage — optional, only meaningful under SCORM with no
+  // actorAccountHomePage: optional, only meaningful under SCORM with no
   // explicit actor.
   const aahp = entry.actorAccountHomePage;
   if (aahp !== undefined) {
@@ -343,7 +341,7 @@ function validateSingleXAPIEntry(
     );
   }
 
-  // registration — optional UUID v4.
+  // registration: optional UUID v4.
   const registration = entry.registration;
   if (registration !== undefined) {
     if (typeof registration !== 'string' || !UUID_RE.test(registration)) {

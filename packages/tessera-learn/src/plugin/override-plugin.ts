@@ -3,6 +3,7 @@ import { normalizePath } from 'vite';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { virtualModule } from './virtual-module.js';
+import { resolvePackageRoot } from './package-root.js';
 import type { BuildContext } from './build-context.js';
 
 interface OverridePluginOptions {
@@ -15,10 +16,34 @@ interface OverridePluginOptions {
   namespace?: boolean;
 }
 
+export const LAYOUT_OVERRIDE: OverridePluginOptions = {
+  name: 'tessera:layout',
+  virtualId: 'virtual:tessera-layout',
+  projectFile: 'layout.svelte',
+};
+
+export const QUIZ_OVERRIDE: OverridePluginOptions = {
+  name: 'tessera:quiz',
+  virtualId: 'virtual:tessera-quiz',
+  projectFile: 'quiz.svelte',
+  builtinFile: resolve(
+    resolvePackageRoot(),
+    'src',
+    'components',
+    'Quiz.svelte',
+  ),
+};
+
+export const COURSE_RUNTIME_OVERRIDE: OverridePluginOptions = {
+  name: 'tessera:course-runtime',
+  virtualId: 'virtual:tessera-course-runtime',
+  projectFile: 'course.runtime.js',
+  namespace: true,
+};
+
 /**
  * A virtual module that resolves to a project-root override file when present,
- * and to the built-in (or a null export) otherwise. Shared by the layout, quiz
- * and course-runtime plugins.
+ * and to the built-in (or a null export) otherwise.
  */
 export function createOverridePlugin(
   ctx: BuildContext,

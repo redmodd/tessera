@@ -47,7 +47,6 @@ type RecordingStandard = Extract<
 >;
 
 interface RuleContext {
-  fileRel: string;
   d: Diagnostics;
   standard: RecordingStandard | undefined;
   id: string | null;
@@ -71,7 +70,7 @@ const QUESTION_COMPONENTS: Record<
   MultipleChoice: {
     required: ['id', 'question', 'options', 'correct'],
     indexedLists: { options: 'some' },
-    check({ props }, { fileRel, d }) {
+    check({ props }, { d }) {
       const options = staticArray(props.get('options'));
       const correct = staticNumber(props.get('correct'));
       if (options && correct !== null) {
@@ -81,35 +80,35 @@ const QUESTION_COMPONENTS: Record<
           correct >= options.length
         ) {
           d.error(
-            `${fileRel}: <MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`,
+            `<MultipleChoice> correct={${correct}} is out of range for ${options.length} options (valid: 0–${options.length - 1})`,
           );
         }
       }
       const optionFeedback = staticArray(props.get('optionFeedback'));
       if (options && optionFeedback && optionFeedback.length > options.length) {
         d.warn(
-          `${fileRel}: <MultipleChoice> optionFeedback has ${optionFeedback.length} entries but only ${options.length} options — the extra entries can never be shown`,
+          `<MultipleChoice> optionFeedback has ${optionFeedback.length} entries but only ${options.length} options, so the extra entries can never be shown`,
         );
       }
     },
   },
   FillInTheBlank: {
     required: ['id', 'question', 'answers'],
-    check(match, { fileRel, d, standard, id }) {
+    check(match, { d, standard, id }) {
       const answers = staticList(match.props.get('answers'));
       if (answers) {
         if (!isStringArray(answers)) {
           d.error(
-            `${fileRel}: <FillInTheBlank> answers must be a string or an array of strings`,
+            `<FillInTheBlank> answers must be a string or an array of strings`,
           );
         } else if (answers.every((a) => a.trim() === '')) {
           // A learner can't submit blank input, so no response could match.
-          d.error(`${fileRel}: <FillInTheBlank> answers must not be empty`);
+          d.error(`<FillInTheBlank> answers must not be empty`);
         } else if (answers.some((a) => a.trim() === '')) {
           d.warn(
             tag(
               A11Y_IDS.questionLabel,
-              `${fileRel}: <FillInTheBlank> has an empty answer label`,
+              `<FillInTheBlank> has an empty answer label`,
             ),
           );
         }
@@ -126,14 +125,14 @@ const QUESTION_COMPONENTS: Record<
       );
       const subject = id === null ? '' : ` "${id}"`;
       for (const warning of warnings) {
-        d.warn(`${fileRel}: <FillInTheBlank>${subject} ${warning}`);
+        d.warn(`<FillInTheBlank>${subject} ${warning}`);
       }
     },
   },
   Matching: {
     required: ['id', 'question', 'pairs'],
     indexedLists: { pairs: 'every' },
-    check({ props }, { fileRel, d }) {
+    check({ props }, { d }) {
       const pairs = staticArray(props.get('pairs'));
       if (pairs) {
         const bad = pairs.some(
@@ -144,7 +143,7 @@ const QUESTION_COMPONENTS: Record<
         );
         if (bad) {
           d.error(
-            `${fileRel}: <Matching> pairs must be an array of { left: string, right: string } objects`,
+            `<Matching> pairs must be an array of { left: string, right: string } objects`,
           );
         }
       }
@@ -153,13 +152,13 @@ const QUESTION_COMPONENTS: Record<
   Sorting: {
     required: ['id', 'question', 'items', 'targets', 'correct'],
     indexedLists: { items: 'every', targets: 'some' },
-    check({ props }, { fileRel, d }) {
+    check({ props }, { d }) {
       const items = staticArray(props.get('items'));
       const targets = staticArray(props.get('targets'));
       const correct = staticArray(props.get('correct'));
       if (items && correct && correct.length !== items.length) {
         d.error(
-          `${fileRel}: <Sorting> correct has ${correct.length} entries but items has ${items.length} — they must be parallel arrays`,
+          `<Sorting> correct has ${correct.length} entries but items has ${items.length}; they must be parallel arrays`,
         );
       }
       if (targets && correct) {
@@ -171,7 +170,7 @@ const QUESTION_COMPONENTS: Record<
             idx >= targets.length
           ) {
             d.error(
-              `${fileRel}: <Sorting> correct contains ${formatValue(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`,
+              `<Sorting> correct contains ${formatValue(idx)}, out of range for ${targets.length} targets (valid: 0–${targets.length - 1})`,
             );
             break;
           }
@@ -183,7 +182,6 @@ const QUESTION_COMPONENTS: Record<
 
 export function validateQuestionComponents(
   components: ComponentMatch[],
-  fileRel: string,
   d: Diagnostics,
   profile: StandardProfile | undefined,
 ): void {
@@ -196,7 +194,7 @@ export function validateQuestionComponents(
     const rule = QUESTION_COMPONENTS[name as QuestionComponentName];
     for (const req of rule.required) {
       if (!hasSpread && !props.has(req)) {
-        d.error(`${fileRel}: <${name}> is missing required prop "${req}"`);
+        d.error(`<${name}> is missing required prop "${req}"`);
       }
     }
 
@@ -204,21 +202,18 @@ export function validateQuestionComponents(
     const options = staticArray(props.get('options'));
     if (options?.some((e) => typeof e === 'string' && e.trim() === '')) {
       d.warn(
-        tag(
-          A11Y_IDS.questionLabel,
-          `${fileRel}: <${name}> has an empty option label`,
-        ),
+        tag(A11Y_IDS.questionLabel, `<${name}> has an empty option label`),
       );
     }
 
     const resolvedId = staticQuestionId(match);
     if (resolvedId === null && literalValue(props.get('id'))) {
-      d.error(`${fileRel}: <${name}> id must be a string that is not blank`);
+      d.error(`<${name}> id must be a string that is not blank`);
     }
     if (resolvedId !== null) {
       if (seenIds.has(resolvedId)) {
         d.error(
-          `${fileRel}: duplicate question id "${resolvedId}"; each question on a page needs a unique id`,
+          `duplicate question id "${resolvedId}"; each question on a page needs a unique id`,
         );
       } else if (standard) {
         // The standard's identifier rules can rewrite ids, so distinct raw ids
@@ -227,12 +222,12 @@ export function validateQuestionComponents(
         const sane = standard.interactionFormat.identifier(resolvedId);
         if (sane !== resolvedId) {
           d.warn(
-            `${fileRel}: question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only ASCII letters, digits and underscores`,
+            `question id "${resolvedId}" will be rewritten to "${sane}" for ${standard.name}; use only ASCII letters, digits and underscores`,
           );
         }
         if (seenSanitized.has(sane)) {
           d.error(
-            `${fileRel}: question id "${resolvedId}" collides with a prior id after ${standard.name} sanitization ("${sane}")`,
+            `question id "${resolvedId}" collides with a prior id after ${standard.name} sanitization ("${sane}")`,
           );
         }
         seenSanitized.add(sane);
@@ -243,13 +238,13 @@ export function validateQuestionComponents(
     const weightProp = props.get('weight');
     if (weightProp?.kind === 'string') {
       d.warn(
-        `${fileRel}: <${name}> weight="${weightProp.value}" is a string and is ignored (treated as 1) — pass a number: weight={${weightProp.value}}`,
+        `<${name}> weight="${weightProp.value}" is a string and is ignored (treated as 1). Pass a number: weight={${weightProp.value}}`,
       );
     } else {
       const weight = staticNumber(weightProp);
       if (weight !== null && !(Number.isFinite(weight) && weight > 0)) {
         d.warn(
-          `${fileRel}: <${name}> weight ${weight} is not a positive finite number and is ignored (treated as 1)`,
+          `<${name}> weight ${weight} is not a positive finite number and is ignored (treated as 1)`,
         );
       }
     }
@@ -270,12 +265,12 @@ export function validateQuestionComponents(
               ? 'every response and correct answer'
               : `any response or correct answer that uses one past the ${max}th`;
           d.warn(
-            `${fileRel}: <${name}> has ${count} ${prop} but ${standard.name} records at most ${max}; ${lost} is left out of the LMS record`,
+            `<${name}> has ${count} ${prop} but ${standard.name} records at most ${max}; ${lost} is left out of the LMS record`,
           );
         }
       }
     }
 
-    rule.check(match, { fileRel, d, standard, id: resolvedId });
+    rule.check(match, { d, standard, id: resolvedId });
   }
 }
