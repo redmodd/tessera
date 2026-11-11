@@ -370,7 +370,7 @@ export class XAPIPublisher {
   buildStatement(partial: PartialStatement, opts?: { id?: string }): Statement {
     if (!this.#cachedActor) {
       throw new XAPIConfigError(
-        'XAPIPublisher.buildStatement() called before init() resolved.',
+        'XAPIPublisher used before init() resolved. Await publisher.init() first.',
       );
     }
     const object = partial.object ?? {
@@ -703,19 +703,23 @@ export class XAPIPublisher {
       !this.#unloading
     ) {
       this.#cachedAuth = null;
-      return this.#resolveAuth()
-        .then((newToken) => this.#post(newToken, body, keepalive))
-        .then((retryResp) => {
-          if (retryResp.status !== 401) return outcomeOf(retryResp);
-          this.#authDead = true;
-          return {
-            ok: false,
-            status: 401,
-            error: new Error(
-              'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
-            ),
-          };
-        });
+      return this.#resolveAuth().then(
+        (newToken) =>
+          this.#post(newToken, body, keepalive).then((retryResp) => {
+            if (retryResp.status !== 401) return outcomeOf(retryResp);
+            this.#authDead = true;
+            return {
+              ok: false,
+              status: 401,
+              error: new Error(
+                'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
+              ),
+            };
+          }),
+        // A failed re-resolve keeps the 401 so the retry loop stops; only a
+        // network error on the resend is retried.
+        (err): SendOutcome => ({ ok: false, status: 401, error: toError(err) }),
+      );
     }
     return outcomeOf(resp);
   }
