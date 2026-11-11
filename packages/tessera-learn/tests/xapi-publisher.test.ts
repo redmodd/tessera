@@ -388,6 +388,44 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
     expect(r.destinations[0].ok).toBe(true);
   });
 
+  it('surfaces the LRS response body when the retry after a 401 fails', async () => {
+    mockFetch
+      .mockResolvedValueOnce(respond(401))
+      .mockResolvedValue(respond(403, 'Forbidden for this agent'));
+    const pub = await initPublisher({ auth: vi.fn().mockResolvedValue('tok') });
+    const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
+    expect(r.destinations[0]).toMatchObject({ ok: false, status: 403 });
+    expect(r.destinations[0].error?.message).toBe(
+      'LRS responded 403: Forbidden for this agent',
+    );
+  });
+
+  it('keeps retrying when the resend after a 401 hits a network error', async () => {
+    useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce(respond(401))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher({ auth: vi.fn().mockResolvedValue('tok') });
+    const sent = pub.sendStatement({ verb: { id: 'http://verb/a' } });
+    await vi.advanceTimersByTimeAsync(600_000);
+    await expect(sent).resolves.toMatchObject({ destinations: [{ ok: true }] });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops without retrying when the auth resolver fails after a 401', async () => {
+    mockFetch.mockResolvedValue(respond(401));
+    const resolver = vi
+      .fn()
+      .mockResolvedValueOnce('tok')
+      .mockRejectedValue(new Error('token endpoint down'));
+    const pub = await initPublisher({ auth: resolver });
+    const r = await pub.sendStatement({ verb: { id: 'http://verb/a' } });
+    expect(r.destinations[0]).toMatchObject({ ok: false, status: 401 });
+    expect(r.destinations[0].error?.message).toMatch(/token endpoint down/);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('on two consecutive 401s, marks auth dead', async () => {
     mockFetch.mockResolvedValue(respond(401));
     const resolver = vi.fn().mockResolvedValue('tok');

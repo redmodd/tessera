@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import type { Plugin, PreviewServer } from 'vite';
 import type { ContextPluginApi } from '../build-context.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
+import { errorMessage } from '../../runtime/errors.js';
 
 export interface AuditOptions {
   /** Minimum violation impact that fails the run (CI gate). Default 'serious'. */
@@ -231,7 +232,7 @@ export async function launchWithInstall({
   try {
     return { ok: true, browser: await launch() };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     if (isMissingDepsError(message)) {
       reportLaunchFailure(message, isLinux);
       return { ok: false, code: 1 };
@@ -250,8 +251,7 @@ export async function launchWithInstall({
     try {
       return { ok: true, browser: await launch() };
     } catch (retryErr) {
-      const retryMessage =
-        retryErr instanceof Error ? retryErr.message : String(retryErr);
+      const retryMessage = errorMessage(retryErr);
       if (
         isMissingBrowserError(retryMessage) &&
         !isMissingDepsError(retryMessage)
@@ -485,9 +485,7 @@ export async function runAudit(
     return report.passed ? 0 : 1;
   } catch (err) {
     console.error(
-      `\x1b[31m[tessera a11y]\x1b[0m Audit could not complete: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      `\x1b[31m[tessera a11y]\x1b[0m Audit could not complete: ${errorMessage(err)}`,
     );
     return 1;
   } finally {
@@ -495,9 +493,7 @@ export async function runAudit(
     else process.env[AUDIT_ENV_FLAG] = prevEnv;
     await server?.close().catch((err: unknown) => {
       console.warn(
-        `\x1b[33m[tessera a11y]\x1b[0m Could not close the preview server: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `\x1b[33m[tessera a11y]\x1b[0m Could not close the preview server: ${errorMessage(err)}`,
       );
     });
   }

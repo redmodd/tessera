@@ -5,6 +5,7 @@ import { STANDARDS, httpOrigin } from '../standards.js';
 import type { CompletionStatus, SuccessStatus } from '../persistence.js';
 import { isRecord, type Verdict } from '../types.js';
 import type { XAPIContext } from '../xapi/types.js';
+import { errorMessage } from '../errors.js';
 
 const CMI5_MASTERYSCORE_EXT =
   'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
@@ -103,7 +104,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       resp = await fetch(fetchUrl, { method: 'POST' });
     } catch (err) {
       throw new Error(
-        `Tessera cmi5: fetch token request failed (${err instanceof Error ? err.message : String(err)}). The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`,
+        `Tessera cmi5: fetch token request failed (${errorMessage(err)}). The cmi5 launch fetch URL is single-use; reload from the LMS to retry.`,
         { cause: err },
       );
     }
@@ -322,7 +323,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       );
     } catch (err) {
       console.warn(
-        `Tessera cmi5: LMS.LaunchData State GET failed (${err instanceof Error ? err.message : String(err)}).`,
+        `Tessera cmi5: LMS.LaunchData State GET failed (${errorMessage(err)}).`,
       );
     }
     return null;
@@ -344,7 +345,7 @@ export class CMI5Adapter extends BaseXAPILaunchAdapter {
       }
     } catch (err) {
       console.warn(
-        `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) failed (${err instanceof Error ? err.message : String(err)}).`,
+        `Tessera cmi5: Agent Profile GET (cmi5LearnerPreferences) failed (${errorMessage(err)}).`,
       );
     }
   }

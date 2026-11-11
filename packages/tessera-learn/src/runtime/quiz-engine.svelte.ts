@@ -47,17 +47,10 @@ export interface QuizEngineDeps {
   restore?: QuizPageState;
 }
 
-interface InternalQuestion {
-  id: string;
+type InternalQuestion = UseQuizQuestionApi & {
   weight: number;
-  checkAnswer: () => boolean | null;
-  reset?: () => void;
-  complete?: () => boolean;
-  interaction?: () => Interaction | undefined;
-  text?: () => string | undefined;
-  restore?: UseQuizQuestionApi['restore'];
   render: unknown;
-}
+};
 
 /**
  * The quiz engine: all reactive state, scoring, retry/feedback policy and the
@@ -212,14 +205,9 @@ export class QuizEngine implements UseQuizHandle {
     }
     this.#seenIds.add(id);
     const internal: InternalQuestion = {
+      ...api,
       id,
       weight: normalizeWeight(api.weight),
-      checkAnswer: api.checkAnswer,
-      reset: api.reset,
-      complete: api.complete,
-      interaction: api.interaction,
-      text: api.text,
-      restore: api.restore,
       render: undefined,
     };
     this.#internalQuestions.push(internal);

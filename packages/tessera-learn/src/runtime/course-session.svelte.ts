@@ -16,6 +16,7 @@ import {
   type SuccessStatus,
 } from './persistence.js';
 import type { XAPIClient } from './xapi/client.js';
+import { toError } from './errors.js';
 
 // The cmi5 auth token, LaunchData and Agent Profile fetches inside init()
 // have no deadline of their own, and the first page waits on all three.
@@ -141,7 +142,7 @@ export class CourseSession {
         }),
       ]);
     } catch (err) {
-      return err instanceof Error ? err : new Error(String(err));
+      return toError(err);
     } finally {
       clearTimeout(initDeadline);
     }

@@ -1,6 +1,7 @@
 import { Parser } from 'acorn';
 import { tsPlugin } from '@sveltejs/acorn-typescript';
 import { parse } from 'svelte/compiler';
+import { errorMessage } from '../runtime/errors.js';
 
 /**
  * Shared parsing layer for the build-time validator and manifest generator.
@@ -97,7 +98,7 @@ function parseRoot(source: string): CacheEntry {
         error: null,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       const firstLine = message.split('\n')[0].trim();
       return { root: null, error: firstLine || 'parse error' };
     }

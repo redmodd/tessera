@@ -22,6 +22,7 @@ import {
   type StandardId,
   type StandardProfile,
 } from '../runtime/standards.js';
+import { errorMessage } from '../runtime/errors.js';
 
 // ---------- Types ----------
 
@@ -470,7 +471,7 @@ export function generateManifest(
         try {
           source = readFileSync(filePath, 'utf-8');
         } catch (e) {
-          console.warn(`[tessera warning] ${(e as Error).message}`);
+          console.warn(`[tessera warning] ${errorMessage(e)}`);
         }
         const parsed = parsePageConfigFromSource(source);
         const pageConfig: PageConfig = parsed.kind === 'ok' ? parsed.value : {};

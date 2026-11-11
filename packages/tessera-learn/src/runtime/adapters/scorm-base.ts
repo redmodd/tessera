@@ -6,7 +6,10 @@ import {
   type SuccessStatus,
 } from '../persistence.js';
 import type { Interaction } from '../interaction.js';
-import { buildScormInteractionFields } from '../interaction-format.js';
+import {
+  buildScormInteractionFields,
+  type ScormInteractionFields,
+} from '../interaction-format.js';
 import {
   WriteQueue,
   callSyncOrWarn,
@@ -38,15 +41,9 @@ export interface ScormDialect<TApi> {
   masteryKey: string;
   masteryRange: readonly [number, number];
   formatDuration(seconds: number): string;
-  interactionFields: {
-    responseField: 'student_response' | 'learner_response';
-    timestampField: 'time' | 'timestamp';
-    timestamp(): string;
-    typeValue(type: Interaction['type']): string;
-    resultLabels: { correct: string; incorrect: string };
-    /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
-    description?(text: string, lang: string): string | null;
-  };
+  interactionFields: ScormInteractionFields;
+  /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
+  interactionDescription?(text: string, lang: string): string | null;
   initialize(api: TApi): string;
   terminate(api: TApi): string;
   getValue(api: TApi, key: string): string;
@@ -221,7 +218,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
   ): void {
     if (!this.canWrite()) return;
     const description = text
-      ? this.dialect.interactionFields.description?.(text, this.#lang)
+      ? this.dialect.interactionDescription?.(text, this.#lang)
       : undefined;
     if (description === null) {
       console.warn(
@@ -232,15 +229,9 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
       questionId,
       interaction,
       correct,
-      {
-        responseField: this.dialect.interactionFields.responseField,
-        timestampField: this.dialect.interactionFields.timestampField,
-        timestamp: this.dialect.interactionFields.timestamp(),
-        typeValue: this.dialect.interactionFields.typeValue(interaction.type),
-        resultLabels: this.dialect.interactionFields.resultLabels,
-        format: this.dialect.profile.interactionFormat,
-        description,
-      },
+      this.dialect.interactionFields,
+      this.dialect.profile.interactionFormat,
+      description,
     );
     const earlier = this.#questionIdsByRecorded.get(id);
     if (earlier !== undefined && earlier !== questionId) {

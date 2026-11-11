@@ -605,14 +605,12 @@ export function scorm12Type(type: Interaction['type']): string {
   }
 }
 
-export interface ScormInteractionSpec {
+export interface ScormInteractionFields {
   responseField: 'student_response' | 'learner_response';
   timestampField: 'time' | 'timestamp';
-  timestamp: string;
-  typeValue: string;
+  timestamp(): string;
+  typeValue(type: Interaction['type']): string;
   resultLabels: { correct: string; incorrect: string };
-  format: InteractionFormat;
-  description?: string | null;
 }
 
 /**
@@ -1010,14 +1008,18 @@ export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
   correct: boolean | null,
-  spec: ScormInteractionSpec,
+  dialect: ScormInteractionFields,
+  format: InteractionFormat,
+  description?: string | null,
 ): { id: string; fields: Array<[string, string]> } {
-  const fields: Array<[string, string]> = [['type', spec.typeValue]];
-  if (spec.description) fields.push(['description', spec.description]);
-  warnResponseIds(questionId, interaction, spec.format);
-  const patterns = formatPatterns(questionId, interaction, spec.format);
-  const response = formatResponse(questionId, interaction, spec.format);
-  warnStepAnswers(questionId, interaction, spec.format, {
+  const fields: Array<[string, string]> = [
+    ['type', dialect.typeValue(interaction.type)],
+  ];
+  if (description) fields.push(['description', description]);
+  warnResponseIds(questionId, interaction, format);
+  const patterns = formatPatterns(questionId, interaction, format);
+  const response = formatResponse(questionId, interaction, format);
+  warnStepAnswers(questionId, interaction, format, {
     pattern: patterns !== null,
     response: response !== null,
     result: correct !== null,
@@ -1025,13 +1027,13 @@ export function buildScormInteractionFields(
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });
-  if (response !== null) fields.push([spec.responseField, response]);
+  if (response !== null) fields.push([dialect.responseField, response]);
   if (correct !== null) {
     fields.push([
       'result',
-      correct ? spec.resultLabels.correct : spec.resultLabels.incorrect,
+      correct ? dialect.resultLabels.correct : dialect.resultLabels.incorrect,
     ]);
   }
-  fields.push([spec.timestampField, spec.timestamp]);
-  return { id: spec.format.identifier(questionId), fields };
+  fields.push([dialect.timestampField, dialect.timestamp()]);
+  return { id: format.identifier(questionId), fields };
 }

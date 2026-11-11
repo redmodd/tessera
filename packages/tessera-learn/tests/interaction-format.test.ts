@@ -23,14 +23,19 @@ function recordedResponse(
   format: InteractionFormat,
   correct: boolean | null = null,
 ) {
-  const { fields } = buildScormInteractionFields('q', i, correct, {
-    responseField: 'learner_response',
-    timestampField: 'timestamp',
-    timestamp: '',
-    typeValue: i.type,
-    resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+  const { fields } = buildScormInteractionFields(
+    'q',
+    i,
+    correct,
+    {
+      responseField: 'learner_response',
+      timestampField: 'timestamp',
+      timestamp: () => '',
+      typeValue: (type) => type,
+      resultLabels: { correct: 'correct', incorrect: 'incorrect' },
+    },
     format,
-  });
+  );
   return fields.find(([key]) => key === 'learner_response')?.[1];
 }
 

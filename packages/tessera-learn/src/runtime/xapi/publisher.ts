@@ -20,6 +20,7 @@ import {
 import { RETRY_ATTEMPTS, backoffMs } from '../adapters/retry.js';
 import { httpOrigin } from '../standards.js';
 import { isRecord } from '../types.js';
+import { errorMessage, toError } from '../errors.js';
 
 /** cmi5 §9.6.3.1: the cmi5 session id context extension IRI. */
 export const CMI5_SESSIONID_EXT =
@@ -184,6 +185,27 @@ function isClientError(status: number | undefined): boolean {
 }
 
 /**
+ * A 409 means the LRS already holds the statement id. On failure, the error
+ * carries the first 500 characters of the LRS body (e.g. "Forbidden cmi5
+ * defined statement: ...") or the bare status when the body can't be read.
+ * Success stays synchronous so the queue starts the next send without extra
+ * microtask hops.
+ */
+function outcomeOf(resp: Response): SendOutcome | Promise<SendOutcome> {
+  if (resp.ok || resp.status === 409) return { ok: true, status: resp.status };
+  return resp
+    .text()
+    .catch(() => '')
+    .then((respBody) => ({
+      ok: false,
+      status: resp.status,
+      error: new Error(
+        `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
+      ),
+    }));
+}
+
+/**
  * Single-destination xAPI publisher. Builds and sends statements with
  * sequential queue ordering, retry on 5xx/network errors, and 401-driven
  * auth re-resolution.
@@ -286,7 +308,7 @@ export class XAPIPublisher {
         resolved = await this.#actorValue();
       } catch (err) {
         throw new XAPIConfigError(
-          `xapi.actor resolver threw: ${err instanceof Error ? err.message : String(err)}`,
+          `xapi.actor resolver threw: ${errorMessage(err)}`,
         );
       }
       const err = validateAgent(resolved);
@@ -348,7 +370,7 @@ export class XAPIPublisher {
   buildStatement(partial: PartialStatement, opts?: { id?: string }): Statement {
     if (!this.#cachedActor) {
       throw new XAPIConfigError(
-        'XAPIPublisher.buildStatement() called before init() resolved.',
+        'XAPIPublisher used before init() resolved. Await publisher.init() first.',
       );
     }
     const object = partial.object ?? {
@@ -405,38 +427,17 @@ export class XAPIPublisher {
    * class is single-destination — the fan-out wrapper combines them).
    *
    * Validation failures (verb.id missing, object.id missing when supplied,
-   * score.scaled out of range) throw synchronously — the returned promise
-   * rejects before any HTTP traffic happens.
+   * score.scaled out of range) reject before any HTTP traffic happens.
    */
-  sendStatement(
+  async sendStatement(
     partial: PartialStatement,
     options?: SendStatementOptions & { id?: string },
   ): Promise<SendStatementResult> {
-    if (this.#unavailableReason) {
-      return Promise.reject(this.#unavailableReason());
-    }
-    try {
-      validatePartialStatement(partial);
-    } catch (err) {
-      // Caller-friendly: surface validation errors as a rejected promise
-      // so both `await sendStatement(...)` and
-      // `sendStatement(...).catch(...)` paths see them. The rejection
-      // happens before any HTTP traffic — no LRS round-trip is started.
-      return Promise.reject(err);
-    }
-    if (!this.#cachedActor) {
-      return Promise.reject(
-        new XAPIConfigError(
-          'XAPIPublisher.sendStatement() called before init() resolved.',
-        ),
-      );
-    }
+    if (this.#unavailableReason) throw this.#unavailableReason();
+    validatePartialStatement(partial);
     const statement = this.buildStatement(partial, { id: options?.id });
-    return this.enqueueBuilt(statement, options).then((outcome) => ({
-      statementId: statement.id,
-      statement,
-      destinations: [outcome],
-    }));
+    const outcome = await this.enqueueBuilt(statement, options);
+    return { statementId: statement.id, statement, destinations: [outcome] };
   }
 
   /**
@@ -655,7 +656,7 @@ export class XAPIPublisher {
       .then((token) => this.#fetchWithToken(token, body, keepalive))
       .catch((err) => ({
         ok: false,
-        error: err instanceof Error ? err : new Error(String(err)),
+        error: toError(err),
       }));
   }
 
@@ -685,7 +686,7 @@ export class XAPIPublisher {
       .then((resp) => this.#handleResponse(resp, body, keepalive))
       .catch((err) => ({
         ok: false,
-        error: err instanceof Error ? err : new Error(String(err)),
+        error: toError(err),
       }));
   }
 
@@ -693,10 +694,7 @@ export class XAPIPublisher {
     resp: Response,
     body: string,
     keepalive: boolean,
-  ): Promise<SendOutcome> | SendOutcome {
-    if (resp.ok || resp.status === 409) {
-      return { ok: true, status: resp.status };
-    }
+  ): SendOutcome | Promise<SendOutcome> {
     // 401 with a function-form auth: invalidate cache, re-resolve once,
     // retry the same request.
     if (
@@ -705,13 +703,10 @@ export class XAPIPublisher {
       !this.#unloading
     ) {
       this.#cachedAuth = null;
-      return this.#resolveAuth()
-        .then((newToken) => this.#post(newToken, body, keepalive))
-        .then((retryResp): SendOutcome => {
-          if (retryResp.ok || retryResp.status === 409) {
-            return { ok: true, status: retryResp.status };
-          }
-          if (retryResp.status === 401) {
+      return this.#resolveAuth().then(
+        (newToken) =>
+          this.#post(newToken, body, keepalive).then((retryResp) => {
+            if (retryResp.status !== 401) return outcomeOf(retryResp);
             this.#authDead = true;
             return {
               ok: false,
@@ -720,58 +715,33 @@ export class XAPIPublisher {
                 'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
               ),
             };
-          }
-          return {
-            ok: false,
-            status: retryResp.status,
-            error: new Error(`LRS responded ${retryResp.status}`),
-          };
-        })
-        .catch((err): SendOutcome => ({
-          ok: false,
-          status: 401,
-          error: err instanceof Error ? err : new Error(String(err)),
-        }));
+          }),
+        // A failed re-resolve keeps the 401 so the retry loop stops; only a
+        // network error on the resend is retried.
+        (err): SendOutcome => ({ ok: false, status: 401, error: toError(err) }),
+      );
     }
-    // Append the LRS body to the error message so callers see the
-    // specific reason (e.g. "Forbidden cmi5 defined statement: ...").
-    // Cap at 500 chars; on read failure, fall back to bare status.
-    return resp.text().then(
-      (respBody): SendOutcome => ({
-        ok: false,
-        status: resp.status,
-        error: new Error(
-          `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
-        ),
-      }),
-      (): SendOutcome => ({
-        ok: false,
-        status: resp.status,
-        error: new Error(`LRS responded ${resp.status}`),
-      }),
-    );
+    return outcomeOf(resp);
   }
 
   /** Only reached with function-form auth; the constructor caches static auth. */
-  #resolveAuth(): Promise<string> {
-    return Promise.resolve()
-      .then(() => (this.#authValue as () => string | Promise<string>)())
-      .then((resolved) => {
-        if (typeof resolved !== 'string' || !resolved) {
-          throw new XAPIConfigError(
-            'xapi.auth resolver must return a non-empty string',
-          );
-        }
-        const err = validateAuthCredential(resolved);
-        if (err) throw new XAPIConfigError(`xapi.auth: ${err}`);
-        this.#cachedAuth = resolved;
-        return resolved;
-      })
-      .catch((err) => {
-        if (err instanceof XAPIConfigError) throw err;
-        throw new XAPIConfigError(
-          `xapi.auth resolver threw: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
+  async #resolveAuth(): Promise<string> {
+    let resolved: unknown;
+    try {
+      resolved = await (this.#authValue as () => string | Promise<string>)();
+    } catch (err) {
+      throw new XAPIConfigError(
+        `xapi.auth resolver threw: ${errorMessage(err)}`,
+      );
+    }
+    if (typeof resolved !== 'string' || !resolved) {
+      throw new XAPIConfigError(
+        'xapi.auth resolver must return a non-empty string',
+      );
+    }
+    const err = validateAuthCredential(resolved);
+    if (err) throw new XAPIConfigError(`xapi.auth: ${err}`);
+    this.#cachedAuth = resolved;
+    return resolved;
   }
 }

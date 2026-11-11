@@ -3,8 +3,6 @@ import type {
   SendStatementOptions,
   SendStatementResult,
   XAPIAgent,
-  Statement,
-  DestinationOutcome,
 } from './types.js';
 import { XAPIPublisher } from './publisher.js';
 import { validatePartialStatement } from './validation.js';
@@ -38,36 +36,26 @@ export class XAPIClient {
    * final failure). Per-destination outcomes are exposed on
    * `result.destinations` so authors can act on partial failures.
    *
-   * Validation failures throw synchronously — the returned promise
-   * rejects before any HTTP traffic.
+   * Validation failures reject before any HTTP traffic. The first
+   * destination's built statement is returned as the canonical `statement`:
+   * other destinations may differ in actor, grouping or timestamp, but the
+   * id and the author-supplied verb, object and result are identical.
    */
-  sendStatement(
+  async sendStatement(
     partial: PartialStatement,
     options?: SendStatementOptions,
   ): Promise<SendStatementResult> {
-    try {
-      validatePartialStatement(partial);
-    } catch (err) {
-      return Promise.reject(err);
-    }
+    validatePartialStatement(partial);
     const id = uuidv4();
-    // The first publisher's built statement is what we return as the
-    // canonical `statement` in the result. Other destinations may have
-    // a different actor/grouping but the verb/object/result/timestamp
-    // are author-supplied and identical.
-    let primary: Statement | null = null;
-    const destinationPromises: Promise<DestinationOutcome>[] = [];
-    for (let i = 0; i < this.#publishers.length; i++) {
-      const pub = this.#publishers[i];
-      const built = pub.buildStatement(partial, { id });
-      if (i === 0) primary = built;
-      destinationPromises.push(pub.enqueueBuilt(built, options));
-    }
-    return Promise.all(destinationPromises).then((destinations) => ({
-      statementId: id,
-      statement: primary as Statement,
-      destinations,
-    }));
+    const statements = this.#publishers.map((pub) =>
+      pub.buildStatement(partial, { id }),
+    );
+    const destinations = await Promise.all(
+      this.#publishers.map((pub, i) =>
+        pub.enqueueBuilt(statements[i], options),
+      ),
+    );
+    return { statementId: id, statement: statements[0], destinations };
   }
 
   /**
