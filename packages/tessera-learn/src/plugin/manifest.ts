@@ -81,14 +81,6 @@ export function stripPrefix(name: string): string {
   return name.replace(/^\d+-/, '');
 }
 
-/** Title-case a slug: "getting-started" → "Getting Started" */
-export function titleCase(slug: string): string {
-  return slug
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 /** Derive slug from folder/file name */
 export function deriveSlug(name: string, isFile = false): string {
   if (isFile) {
@@ -435,7 +427,7 @@ export function generateManifest(
     const sectionSlug = deriveSlug(walkedSection.name);
 
     const section: ManifestSection = {
-      title: sectionMeta.title || titleCase(sectionSlug),
+      title: sectionMeta.title ?? '',
       slug: sectionSlug,
       lessons: [],
     };
@@ -453,7 +445,7 @@ export function generateManifest(
         : `/pages/${walkedSection.name}/${walkedLesson.name}`;
 
       const lesson: ManifestLesson = {
-        title: isFlat ? '' : lessonMeta.title || titleCase(lessonSlug),
+        title: isFlat ? '' : (lessonMeta.title ?? ''),
         slug: lessonSlug,
         pages: [],
       };
@@ -485,7 +477,7 @@ export function generateManifest(
             : [];
         const page: ManifestPage = {
           index: pageIndex,
-          title: pageConfig.title || titleCase(pageSlug),
+          title: pageConfig.title ?? '',
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
           quiz,

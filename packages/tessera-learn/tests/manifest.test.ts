@@ -8,13 +8,12 @@ import {
   readMetaFile,
   orderPageFiles,
   stripPrefix,
-  titleCase,
   deriveSlug,
 } from '../src/plugin/manifest.js';
 import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
 import { validateProject } from '../src/plugin/validation.js';
 import { normalizeWeight } from '../src/runtime/progress.svelte.js';
-import { tempDir, writeLessonPage } from './helpers.js';
+import { tempDir, titledPage, writeLessonPage } from './helpers.js';
 
 vi.mock('svelte/compiler', async (importOriginal) => {
   const compiler = await importOriginal<typeof import('svelte/compiler')>();
@@ -49,7 +48,7 @@ export const pageConfig = { title: "Welcome to the Course" }
   );
   createFile(
     '01-introduction/01-welcome/objectives.svelte',
-    '<h1>Objectives</h1>',
+    titledPage('<h1>Objectives</h1>', 'Objectives'),
   );
   createFile(
     '02-core-content/_meta.js',
@@ -59,7 +58,10 @@ export const pageConfig = { title: "Welcome to the Course" }
     '02-core-content/01-basics/_meta.js',
     'export default { title: "The Basics", pages: ["overview"] };',
   );
-  createFile('02-core-content/01-basics/overview.svelte', '<h1>Overview</h1>');
+  createFile(
+    '02-core-content/01-basics/overview.svelte',
+    titledPage('<h1>Overview</h1>', 'Overview'),
+  );
 }
 
 beforeEach(() => {
@@ -77,17 +79,6 @@ describe('stripPrefix', () => {
 
   it('returns unchanged if no prefix', () => {
     expect(stripPrefix('introduction')).toBe('introduction');
-  });
-});
-
-describe('titleCase', () => {
-  it('title-cases hyphenated slugs', () => {
-    expect(titleCase('getting-started')).toBe('Getting Started');
-    expect(titleCase('core-content')).toBe('Core Content');
-  });
-
-  it('handles single word', () => {
-    expect(titleCase('welcome')).toBe('Welcome');
   });
 });
 
@@ -492,25 +483,6 @@ describe('generateManifest', () => {
     expect(manifest.pages[2].index).toBe(2);
   });
 
-  it('falls back to the folder name for a non-string _meta.js title', () => {
-    createFile(
-      '01-intro/_meta.js',
-      'export default { title: { en: "Intro" } };',
-    );
-    createFile('01-intro/page.svelte', '<h1>Hi</h1>');
-    expect(generateManifest(root).sections[0].title).toBe('Intro');
-  });
-
-  it('derives the title for a pageConfig that is not a static literal', () => {
-    createFile(
-      '01-intro/first-page.svelte',
-      `<script module>
-export const pageConfig = { title: someTitle }
-</script>`,
-    );
-    expect(generateManifest(root).pages[0].title).toBe('First Page');
-  });
-
   it('carries pageConfig.graded and weight onto the manifest page', () => {
     createFile(
       '01-s/01-l/_meta.js',
@@ -639,25 +611,6 @@ export const pageConfig = { graded: true, weight: 0 }
 
     expect(manifest.pages[0].weight).toBe(0);
     expect(normalizeWeight(manifest.pages[0].weight)).toBe(1);
-  });
-
-  it('uses title-case fallback when _meta.js missing', () => {
-    createFile('01-my-section/01-my-lesson/page.svelte', '<h1>Hello</h1>');
-    const manifest = generateManifest(root);
-
-    expect(manifest.sections[0].title).toBe('My Section');
-    expect(manifest.sections[0].lessons[0].title).toBe('My Lesson');
-  });
-
-  it('uses title-case fallback for page without pageConfig', () => {
-    createFile(
-      '01-s/01-l/_meta.js',
-      'export default { title: "L", pages: ["my-page"] };',
-    );
-    createFile('01-s/01-l/my-page.svelte', '<h1>Hello</h1>');
-    const manifest = generateManifest(root);
-
-    expect(manifest.pages[0].title).toBe('My Page');
   });
 
   it('appends unlisted svelte files alphabetically after listed ones', () => {

@@ -76,11 +76,6 @@ describe('SCORM 1.2 manifest', () => {
     expect(xml).toContain('<title>A &amp; B &lt;Course&gt;</title>');
   });
 
-  it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
-    const xml = scormXml('scorm12', { title: '' });
-    expect(xml).toContain('<title>Untitled Course</title>');
-  });
-
   it('lists all files in dist/', () => {
     const xml = scormXml('scorm12', { title: 'Test' });
 
@@ -276,11 +271,6 @@ describe('generateCMI5Xml', () => {
     const xml = cmi5Xml({ title: 'Test', completion: { mode: 'manual' } });
     expect(xml).not.toContain('masteryScore');
     expect(xml).toContain('moveOn="Completed">');
-  });
-
-  it('falls back to "Untitled Course" for an empty title — the validator promises this fallback', () => {
-    const xml = cmi5Xml({ title: '' });
-    expect(xml).toContain('<langstring lang="en">Untitled Course</langstring>');
   });
 
   it('includes URN IRIs for course and AU ids', () => {

@@ -171,10 +171,23 @@ export function tempDir(): string {
   return dir;
 }
 
+/** Page source with the required `pageConfig.title`. */
+export function titledPage(body = '<h1>Page</h1>', title = 'Page'): string {
+  return `<script module>\n  export const pageConfig = { title: ${JSON.stringify(title)} };\n</script>\n${body}`;
+}
+
+/** A `_meta.js` source with the required `title`. */
+export function titledMeta(title: string): string {
+  return `export default { title: ${JSON.stringify(title)} };`;
+}
+
 export function writeLessonPage(courseRoot: string): void {
-  const lesson = join(courseRoot, 'pages', '01-section', '01-lesson');
+  const section = join(courseRoot, 'pages', '01-section');
+  const lesson = join(section, '01-lesson');
   mkdirSync(lesson, { recursive: true });
-  writeFileSync(join(lesson, 'page.svelte'), '<h1>Page</h1>');
+  writeFileSync(join(section, '_meta.js'), titledMeta('Section'));
+  writeFileSync(join(lesson, '_meta.js'), titledMeta('Lesson'));
+  writeFileSync(join(lesson, 'page.svelte'), titledPage());
 }
 
 export function makeWorkspace(courses: string[] = []): string {

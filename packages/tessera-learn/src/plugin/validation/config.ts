@@ -118,23 +118,12 @@ export function parseConfig(
     }
   }
 
-  // Validate title against the runtime merge `userConfig.title || "Untitled
-  // Course"`: a missing or empty string falls back to the default (warn), a
-  // whitespace-only string is truthy and ships verbatim (warn), and a
-  // non-string is a misconfiguration — a truthy one ships as-is, a falsy one
-  // falls back, but either way the author should fix it (error).
   if (config.title !== undefined && typeof config.title !== 'string') {
     d.error(
       `course.config.js: "title" must be a string, got ${describeType(config.title)}`,
     );
-  } else if (config.title === undefined || config.title === '') {
-    d.warn(
-      'course.config.js: "title" is missing or empty — the course will ship as "Untitled Course"',
-    );
-  } else if (config.title.trim() === '') {
-    d.warn(
-      'course.config.js: "title" is only whitespace — it ships verbatim and will not fall back to "Untitled Course"',
-    );
+  } else if (!config.title?.trim()) {
+    d.error('course.config.js: missing required "title" field');
   }
 
   if (config.branding !== undefined) {

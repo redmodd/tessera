@@ -168,15 +168,15 @@ If none fit, surface the limitation instead of patching around it.
 ### Hierarchy and ordering
 
 - Manifest is always **section → lesson → page**. Files directly in a section folder form one implicit untitled lesson, ordered before the section's lesson subdirectories. Both shapes can coexist.
-- Sorting is alphabetical by directory/filename. Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs/titles (`01-getting-started/` → slug `getting-started`, title "Getting Started").
-- Page filenames keep their prefix (`01-welcome.svelte` → slug `01-welcome`, title "01 Welcome"), so control page order **within a lesson** with `_meta.js`, not filename prefixes.
+- Sorting is alphabetical by directory/filename. Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs (`01-getting-started/` → slug `getting-started`).
+- Page filenames keep their prefix (`01-welcome.svelte` → slug `01-welcome`), so control page order **within a lesson** with `_meta.js`, not filename prefixes.
 
 ### `_meta.js`
 
-Optional in every section and lesson folder; without one the title is the title-cased slug and pages sort alphabetically. **Omit it unless you need an override.**
+**Required** in every section and lesson folder (build error without it).
 
-- `title`: **required when the file exists** (build error without it).
-- `pages`: explicit page order. Listed names come first; unlisted `.svelte` files are appended alphabetically with a warning. A listed name with no file is a build error.
+- `title`: **required**, a non-empty string.
+- `pages`: optional page order; without it pages sort alphabetically. Listed names come first; unlisted `.svelte` files are appended alphabetically with a warning. A listed name with no file is a build error.
 - A section's `_meta.js` also orders the pages placed directly in that section.
 
 ```js
@@ -202,7 +202,7 @@ A custom widget that calls `useQuestion` and emits an `Interaction` is scored, r
 
 Each page is a `.svelte` file inside a lesson folder; standard HTML works as-is. Import components from `tessera-learn` (`import { Callout, Image } from 'tessera-learn'`).
 
-`pageConfig` is optional. It must be a **static object literal** exported from a `<script module>` block.
+Every page needs a `pageConfig` with a `title`. It must be a **static object literal** exported from a `<script module>` block.
 
 ```svelte
 <script module>
@@ -212,14 +212,14 @@ Each page is a `.svelte` file inside a lesson folder; standard HTML works as-is.
 <h1>Introduction to the Topic</h1>
 ```
 
-| Field         | Type      | Default              | Purpose                                                                                           |
-| ------------- | --------- | -------------------- | ------------------------------------------------------------------------------------------------- |
-| `title`       | `string`  | title-cased filename | Page title (`my-page.svelte` → "My Page")                                                         |
-| `quiz`        | `object`  | none                 | Makes the page a quiz page. See [`pageConfig.quiz` fields](#pageconfigquiz-fields)                |
-| `graded`      | `boolean` | `false`              | Page counts toward the course score. See [Per-page weighting](docs/scoring.md#per-page-weighting) |
-| `required`    | `boolean` | `true`               | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |
-| `weight`      | `number`  | `1`                  | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |
-| `completesOn` | `"view"`  | none                 | `completion.mode: "manual"` only. See [Manual completion](docs/scoring.md#manual-completion)      |
+| Field         | Type      | Default         | Purpose                                                                                           |
+| ------------- | --------- | --------------- | ------------------------------------------------------------------------------------------------- |
+| `title`       | `string`  | none (required) | Page title in the navigation and LMS reports                                                      |
+| `quiz`        | `object`  | none            | Makes the page a quiz page. See [`pageConfig.quiz` fields](#pageconfigquiz-fields)                |
+| `graded`      | `boolean` | `false`         | Page counts toward the course score. See [Per-page weighting](docs/scoring.md#per-page-weighting) |
+| `required`    | `boolean` | `true`          | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |
+| `weight`      | `number`  | `1`             | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |
+| `completesOn` | `"view"`  | none            | `completion.mode: "manual"` only. See [Manual completion](docs/scoring.md#manual-completion)      |
 
 An unknown field warns and is ignored. Don't skip heading levels in page markup (`<h2>` then `<h4>` warns).
 
@@ -547,7 +547,7 @@ Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-s
 
 ```js
 export default {
-  title: 'My Course', // omitted, the build warns and ships "Untitled Course"
+  title: 'My Course', // required
   id: 'urn:uuid:…', // unique course identity; scaffolders generate one, keep it
   description: '',
   author: '',

@@ -130,7 +130,7 @@ export default {};
       `import { writeFileSync } from 'node:fs';
 writeFileSync(
   new URL('./pages/01-assessment/zz-added.svelte', import.meta.url),
-  '<h1>Added</h1>',
+  '<script module>export const pageConfig = { title: "Added" };</script><h1>Added</h1>',
 );
 export default {};
 `,
@@ -142,6 +142,6 @@ export default {};
       readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
     );
     expect(report.totalPages).toBe(3);
-    expect(report.pages.at(-1).title).toBe('Zz Added');
+    expect(report.pages.at(-1).title).toBe('Added');
   });
 });

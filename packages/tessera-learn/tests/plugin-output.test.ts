@@ -15,7 +15,7 @@ import { tesseraPlugin } from '../src/plugin/index.js';
 import { resolveTesseraConfig } from '../src/plugin/inline-config.js';
 import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
-import { tempDir, writeLessonPage } from './helpers.js';
+import { tempDir, titledPage, writeLessonPage } from './helpers.js';
 
 // svelte() keeps its options in a closure, so the wrapper records them to reach onwarn.
 const svelteOptions = vi.hoisted(() => ({ onwarn: undefined as any }));
@@ -277,6 +277,10 @@ describe('export packaging gate', () => {
     if (pageConfig) {
       mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
       writeFileSync(
+        resolve(projectRoot, 'pages', '01-quiz', '_meta.js'),
+        'export default { title: "Quiz" };',
+      );
+      writeFileSync(
         resolve(projectRoot, 'pages', '01-quiz', 'check.svelte'),
         `<script module>\nexport const pageConfig = ${pageConfig}\n</script>\n<h1>Check</h1>`,
         'utf-8',
@@ -306,7 +310,7 @@ describe('export packaging gate', () => {
   it('asks for a Passed when a graded page is required', async () => {
     const xml = await exportCmi5(
       quizVerdictConfig,
-      '{ quiz: { graded: true } }',
+      '{ title: "Check", quiz: { graded: true } }',
     );
     expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
@@ -314,7 +318,7 @@ describe('export packaging gate', () => {
   it('satisfies on Completed when every graded page is optional', async () => {
     const xml = await exportCmi5(
       quizVerdictConfig,
-      '{ required: false, quiz: { graded: true } }',
+      '{ title: "Check", required: false, quiz: { graded: true } }',
     );
     expect(xml).toContain('moveOn="Completed"');
   });
@@ -499,9 +503,9 @@ describe('sources changed after validation', () => {
       (path) => writeFileSync(path, '<h1>Extra</h1>'),
     ],
     [
-      'an added _meta.js',
+      'an edited _meta.js',
       'pages/01-section/_meta.js',
-      (path) => writeFileSync(path, 'export default { title: "Section" };'),
+      (path) => writeFileSync(path, 'export default { title: "Renamed" };'),
     ],
     [
       'an added layout.svelte',
@@ -1106,14 +1110,14 @@ describe('dev revalidation', () => {
       await hotUpdate(validation, `${lessonDir}/${name}`);
     };
     const weighted =
-      '<script module>export const pageConfig = { weight: 2 };</script>';
+      '<script module>export const pageConfig = { title: "Other", weight: 2 };</script>';
 
     await savePage(
       'broken.svelte',
       '<script module>export const pageConfig = {</script>',
     );
     await savePage('other.svelte', weighted);
-    await savePage('other.svelte', '<h1>Other</h1>');
+    await savePage('other.svelte', titledPage('<h1>Other</h1>', 'Other'));
     warnings.mockClear();
 
     await savePage('other.svelte', weighted);

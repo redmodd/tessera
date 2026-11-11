@@ -314,7 +314,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     userConfig.completion?.mode === 'manual' && success.from !== 'quiz';
   return {
     ...userConfig,
-    title: userConfig.title || 'Untitled Course',
+    title: userConfig.title ?? '',
     language: courseLanguage(userConfig),
     resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },

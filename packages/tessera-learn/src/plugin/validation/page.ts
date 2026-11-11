@@ -341,9 +341,13 @@ function validateMetaFile(
   d: Diagnostics,
 ): MetaFile | null {
   const { meta, problem, rejected = {} } = readMetaFile(metaPath);
-  if (problem === 'missing') return null;
-
   const metaRel = relative(projectRoot, metaPath);
+  if (problem === 'missing') {
+    d.error(
+      `${metaRel}: missing. Every section and lesson folder needs a _meta.js with a "title".`,
+    );
+    return null;
+  }
   if (problem) {
     d.error(`${metaRel}: ${READ_FAILURE_MESSAGES[problem]}`);
     return null;
@@ -353,7 +357,7 @@ function validateMetaFile(
     d.error(
       `${metaRel}: "title" must be a string, got ${describeType(rejected.title)}`,
     );
-  } else if (!meta.title) {
+  } else if (!meta.title?.trim()) {
     d.error(`${metaRel}: missing required "title" field`);
   }
   if ('pages' in rejected) {
@@ -381,10 +385,18 @@ function validatePageConfig(
       if (!KNOWN_PAGE_FIELDS.has(key))
         d.warn(`${fileRel}: unknown field pageConfig.${key} is ignored`);
     }
+    const { title } = result.value;
+    if (typeof title !== 'string' || !title.trim()) {
+      d.error(`${fileRel}: missing required pageConfig.title`);
+    }
     return result.value;
   }
   if (result.kind === 'invalid') {
     d.error(`${fileRel}: pageConfig ${STATIC_LITERAL_RULE}`);
+  } else {
+    d.error(
+      `${fileRel}: missing required pageConfig.title. Add \`export const pageConfig = { title: '...' }\` in <script module>.`,
+    );
   }
   return null;
 }

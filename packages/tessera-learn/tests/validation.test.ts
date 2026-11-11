@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
 import { readCourseConfig } from '../src/plugin/manifest.js';
-import { tempDir } from './helpers.js';
+import { tempDir, titledPage } from './helpers.js';
 
 let testRoot: string;
 
@@ -60,7 +60,11 @@ function createValidProject(root: string): void {
     'pages/01-section/01-lesson/_meta.js',
     'export default { title: "Lesson" };',
   );
-  writeFile(root, 'pages/01-section/01-lesson/page.svelte', '<h1>Hello</h1>');
+  writeFile(
+    root,
+    'pages/01-section/01-lesson/page.svelte',
+    titledPage('<h1>Hello</h1>'),
+  );
 }
 
 function writeGradedPage(
@@ -485,59 +489,19 @@ describe('config validation', () => {
     );
   });
 
-  it('warns when title is missing', () => {
+  it.each([
+    ['missing', ''],
+    ['empty', 'title: "",'],
+    ['only whitespace', 'title: "   ",'],
+  ])('errors when title is %s', (_, title) => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
-      `export default {
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
+      `export default { ${title} language: "en", export: { standard: "web" } };`,
     );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"title" is missing or empty'),
-    );
-  });
-
-  it('warns when title is an empty string', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"title" is missing or empty'),
-    );
-  });
-
-  it('warns that a whitespace-only title ships verbatim, not as the default', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "   ",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"title" is only whitespace'),
-    );
-    expect(warnings).not.toContainEqual(
-      expect.stringContaining('"title" is missing or empty'),
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'course.config.js: missing required "title" field',
     );
   });
 
@@ -776,6 +740,52 @@ describe('_meta.js validation', () => {
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining('_meta.js: missing required "title" field'),
+    );
+  });
+
+  it('errors on a whitespace-only _meta.js title', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/_meta.js',
+      'export default { title: "  " };',
+    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(
+      'pages/01-section/_meta.js: missing required "title" field',
+    );
+  });
+
+  it.each(['pages/01-section/_meta.js', 'pages/01-section/01-lesson/_meta.js'])(
+    'errors when %s is missing',
+    (meta) => {
+      createValidProject(testRoot);
+      rmSync(resolve(testRoot, meta));
+      const { errors } = validateProject(testRoot);
+      expect(errors).toContain(
+        `${meta}: missing. Every section and lesson folder needs a _meta.js with a "title".`,
+      );
+    },
+  );
+
+  it.each([
+    ['has no pageConfig', '<h1>Hi</h1>'],
+    [
+      'has no pageConfig.title',
+      '<script module>export const pageConfig = { required: false };</script>',
+    ],
+    [
+      'has an empty pageConfig.title',
+      '<script module>export const pageConfig = { title: " " };</script>',
+    ],
+  ])('errors when a page %s', (_, source) => {
+    createValidProject(testRoot);
+    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', source);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        'pages/01-section/01-lesson/page.svelte: missing required pageConfig.title',
+      ),
     );
   });
 
@@ -1703,7 +1713,7 @@ describe('structure validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/flat-page.svelte',
-      '<p>Flat page</p>',
+      titledPage('<p>Flat page</p>'),
     );
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toEqual([]);

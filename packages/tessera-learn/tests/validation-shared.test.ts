@@ -36,7 +36,10 @@ describe('validation with $shared imports', () => {
     const course = makeCourse();
     writeFileSync(
       join(course, 'pages', '01-section', '01-lesson', 'page.svelte'),
-      `<script>
+      `<script module>
+  export const pageConfig = { title: 'Hello' };
+</script>
+<script>
   import Button from '$shared/Button.svelte';
   import '$shared/tokens.css';
 </script>
