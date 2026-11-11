@@ -106,7 +106,7 @@ export function parseConfig(
 
   for (const key of Object.keys(config)) {
     if (!KNOWN_CONFIG_FIELDS.has(key)) {
-      d.warn(`unknown field "${key}" — will be ignored`);
+      d.warn(`unknown field "${key}" will be ignored`);
     }
   }
 
@@ -125,11 +125,11 @@ export function parseConfig(
     d.error(`"title" must be a string, got ${describeType(config.title)}`);
   } else if (config.title === undefined || config.title === '') {
     d.warn(
-      '"title" is missing or empty — the course will ship as "Untitled Course"',
+      '"title" is missing or empty, so the course will ship as "Untitled Course"',
     );
   } else if (config.title.trim() === '') {
     d.warn(
-      '"title" is only whitespace — it ships verbatim and will not fall back to "Untitled Course"',
+      '"title" is only whitespace. It ships verbatim and will not fall back to "Untitled Course"',
     );
   }
 
@@ -316,7 +316,7 @@ function validateBranding(
 ): void {
   if (!isRecord(branding)) {
     d.warn(
-      `"branding" must be an object, got ${describeType(branding)} — will be ignored`,
+      `"branding" must be an object, got ${describeType(branding)}; it will be ignored`,
     );
     return;
   }
@@ -354,7 +354,7 @@ function validateBranding(
         d.warn(
           tag(
             A11Y_IDS.primaryContrast,
-            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white — it's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
+            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white. It's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
           ),
         );
       }

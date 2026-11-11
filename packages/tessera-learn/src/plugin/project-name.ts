@@ -1,6 +1,7 @@
-// Pure, dependency-free helpers shared by the `tessera new` subcommand and the
-// `create-tessera` scaffolder. Kept import-free so create-tessera can bundle it
-// at build time without dragging in the rest of the plugin (vite, svelte, …).
+// Pure, dependency-free helpers shared by the `tessera new` subcommand, the
+// `create-tessera` scaffolder and the manifest's default titles. Kept
+// import-free so create-tessera can bundle it at build time without dragging
+// in the rest of the plugin (vite, svelte, …).
 
 // npm package name rules: 1-214 chars, lowercase, must start with [a-z0-9],
 // allowed chars [a-z0-9._-], no leading dot or underscore.

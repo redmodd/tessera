@@ -116,7 +116,7 @@ export function validateXAPIConfig(
     // At most one 'lms' entry — more than one is never legitimate.
     if (endpoints.filter((ep) => ep === 'lms').length > 1) {
       d.error(
-        "xapi has multiple entries with endpoint: 'lms' — only one launch-inherited destination is allowed",
+        "xapi has multiple entries with endpoint: 'lms'. Only one launch-inherited destination is allowed",
       );
     }
     // Warn on duplicate explicit endpoints.
@@ -129,7 +129,7 @@ export function validateXAPIConfig(
     for (const [ep, count] of seen) {
       if (count > 1) {
         d.warn(
-          `xapi has ${count} entries with endpoint "${ep}" — usually a copy-paste mistake; ` +
+          `xapi has ${count} entries with endpoint "${ep}", usually a copy-paste mistake; ` +
             'fan-out to the same LRS with different actors/activityIds is supported but uncommon.',
         );
       }
@@ -186,14 +186,14 @@ function validateSingleXAPIEntry(
     // one config can still export to every standard.
     if (profile && !profile.hasLaunchLRS) {
       d.warn(
-        `${label}.endpoint: 'lms' has no launch LRS under export.standard "${profile.id}" — ` +
+        `${label}.endpoint: 'lms' has no launch LRS under export.standard "${profile.id}", so ` +
           'this entry is ignored. Give it an explicit LRS endpoint to send statements from this package.',
       );
     }
     for (const f of LAUNCH_INHERITED_FIELDS) {
       if (entry[f] !== undefined) {
         d.error(
-          `${label}.${f} must be omitted when ${label}.endpoint is 'lms' — it is inherited from the launch.`,
+          `${label}.${f} must be omitted when ${label}.endpoint is 'lms' because it is inherited from the launch.`,
         );
       }
     }

@@ -235,7 +235,7 @@ export function headingLevels(source: string): number[] {
   const { root } = parseRoot(source);
   if (!root) return [];
   const headings: Node[] = [];
-  walkNodes(root, (node) => {
+  walkNodes(root.fragment as Node, (node) => {
     if (node.type === 'RegularElement' && /^h[1-6]$/.test(node.name as string))
       headings.push(node);
   });
