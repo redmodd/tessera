@@ -188,17 +188,21 @@ function isClientError(status: number | undefined): boolean {
  * A 409 means the LRS already holds the statement id. On failure, the error
  * carries the first 500 characters of the LRS body (e.g. "Forbidden cmi5
  * defined statement: ...") or the bare status when the body can't be read.
+ * Success stays synchronous so the queue starts the next send without extra
+ * microtask hops.
  */
-async function outcomeOf(resp: Response): Promise<SendOutcome> {
+function outcomeOf(resp: Response): SendOutcome | Promise<SendOutcome> {
   if (resp.ok || resp.status === 409) return { ok: true, status: resp.status };
-  const respBody = await resp.text().catch(() => '');
-  return {
-    ok: false,
-    status: resp.status,
-    error: new Error(
-      `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
-    ),
-  };
+  return resp
+    .text()
+    .catch(() => '')
+    .then((respBody) => ({
+      ok: false,
+      status: resp.status,
+      error: new Error(
+        `LRS responded ${resp.status}${respBody ? `: ${respBody.slice(0, 500)}` : ''}`,
+      ),
+    }));
 }
 
 /**
@@ -431,11 +435,6 @@ export class XAPIPublisher {
   ): Promise<SendStatementResult> {
     if (this.#unavailableReason) throw this.#unavailableReason();
     validatePartialStatement(partial);
-    if (!this.#cachedActor) {
-      throw new XAPIConfigError(
-        'XAPIPublisher.sendStatement() called before init() resolved.',
-      );
-    }
     const statement = this.buildStatement(partial, { id: options?.id });
     const outcome = await this.enqueueBuilt(statement, options);
     return { statementId: statement.id, statement, destinations: [outcome] };
@@ -695,7 +694,7 @@ export class XAPIPublisher {
     resp: Response,
     body: string,
     keepalive: boolean,
-  ): Promise<SendOutcome> {
+  ): SendOutcome | Promise<SendOutcome> {
     // 401 with a function-form auth: invalidate cache, re-resolve once,
     // retry the same request.
     if (
@@ -716,12 +715,7 @@ export class XAPIPublisher {
               'LRS rejected re-resolved auth (consecutive 401s); auth resolver marked dead',
             ),
           };
-        })
-        .catch((err): SendOutcome => ({
-          ok: false,
-          status: 401,
-          error: toError(err),
-        }));
+        });
     }
     return outcomeOf(resp);
   }

@@ -400,6 +400,19 @@ describe('XAPIPublisher — function-form auth and 401 handling', () => {
     );
   });
 
+  it('keeps retrying when the resend after a 401 hits a network error', async () => {
+    useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce(respond(401))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValue(respond(204));
+    const pub = await initPublisher({ auth: vi.fn().mockResolvedValue('tok') });
+    const sent = pub.sendStatement({ verb: { id: 'http://verb/a' } });
+    await vi.advanceTimersByTimeAsync(600_000);
+    await expect(sent).resolves.toMatchObject({ destinations: [{ ok: true }] });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
   it('on two consecutive 401s, marks auth dead', async () => {
     mockFetch.mockResolvedValue(respond(401));
     const resolver = vi.fn().mockResolvedValue('tok');

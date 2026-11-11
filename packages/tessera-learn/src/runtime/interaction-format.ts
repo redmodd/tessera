@@ -1008,12 +1008,12 @@ export function buildScormInteractionFields(
   questionId: string,
   interaction: Interaction,
   correct: boolean | null,
-  spec: ScormInteractionFields,
+  dialect: ScormInteractionFields,
   format: InteractionFormat,
   description?: string | null,
 ): { id: string; fields: Array<[string, string]> } {
   const fields: Array<[string, string]> = [
-    ['type', spec.typeValue(interaction.type)],
+    ['type', dialect.typeValue(interaction.type)],
   ];
   if (description) fields.push(['description', description]);
   warnResponseIds(questionId, interaction, format);
@@ -1027,13 +1027,13 @@ export function buildScormInteractionFields(
   patterns?.forEach((pattern, n) => {
     fields.push([`correct_responses.${n}.pattern`, pattern]);
   });
-  if (response !== null) fields.push([spec.responseField, response]);
+  if (response !== null) fields.push([dialect.responseField, response]);
   if (correct !== null) {
     fields.push([
       'result',
-      correct ? spec.resultLabels.correct : spec.resultLabels.incorrect,
+      correct ? dialect.resultLabels.correct : dialect.resultLabels.incorrect,
     ]);
   }
-  fields.push([spec.timestampField, spec.timestamp()]);
+  fields.push([dialect.timestampField, dialect.timestamp()]);
   return { id: format.identifier(questionId), fields };
 }
