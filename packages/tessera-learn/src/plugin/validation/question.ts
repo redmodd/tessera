@@ -99,16 +99,16 @@ const QUESTION_COMPONENTS: Record<
       if (answers) {
         if (!isStringArray(answers)) {
           d.error(
-            `<FillInTheBlank> answers must be a string or an array of strings`,
+            '<FillInTheBlank> answers must be a string or an array of strings',
           );
         } else if (answers.every((a) => a.trim() === '')) {
           // A learner can't submit blank input, so no response could match.
-          d.error(`<FillInTheBlank> answers must not be empty`);
+          d.error('<FillInTheBlank> answers must not be empty');
         } else if (answers.some((a) => a.trim() === '')) {
           d.warn(
             tag(
               A11Y_IDS.questionLabel,
-              `<FillInTheBlank> has an empty answer label`,
+              '<FillInTheBlank> has an empty answer label',
             ),
           );
         }
@@ -143,7 +143,7 @@ const QUESTION_COMPONENTS: Record<
         );
         if (bad) {
           d.error(
-            `<Matching> pairs must be an array of { left: string, right: string } objects`,
+            '<Matching> pairs must be an array of { left: string, right: string } objects',
           );
         }
       }

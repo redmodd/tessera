@@ -40,7 +40,7 @@ export function validateMediaComponents(content: string, d: Diagnostics): void {
         d.error(
           tag(
             A11Y_IDS.imageAlt,
-            `<Image> needs alt text, or mark it decorative={true} if purely ornamental`,
+            '<Image> needs alt text, or mark it decorative={true} if purely ornamental',
           ),
         );
       }
@@ -48,7 +48,7 @@ export function validateMediaComponents(content: string, d: Diagnostics): void {
         d.warn(
           tag(
             A11Y_IDS.imageAlt,
-            `<Image> is decorative but also has alt text, so the alt will be dropped`,
+            '<Image> is decorative but also has alt text, so the alt will be dropped',
           ),
         );
       }
@@ -79,7 +79,7 @@ export function validateMediaComponents(content: string, d: Diagnostics): void {
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
-          `<Video> embeds can't carry caption tracks, so provide a transcript for WCAG 1.2`,
+          "<Video> embeds can't carry caption tracks, so provide a transcript for WCAG 1.2",
         ),
       );
     }
@@ -93,7 +93,7 @@ export function validateMediaComponents(content: string, d: Diagnostics): void {
       d.warn(
         tag(
           A11Y_IDS.mediaCaptions,
-          `native <Video> has no caption tracks or transcript. Add tracks={[…]} or a transcript for WCAG 1.2.2`,
+          'native <Video> has no caption tracks or transcript. Add tracks={[…]} or a transcript for WCAG 1.2.2',
         ),
       );
     }
@@ -101,7 +101,7 @@ export function validateMediaComponents(content: string, d: Diagnostics): void {
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
-          `<Audio> has no transcript, which WCAG 1.2.1 requires`,
+          '<Audio> has no transcript, which WCAG 1.2.1 requires',
         ),
       );
     }
@@ -121,8 +121,12 @@ export function validateAssetRefs(
   content: string,
   assetsDir: string,
   d: Diagnostics,
-  existsCache = new Map<string, boolean>(),
+  {
+    existsCache = new Map<string, boolean>(),
+    field,
+  }: { existsCache?: Map<string, boolean>; field?: string } = {},
 ): void {
+  const subject = field ? `"${field}": ` : '';
   for (const assetPath of collectAssetRefs(content)) {
     const fullAssetPath = resolve(assetsDir, assetPath);
     let exists = existsCache.get(fullAssetPath);
@@ -131,7 +135,7 @@ export function validateAssetRefs(
       existsCache.set(fullAssetPath, exists);
     }
     if (!exists) {
-      d.warn(`"$assets/${assetPath}" not found in assets/ directory`);
+      d.warn(`${subject}"$assets/${assetPath}" not found in assets/ directory`);
     }
   }
 }

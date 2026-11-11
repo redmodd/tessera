@@ -234,14 +234,12 @@ export function findComponents(
 export function headingLevels(source: string): number[] {
   const { root } = parseRoot(source);
   if (!root) return [];
-  const headings: Node[] = [];
+  const levels: number[] = [];
   walkNodes(root.fragment as Node, (node) => {
     if (node.type === 'RegularElement' && /^h[1-6]$/.test(node.name as string))
-      headings.push(node);
+      levels.push(Number((node.name as string)[1]));
   });
-  return headings
-    .sort((a, b) => a.start - b.start)
-    .map((node) => Number((node.name as string)[1]));
+  return levels;
 }
 
 /** Names a page binds from its own modules, which shadow the built-in components. */

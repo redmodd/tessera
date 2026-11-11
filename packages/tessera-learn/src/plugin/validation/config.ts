@@ -168,7 +168,7 @@ export function parseConfig(
   if (config.completion?.trigger !== undefined) {
     if (config.completion.mode !== 'manual') {
       d.warn(
-        `"completion.trigger" is ignored unless completion.mode is "manual"`,
+        '"completion.trigger" is ignored unless completion.mode is "manual"',
       );
     } else if (config.completion.trigger !== 'page') {
       d.error(
@@ -186,7 +186,7 @@ export function parseConfig(
   let successAccepted = false;
   if (success !== undefined) {
     if (!isRecord(success)) {
-      d.error(`"success" must be an object like { from: "quiz" }`);
+      d.error('"success" must be an object like { from: "quiz" }');
     } else if (!oneOf(SUCCESS_SOURCES, success.from)) {
       d.error(oneOfError('"success.from"', SUCCESS_SOURCES, success.from));
     } else if (success.from === 'fixed' && !oneOf(VERDICTS, success.status)) {
@@ -201,7 +201,7 @@ export function parseConfig(
     } else {
       successAccepted = true;
       if (success.from !== 'fixed' && success.status !== undefined) {
-        d.warn(`"success.status" is ignored unless success.from is "fixed"`);
+        d.warn('"success.status" is ignored unless success.from is "fixed"');
       }
     }
   }
@@ -215,7 +215,7 @@ export function parseConfig(
       );
     } else if (!manual) {
       d.warn(
-        `"completion.requireSuccessStatus" is ignored unless completion.mode is "manual"`,
+        '"completion.requireSuccessStatus" is ignored unless completion.mode is "manual"',
       );
     }
     if (manual && !oneOf(VERDICTS, requireStatus)) {
@@ -326,7 +326,9 @@ function validateBranding(
     if (typeof logo !== 'string') {
       d.warn(`"branding.logo" must be a string, got ${describeType(logo)}`);
     } else {
-      validateAssetRefs(logo, resolve(projectRoot, 'assets'), d);
+      validateAssetRefs(logo, resolve(projectRoot, 'assets'), d, {
+        field: 'branding.logo',
+      });
     }
   }
 
@@ -374,6 +376,6 @@ function validateA11yConfig(a11y: unknown, d: Diagnostics): void {
   checkOneOf('"a11y.level"', A11Y_LEVELS, a11y.level, d);
   checkOneOf('"a11y.standard"', A11Y_STANDARDS, a11y.standard, d);
   if (a11y.ignore !== undefined && !isStringArray(a11y.ignore)) {
-    d.error(`"a11y.ignore" must be an array of rule-ID strings`);
+    d.error('"a11y.ignore" must be an array of rule-ID strings');
   }
 }

@@ -131,12 +131,14 @@ export function crossValidate(
   if (isManual && !quizVerdict) {
     for (const page of pageResults.pages) {
       if (page.graded) {
-        d.warn(
-          `${page.fileRel}: the page is graded under completion.mode: "manual". ` +
-            'The score will be reported to the LMS for transcripts, but it will not drive ' +
-            "completion or success status — `markComplete()` / completesOn does. If that's " +
-            'not what you want, set graded: false, add success: { from: "quiz" } to judge ' +
-            'it, or change completion.mode.',
+        d.within(page.fileRel, () =>
+          d.warn(
+            'the page is graded under completion.mode: "manual". ' +
+              'The score will be reported to the LMS for transcripts, but it will not drive ' +
+              "completion or success status; `markComplete()` / completesOn does. If that's " +
+              'not what you want, set graded: false, add success: { from: "quiz" } to judge ' +
+              'it, or change completion.mode.',
+          ),
         );
       }
     }
@@ -151,15 +153,19 @@ export function crossValidate(
   }
   if (!isManual) {
     for (const page of completesOnPages) {
-      d.warn(
-        `${page.fileRel}: pageConfig.completesOn is ignored — completion.mode is "${config.completion?.mode ?? 'percentage'}"`,
+      d.within(page.fileRel, () =>
+        d.warn(
+          `pageConfig.completesOn is ignored because completion.mode is "${config.completion?.mode ?? 'percentage'}"`,
+        ),
       );
     }
   }
   for (const page of pageResults.pages) {
     if (page.completesOnView && page.hasQuiz) {
-      d.warn(
-        `${page.fileRel}: completion fires on view, before the quiz can be answered — likely a mistake`,
+      d.within(page.fileRel, () =>
+        d.warn(
+          'completion fires on view, before the quiz can be answered, which is likely a mistake',
+        ),
       );
     }
   }
@@ -167,8 +173,10 @@ export function crossValidate(
   if (isManual) {
     const firstPage = pageResults.pages[0];
     if (firstPage?.completesOnView) {
-      d.warn(
-        `${firstPage.fileRel}: pageConfig.completesOn: "view" is on the first page — the course will complete immediately on launch, before the learner sees any other content.`,
+      d.within(firstPage.fileRel, () =>
+        d.warn(
+          'pageConfig.completesOn: "view" is on the first page, so the course will complete immediately on launch, before the learner sees any other content.',
+        ),
       );
     }
   }
@@ -217,7 +225,7 @@ function reportSuspendDataEstimate(
   const limit = profile.suspendDataLimit;
   if (estimatedSize > limit * 0.8) {
     d.warn(
-      `Course has ${totalPages} pages with ${totalQuizzes} quizzes — estimated ${profile.name} suspend_data ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider ${quoteList(largerSuspendDataStandards(limit))}.`,
+      `Course has ${totalPages} pages with ${totalQuizzes} quizzes, so its estimated ${profile.name} suspend_data of ~${estimatedSize} bytes may exceed the ${limit}-byte limit when fully populated (visited + chunks + standalone scores + usePersistence). Consider ${quoteList(largerSuspendDataStandards(limit))}.`,
     );
   }
 }

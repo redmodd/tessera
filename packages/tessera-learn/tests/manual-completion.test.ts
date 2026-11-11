@@ -217,7 +217,7 @@ describe('manual completion — validation', () => {
           .warnings,
       ).toContainEqual(
         expect.stringMatching(
-          /first page — the course will complete immediately on launch/,
+          /first page, so the course will complete immediately on launch/,
         ),
       );
     },

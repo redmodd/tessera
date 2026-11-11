@@ -99,7 +99,7 @@ function validatePageFile(
   const isGradedQuiz = isQuiz && quiz.graded === true;
   validateQuizConfig(quiz, d);
 
-  checkOneOf(`pageConfig.completesOn`, ['view'], pageConfig?.completesOn, d);
+  checkOneOf('pageConfig.completesOn', ['view'], pageConfig?.completesOn, d);
   const completesOnView = pageConfig?.completesOn === 'view';
   const declaresGraded =
     validateBoolean(pageConfig?.graded, 'pageConfig.graded', d) ?? false;
@@ -120,7 +120,7 @@ function validatePageFile(
   const useQuestions = useQuestionGrading(content);
   if (declaresGraded && isQuiz && !isGradedQuiz) {
     d.error(
-      `pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
+      'pageConfig.graded is set on a quiz page whose quiz is not graded. ' +
         "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
         'and it never completes. ' +
         'Use quiz: { graded: true }, or drop graded: true.',
@@ -144,7 +144,7 @@ function validatePageFile(
     splitsAcrossBranches(listedGradedQuestions(questionComponents))
   ) {
     d.warn(
-      `graded questions sit in different branches of one {#if}, {#each} or {#await}. ` +
+      'graded questions sit in different branches of one {#if}, {#each} or {#await}. ' +
         'The page counts as answered only once every graded question on it is, ' +
         'so a learner shown only one branch can never finish it. ' +
         'Put each branch on its own page, or drop graded from the branch questions.',
@@ -157,13 +157,13 @@ function validatePageFile(
       questionComponents.some(isLiterallyGradedQuestion));
   if (gradesUndeclared) {
     d.error(
-      `a question on this page is graded, but pageConfig does not declare graded: true, ` +
+      'a question on this page is graded, but pageConfig does not declare graded: true, ' +
         'so its score never reaches the course score or passed/failed. Add graded: true to ' +
         'pageConfig, or drop graded from the question.',
     );
   }
 
-  validateAssetRefs(content, assetsDir, d, assetExistsCache);
+  validateAssetRefs(content, assetsDir, d, { existsCache: assetExistsCache });
   validateQuestionComponents(questionComponents, d, profile);
   validateMediaComponents(content, d);
   validateHeadingOrder(content, d);
@@ -176,7 +176,7 @@ function validatePageFile(
   ) {
     d.warn(
       `${isQuiz ? 'quiz' : 'graded'} page has no question ` +
-        `components or useQuestion() calls, so it will have nothing to score`,
+        'components or useQuestion() calls, so it will have nothing to score',
     );
   } else if (
     declaresGraded &&
@@ -186,8 +186,8 @@ function validatePageFile(
     (useQuestions === 'absent' || useQuestions === 'none')
   ) {
     d.warn(
-      `pageConfig.graded is set but no question on the page is graded. ` +
-        `The page can never earn a score, so under completion.mode "percentage" it ` +
+      'pageConfig.graded is set but no question on the page is graded. ' +
+        'The page can never earn a score, so under completion.mode "percentage" it ' +
         `never completes. Mark at least one question component \`graded\`, or build one ` +
         `with useQuestion({ graded: true }).`,
     );
@@ -328,14 +328,14 @@ function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
   const { meta, problem, rejected = {} } = readMetaFile(metaPath);
   if (problem === 'missing') return null;
   if (problem) {
-    d.error(`${READ_FAILURE_MESSAGES[problem]}`);
+    d.error(READ_FAILURE_MESSAGES[problem]);
     return null;
   }
 
   if ('title' in rejected) {
     d.error(`"title" must be a string, got ${describeType(rejected.title)}`);
   } else if (!meta.title) {
-    d.error(`missing required "title" field`);
+    d.error('missing required "title" field');
   }
   if ('pages' in rejected) {
     d.error(
@@ -351,7 +351,7 @@ function validatePageConfig(
   d: Diagnostics,
 ): Partial<Record<keyof PageConfig, unknown>> | null {
   if (usesLegacyModuleContext(content)) {
-    d.error(`<script context="module"> is not supported; use <script module>`);
+    d.error('<script context="module"> is not supported; use <script module>');
   }
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') {
@@ -467,8 +467,8 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
     );
   }
 
-  checkOneOf(`quiz.feedbackMode`, FEEDBACK_MODES, quiz.feedbackMode, d);
-  checkOneOf(`quiz.retryMode`, RETRY_MODES, quiz.retryMode, d);
+  checkOneOf('quiz.feedbackMode', FEEDBACK_MODES, quiz.feedbackMode, d);
+  checkOneOf('quiz.retryMode', RETRY_MODES, quiz.retryMode, d);
 }
 
 /**
@@ -503,13 +503,13 @@ const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 function validateContractBypass(content: string, d: Diagnostics): void {
   if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
     d.error(
-      `dispatches "tessera-quiz-complete" directly. The event is a ` +
+      'dispatches "tessera-quiz-complete" directly. The event is a ' +
         `notification, not the scoring path; call useQuiz().submit() instead`,
     );
   }
   if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {
     d.error(
-      `imports from tessera-learn/runtime/*. Use the public hooks ` +
+      'imports from tessera-learn/runtime/*. Use the public hooks ' +
         `(useQuiz, useQuestion, useNavigation, …) instead`,
     );
   }

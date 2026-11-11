@@ -594,7 +594,7 @@ describe('config validation', () => {
       warnings.filter(
         (w) =>
           w ===
-          'course.config.js: "$assets/logo.png" not found in assets/ directory',
+          'course.config.js: "branding.logo": "$assets/logo.png" not found in assets/ directory',
       );
     expect(logoWarning(validateProject(testRoot).warnings)).toHaveLength(1);
 

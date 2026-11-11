@@ -10,7 +10,7 @@ interface OverridePluginOptions {
   name: string;
   virtualId: string;
   projectFile: string;
-  /** Built-in re-exported when the project file is absent; null export otherwise. */
+  /** Package-relative built-in re-exported when the project file is absent; null export otherwise. */
   builtinFile?: string;
   /** Default-export the project file's module namespace, for files with named exports. */
   namespace?: boolean;
@@ -26,12 +26,7 @@ export const QUIZ_OVERRIDE: OverridePluginOptions = {
   name: 'tessera:quiz',
   virtualId: 'virtual:tessera-quiz',
   projectFile: 'quiz.svelte',
-  builtinFile: resolve(
-    resolvePackageRoot(),
-    'src',
-    'components',
-    'Quiz.svelte',
-  ),
+  builtinFile: 'src/components/Quiz.svelte',
 };
 
 export const COURSE_RUNTIME_OVERRIDE: OverridePluginOptions = {
@@ -56,7 +51,7 @@ export function createOverridePlugin(
   }: OverridePluginOptions,
 ): Plugin {
   const fallback = builtinFile
-    ? `export { default } from '${normalizePath(builtinFile)}';`
+    ? `export { default } from '${normalizePath(resolve(resolvePackageRoot(), builtinFile))}';`
     : 'export default null;';
 
   return virtualModule(
