@@ -1,7 +1,6 @@
-// Pure, dependency-free helpers shared by the `tessera new` subcommand, the
-// `create-tessera` scaffolder and the manifest's default titles. Kept
-// import-free so create-tessera can bundle it at build time without dragging
-// in the rest of the plugin (vite, svelte, …).
+// Pure, dependency-free helpers shared by the `tessera new` subcommand and the
+// `create-tessera` scaffolder. Kept import-free so create-tessera can bundle it
+// at build time without dragging in the rest of the plugin (vite, svelte, …).
 
 // npm package name rules: 1-214 chars, lowercase, must start with [a-z0-9],
 // allowed chars [a-z0-9._-], no leading dot or underscore.
@@ -21,10 +20,9 @@ export function validateProjectName(
   return null;
 }
 
-/** Title-case a slug on "-" and "_", so "v1.2-intro" stays "V1.2 Intro". */
 export function toTitleCase(slug: string): string {
   return slug
-    .split(/[-_]+/)
+    .split(/[-_.\s]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');

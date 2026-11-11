@@ -23,7 +23,6 @@ import {
   type StandardProfile,
 } from '../runtime/standards.js';
 import { errorMessage } from '../runtime/errors.js';
-import { toTitleCase } from './project-name.js';
 
 // ---------- Types ----------
 
@@ -80,6 +79,14 @@ export function ensureSvelteSuffix(name: string): string {
 /** Strip numeric prefix and hyphen: "01-introduction" → "introduction" */
 export function stripPrefix(name: string): string {
   return name.replace(/^\d+-/, '');
+}
+
+/** Title-case a slug: "getting-started" → "Getting Started" */
+export function titleCase(slug: string): string {
+  return slug
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 type ReadFailure =
@@ -420,7 +427,7 @@ export function generateManifest(
     const sectionSlug = stripPrefix(walkedSection.name);
 
     const section: ManifestSection = {
-      title: sectionMeta.title || toTitleCase(sectionSlug),
+      title: sectionMeta.title || titleCase(sectionSlug),
       slug: sectionSlug,
       lessons: [],
     };
@@ -438,7 +445,7 @@ export function generateManifest(
         : `/pages/${walkedSection.name}/${walkedLesson.name}`;
 
       const lesson: ManifestLesson = {
-        title: isFlat ? '' : lessonMeta.title || toTitleCase(lessonSlug),
+        title: isFlat ? '' : lessonMeta.title || titleCase(lessonSlug),
         slug: lessonSlug,
         pages: [],
       };
@@ -470,7 +477,7 @@ export function generateManifest(
             : [];
         const page: ManifestPage = {
           index: pageIndex,
-          title: pageConfig.title || toTitleCase(pageSlug),
+          title: pageConfig.title || titleCase(pageSlug),
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
           quiz,

@@ -8,6 +8,7 @@ import {
   readMetaFile,
   orderPageFiles,
   stripPrefix,
+  titleCase,
 } from '../src/plugin/manifest.js';
 import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
 import { validateProject } from '../src/plugin/validation.js';
@@ -75,6 +76,17 @@ describe('stripPrefix', () => {
 
   it('returns unchanged if no prefix', () => {
     expect(stripPrefix('introduction')).toBe('introduction');
+  });
+});
+
+describe('titleCase', () => {
+  it('title-cases hyphenated slugs', () => {
+    expect(titleCase('getting-started')).toBe('Getting Started');
+    expect(titleCase('core-content')).toBe('Core Content');
+  });
+
+  it('handles single word', () => {
+    expect(titleCase('welcome')).toBe('Welcome');
   });
 });
 
