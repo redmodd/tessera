@@ -437,11 +437,8 @@ export class XAPIPublisher {
       );
     }
     const statement = this.buildStatement(partial, { id: options?.id });
-    return this.enqueueBuilt(statement, options).then((outcome) => ({
-      statementId: statement.id,
-      statement,
-      destinations: [outcome],
-    }));
+    const outcome = await this.enqueueBuilt(statement, options);
+    return { statementId: statement.id, statement, destinations: [outcome] };
   }
 
   /**
@@ -730,25 +727,23 @@ export class XAPIPublisher {
   }
 
   /** Only reached with function-form auth; the constructor caches static auth. */
-  #resolveAuth(): Promise<string> {
-    return Promise.resolve()
-      .then(() => (this.#authValue as () => string | Promise<string>)())
-      .then((resolved) => {
-        if (typeof resolved !== 'string' || !resolved) {
-          throw new XAPIConfigError(
-            'xapi.auth resolver must return a non-empty string',
-          );
-        }
-        const err = validateAuthCredential(resolved);
-        if (err) throw new XAPIConfigError(`xapi.auth: ${err}`);
-        this.#cachedAuth = resolved;
-        return resolved;
-      })
-      .catch((err) => {
-        if (err instanceof XAPIConfigError) throw err;
-        throw new XAPIConfigError(
-          `xapi.auth resolver threw: ${errorMessage(err)}`,
-        );
-      });
+  async #resolveAuth(): Promise<string> {
+    let resolved: unknown;
+    try {
+      resolved = await (this.#authValue as () => string | Promise<string>)();
+    } catch (err) {
+      throw new XAPIConfigError(
+        `xapi.auth resolver threw: ${errorMessage(err)}`,
+      );
+    }
+    if (typeof resolved !== 'string' || !resolved) {
+      throw new XAPIConfigError(
+        'xapi.auth resolver must return a non-empty string',
+      );
+    }
+    const err = validateAuthCredential(resolved);
+    if (err) throw new XAPIConfigError(`xapi.auth: ${err}`);
+    this.#cachedAuth = resolved;
+    return resolved;
   }
 }

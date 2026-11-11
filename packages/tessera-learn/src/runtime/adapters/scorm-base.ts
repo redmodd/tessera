@@ -27,46 +27,16 @@ import {
   type STANDARDS,
 } from '../standards.js';
 
-interface ScormCalls {
-  initialize: { args: ['']; name: 'LMSInitialize' | 'Initialize' };
-  terminate: { args: ['']; name: 'LMSFinish' | 'Terminate' };
-  getValue: { args: [key: string]; name: 'LMSGetValue' | 'GetValue' };
-  setValue: {
-    args: [key: string, value: string];
-    name: 'LMSSetValue' | 'SetValue';
-  };
-  commit: { args: ['']; name: 'LMSCommit' | 'Commit' };
-  getLastError: { args: []; name: 'LMSGetLastError' | 'GetLastError' };
-  getErrorString: {
-    args: [code: string];
-    name: 'LMSGetErrorString' | 'GetErrorString';
-  };
-  getDiagnostic: {
-    args: [code: string];
-    name: 'LMSGetDiagnostic' | 'GetDiagnostic';
-  };
-}
-
-type ScormMethod = keyof ScormCalls;
-type ScormArgs<M extends ScormMethod> = ScormCalls[M]['args'];
-
-type ApiMethod<TApi, M extends ScormMethod> = {
-  [K in keyof TApi]: TApi[K] extends (...args: ScormArgs<M>) => string
-    ? K
-    : never;
-}[keyof TApi] &
-  ScormCalls[M]['name'];
-
 /**
  * Per-version differences shared between SCORM 1.2 and SCORM 2004 adapters.
  *
- * `methods` maps each call to its `LMS*`-prefixed (1.2) or bare (2004) API
- * name, so the base class can stay version-agnostic.
+ * The `LMS*`-prefixed (1.2) vs bare (2004) method names are abstracted here
+ * so the base class can stay version-agnostic.
  */
 export interface ScormDialect<TApi> {
   profile: typeof STANDARDS.scorm12 | typeof STANDARDS.scorm2004;
   apiName: string;
-  methods: { [M in ScormMethod]: ApiMethod<TApi, M> };
+  initializeMethod: keyof TApi;
   sessionTimeKey: string;
   masteryKey: string;
   masteryRange: readonly [number, number];
@@ -74,6 +44,14 @@ export interface ScormDialect<TApi> {
   interactionFields: ScormInteractionFields;
   /** `cmi.interactions.n.description`, or null to leave it out. SCORM 1.2 has none. */
   interactionDescription?(text: string, lang: string): string | null;
+  initialize(api: TApi): string;
+  terminate(api: TApi): string;
+  getValue(api: TApi, key: string): string;
+  setValue(api: TApi, key: string, value: string): string;
+  commit(api: TApi): string;
+  getLastError(api: TApi): string;
+  getErrorString(api: TApi, code: string): string;
+  getDiagnostic(api: TApi, code: string): string;
 }
 
 export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
@@ -95,22 +73,11 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.#lang = config.language;
     this.stateLimit = dialect.profile.suspendDataLimit;
     this.errorReporter = {
-      code: () => this.call('getLastError'),
-      message: (c) => this.call('getErrorString', c),
-      diagnostic: (c) => this.call('getDiagnostic', c),
+      code: () => this.dialect.getLastError(this.api),
+      message: (c) => this.dialect.getErrorString(this.api, c),
+      diagnostic: (c) => this.dialect.getDiagnostic(this.api, c),
     };
     this.queue.errorReporter = this.errorReporter;
-  }
-
-  protected call<M extends ScormMethod>(
-    method: M,
-    ...args: ScormArgs<M>
-  ): string {
-    const api = this.api as Record<
-      keyof TApi,
-      (...args: ScormArgs<M>) => string
-    >;
-    return api[this.dialect.methods[method]](...args);
   }
 
   /**
@@ -139,7 +106,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   protected read(key: string): string {
     try {
-      return this.call('getValue', key);
+      return this.dialect.getValue(this.api, key);
     } catch {
       return '';
     }
@@ -152,12 +119,12 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   protected set(key: string, value: string): void {
     if (!this.canWrite()) return;
-    this.queue.enqueue(() => this.call('setValue', key, value), key);
+    this.queue.enqueue(() => this.dialect.setValue(this.api, key, value), key);
   }
 
   async init(): Promise<void> {
     const initialized = await withRetry(
-      () => this.call('initialize', ''),
+      () => this.dialect.initialize(this.api),
       undefined,
       this.errorReporter,
       'Initialize',
@@ -178,7 +145,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
     let raw = '';
     try {
-      raw = this.call('getValue', 'cmi.suspend_data');
+      raw = this.dialect.getValue(this.api, 'cmi.suspend_data');
     } catch (err) {
       console.warn(
         'Tessera: LMS threw on GetValue(cmi.suspend_data); resume disabled for this launch',
@@ -200,7 +167,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     // the prior session's records (the LMS uses n as the array key).
     let countRaw: string;
     try {
-      countRaw = this.call('getValue', 'cmi.interactions._count');
+      countRaw = this.dialect.getValue(this.api, 'cmi.interactions._count');
     } catch (err) {
       console.warn(
         'Tessera: LMS threw on GetValue(cmi.interactions._count); new interactions will be written from index 0 and may overwrite prior session records',
@@ -276,14 +243,14 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     let n: number | null = null;
     const idKey = () => `cmi.interactions.${this.#interactionCount}.id`;
     this.queue.enqueue(() => {
-      const result = this.call('setValue', idKey(), id);
+      const result = this.dialect.setValue(this.api, idKey(), id);
       if (lmsCallSucceeded(result)) n = this.#interactionCount++;
       return result;
     }, idKey);
     for (const [suffix, value] of fields) {
       const key = () => `cmi.interactions.${n}.${suffix}`;
       this.queue.enqueue(
-        () => n === null || this.call('setValue', key(), value),
+        () => n === null || this.dialect.setValue(this.api, key(), value),
         key,
       );
     }
@@ -291,7 +258,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
 
   override commit(): void {
     if (this.#terminated) return;
-    this.queue.enqueue(() => this.call('commit', ''), 'Commit');
+    this.queue.enqueue(() => this.dialect.commit(this.api), 'Commit');
   }
 
   override terminate(): void {
@@ -299,9 +266,13 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
     this.#terminated = true;
     // Async retries can't run during page unload — drain + commit + finish synchronously.
     this.queue.drainSync();
-    callSyncOrWarn(() => this.call('commit', ''), 'Commit', this.errorReporter);
     callSyncOrWarn(
-      () => this.call('terminate', ''),
+      () => this.dialect.commit(this.api),
+      'Commit',
+      this.errorReporter,
+    );
+    callSyncOrWarn(
+      () => this.dialect.terminate(this.api),
       'Terminate',
       this.errorReporter,
     );
@@ -322,7 +293,7 @@ export abstract class BaseScormAdapter<TApi> extends BaseAdapter {
  */
 export function findLMSAPI<TApi>({
   apiName,
-  methods,
+  initializeMethod,
 }: ScormDialect<TApi>): TApi | null {
   function scan(win: Window): TApi | null {
     for (let i = 0; i < 10; i++) {
@@ -330,7 +301,7 @@ export function findLMSAPI<TApi>({
         const value = (win as unknown as Record<string, Partial<TApi> | null>)[
           apiName
         ];
-        if (typeof value?.[methods.initialize] === 'function') {
+        if (typeof value?.[initializeMethod] === 'function') {
           return value as TApi;
         }
       } catch {}
