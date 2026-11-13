@@ -469,7 +469,7 @@ export function generateManifest(
             : [];
         const page: ManifestPage = {
           index: pageIndex,
-          title: pageConfig.title ?? '',
+          title: typeof pageConfig.title === 'string' ? pageConfig.title : '',
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
           quiz,

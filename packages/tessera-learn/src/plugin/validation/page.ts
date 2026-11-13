@@ -231,9 +231,9 @@ export function validatePages(
 
   if (!existsSync(pagesDir)) return noPages();
 
-  const validateMeta = (metaPath: string) =>
+  const validateMeta = (metaPath: string, required: boolean) =>
     d.within(relative(projectRoot, metaPath), () =>
-      validateMetaFile(metaPath, d),
+      validateMetaFile(metaPath, required, d),
     );
   const warnAbout = (path: string, message: string) =>
     d.within(relative(projectRoot, path), () => d.warn(message));
@@ -255,12 +255,14 @@ export function validatePages(
   for (const section of course.sections) {
     const pagesBeforeSection = pages.length;
 
-    const sectionMeta = validateMeta(section.metaPath);
+    const sectionMeta = validateMeta(section.metaPath, true);
 
     for (const lesson of section.lessons) {
       // Flat lesson uses the section _meta, already validated above.
       const meta =
-        lesson.name === null ? sectionMeta : validateMeta(lesson.metaPath);
+        lesson.name === null
+          ? sectionMeta
+          : validateMeta(lesson.metaPath, lesson.files.length > 0);
       d.within(relative(projectRoot, lesson.metaPath), () =>
         validatePageList(lesson, meta?.pages, d),
       );
@@ -324,12 +326,18 @@ function validatePageList(
   }
 }
 
-function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
+function validateMetaFile(
+  metaPath: string,
+  required: boolean,
+  d: Diagnostics,
+): MetaFile | null {
   const { meta, problem, rejected = {} } = readMetaFile(metaPath);
   if (problem === 'missing') {
-    d.error(
-      'missing. Every section and lesson folder needs a _meta.js with a "title".',
-    );
+    if (required) {
+      d.error(
+        'missing. Every section, and every lesson folder with pages, needs a _meta.js with a "title".',
+      );
+    }
     return null;
   }
   if (problem) {
@@ -359,25 +367,24 @@ function validatePageConfig(
     d.error('<script context="module"> is not supported; use <script module>');
   }
   const result = parsePageConfigFromSource(content);
-  if (result.kind === 'ok') {
-    for (const key of Object.keys(result.value)) {
-      if (!KNOWN_PAGE_FIELDS.has(key))
-        d.warn(`unknown field pageConfig.${key} is ignored`);
-    }
-    const { title } = result.value;
-    if (typeof title !== 'string' || !title.trim()) {
-      d.error('missing required pageConfig.title');
-    }
-    return result.value;
-  }
   if (result.kind === 'invalid') {
     d.error(`pageConfig ${STATIC_LITERAL_RULE}`);
-  } else {
+    return null;
+  }
+  const pageConfig = result.kind === 'ok' ? result.value : null;
+  for (const key of Object.keys(pageConfig ?? {})) {
+    if (!KNOWN_PAGE_FIELDS.has(key))
+      d.warn(`unknown field pageConfig.${key} is ignored`);
+  }
+  const title = pageConfig?.title;
+  if (title !== undefined && typeof title !== 'string') {
+    d.error(`pageConfig.title must be a string, got ${describeType(title)}`);
+  } else if (!title?.trim()) {
     d.error(
-      "missing required pageConfig.title. Add `export const pageConfig = { title: '...' }` in <script module>.",
+      "missing required pageConfig.title. Set it in `export const pageConfig = { title: '...' }` in <script module>.",
     );
   }
-  return null;
+  return pageConfig;
 }
 
 const KNOWN_PAGE_FIELDS = new Set(

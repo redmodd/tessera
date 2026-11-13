@@ -173,7 +173,7 @@ If none fit, surface the limitation instead of patching around it.
 
 ### `_meta.js`
 
-**Required** in every section and lesson folder (build error without it).
+**Required** in every section folder and every lesson folder with pages (build error without it).
 
 - `title`: **required**, a non-empty string.
 - `pages`: optional page order; without it pages sort alphabetically. Listed names come first; unlisted `.svelte` files are appended alphabetically with a warning. A listed name with no file is a build error.

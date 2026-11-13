@@ -765,10 +765,16 @@ describe('_meta.js validation', () => {
       rmSync(resolve(testRoot, meta));
       const { errors } = validateProject(testRoot);
       expect(errors).toContain(
-        `${meta}: missing. Every section and lesson folder needs a _meta.js with a "title".`,
+        `${meta}: missing. Every section, and every lesson folder with pages, needs a _meta.js with a "title".`,
       );
     },
   );
+
+  it('allows a lesson folder with no pages and no _meta.js', () => {
+    createValidProject(testRoot);
+    mkdirSync(resolve(testRoot, 'pages/01-section/img'));
+    expect(validateProject(testRoot).errors).toEqual([]);
+  });
 
   it.each([
     ['has no pageConfig', '<h1>Hi</h1>'],
@@ -788,6 +794,18 @@ describe('_meta.js validation', () => {
       expect.stringContaining(
         'pages/01-section/01-lesson/page.svelte: missing required pageConfig.title',
       ),
+    );
+  });
+
+  it('errors on a non-string pageConfig.title', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/01-lesson/page.svelte',
+      '<script module>export const pageConfig = { title: { en: "Intro" } };</script>',
+    );
+    expect(validateProject(testRoot).errors).toContain(
+      'pages/01-section/01-lesson/page.svelte: pageConfig.title must be a string, got object',
     );
   });
 

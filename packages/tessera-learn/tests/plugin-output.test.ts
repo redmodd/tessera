@@ -536,6 +536,20 @@ describe('sources changed after validation', () => {
     );
   });
 
+  it('fails the build on an added _meta.js', () => {
+    mkdirSync(resolve(projectRoot, 'pages/01-section/02-new'), {
+      recursive: true,
+    });
+    const validation = validatedPlugin();
+    writeFileSync(
+      resolve(projectRoot, 'pages/01-section/02-new/_meta.js'),
+      'export default { title: "New" };',
+    );
+    expect(() => buildEnd(validation)).toThrow(
+      '1 file(s) changed during the build, after validation: pages/01-section/02-new/_meta.js.',
+    );
+  });
+
   it('names every file that changed', () => {
     const validation = validatedPlugin();
     writeFileSync(resolve(projectRoot, page), '<h1>Edited</h1>');
