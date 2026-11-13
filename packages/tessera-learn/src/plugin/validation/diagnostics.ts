@@ -105,3 +105,17 @@ export function checkOneOf(
     d.error(oneOfError(field, values, value));
   }
 }
+
+export function checkTitle(
+  field: string,
+  value: unknown,
+  d: Diagnostics,
+  missing = `missing required ${field} field`,
+): void {
+  if (typeof value === 'string' && value.trim()) return;
+  d.error(
+    value === undefined || typeof value === 'string'
+      ? missing
+      : `${field} must be a string, got ${describeType(value)}`,
+  );
+}

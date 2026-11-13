@@ -34,6 +34,7 @@ import { isCspOverrides } from '../csp.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
+  checkTitle,
   describeType,
   formatValue,
   oneOfError,
@@ -116,11 +117,7 @@ export function parseConfig(
     }
   }
 
-  if (config.title !== undefined && typeof config.title !== 'string') {
-    d.error(`"title" must be a string, got ${describeType(config.title)}`);
-  } else if (!config.title?.trim()) {
-    d.error('missing required "title" field');
-  }
+  checkTitle('"title"', config.title, d);
 
   if (config.branding !== undefined) {
     validateBranding(config.branding, projectRoot, d);

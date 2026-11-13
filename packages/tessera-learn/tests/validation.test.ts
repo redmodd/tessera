@@ -765,16 +765,19 @@ describe('_meta.js validation', () => {
       rmSync(resolve(testRoot, meta));
       const { errors } = validateProject(testRoot);
       expect(errors).toContain(
-        `${meta}: missing. Every section, and every lesson folder with pages, needs a _meta.js with a "title".`,
+        `${meta}: missing. Every section and lesson folder with pages needs a _meta.js with a "title".`,
       );
     },
   );
 
-  it('allows a lesson folder with no pages and no _meta.js', () => {
-    createValidProject(testRoot);
-    mkdirSync(resolve(testRoot, 'pages/01-section/img'));
-    expect(validateProject(testRoot).errors).toEqual([]);
-  });
+  it.each(['pages/01-section/img', 'pages/02-empty/01-draft'])(
+    'allows %s with no pages and no _meta.js',
+    (dir) => {
+      createValidProject(testRoot);
+      mkdirSync(resolve(testRoot, dir), { recursive: true });
+      expect(validateProject(testRoot).errors).toEqual([]);
+    },
+  );
 
   it.each([
     ['has no pageConfig', '<h1>Hi</h1>'],

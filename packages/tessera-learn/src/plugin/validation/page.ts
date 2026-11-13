@@ -35,6 +35,7 @@ import {
 import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
+  checkTitle,
   describeType,
   formatValue,
   type Diagnostics,
@@ -255,7 +256,10 @@ export function validatePages(
   for (const section of course.sections) {
     const pagesBeforeSection = pages.length;
 
-    const sectionMeta = validateMeta(section.metaPath, true);
+    const sectionMeta = validateMeta(
+      section.metaPath,
+      section.lessons.some((lesson) => lesson.files.length > 0),
+    );
 
     for (const lesson of section.lessons) {
       // Flat lesson uses the section _meta, already validated above.
@@ -335,7 +339,7 @@ function validateMetaFile(
   if (problem === 'missing') {
     if (required) {
       d.error(
-        'missing. Every section, and every lesson folder with pages, needs a _meta.js with a "title".',
+        'missing. Every section and lesson folder with pages needs a _meta.js with a "title".',
       );
     }
     return null;
@@ -345,11 +349,7 @@ function validateMetaFile(
     return null;
   }
 
-  if ('title' in rejected) {
-    d.error(`"title" must be a string, got ${describeType(rejected.title)}`);
-  } else if (!meta.title?.trim()) {
-    d.error('missing required "title" field');
-  }
+  checkTitle('"title"', 'title' in rejected ? rejected.title : meta.title, d);
   if ('pages' in rejected) {
     d.error(
       `"pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,
@@ -376,14 +376,12 @@ function validatePageConfig(
     if (!KNOWN_PAGE_FIELDS.has(key))
       d.warn(`unknown field pageConfig.${key} is ignored`);
   }
-  const title = pageConfig?.title;
-  if (title !== undefined && typeof title !== 'string') {
-    d.error(`pageConfig.title must be a string, got ${describeType(title)}`);
-  } else if (!title?.trim()) {
-    d.error(
-      "missing required pageConfig.title. Set it in `export const pageConfig = { title: '...' }` in <script module>.",
-    );
-  }
+  checkTitle(
+    'pageConfig.title',
+    pageConfig?.title,
+    d,
+    "missing required pageConfig.title. Set it in `export const pageConfig = { title: '...' }` in <script module>.",
+  );
   return pageConfig;
 }
 

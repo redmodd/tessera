@@ -39,7 +39,7 @@
         onclick={() => toggleSection(section.slug)}
         aria-expanded={!collapsedSections.has(section.slug)}
       >
-        <span>{section.title}</span>
+        <span>{section.title || '(no title)'}</span>
         <svg
           class="tessera-nav-section-chevron"
           class:collapsed={collapsedSections.has(section.slug)}
@@ -85,7 +85,7 @@
                   />
                 </svg>
               {/if}
-              {page.title}
+              {page.title || '(no title)'}
             </button>
           {/each}
         {/each}
