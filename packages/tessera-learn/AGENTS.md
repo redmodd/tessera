@@ -169,7 +169,7 @@ If none fit, surface the limitation instead of patching around it.
 ### Hierarchy and ordering
 
 - Manifest is always **section → lesson → page**. Files directly in a section folder form one implicit untitled lesson, ordered before the section's lesson subdirectories. Both shapes can coexist.
-- A section or lesson folder with no `.svelte` pages is left out of the course and needs no `_meta.js`.
+- A section or lesson folder with no `.svelte` pages is left out of the course with a warning, and needs no `_meta.js`.
 - Sorting is alphabetical by directory/filename. Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs (`01-getting-started/` → slug `getting-started`).
 - Page filenames keep their prefix (`01-welcome.svelte` → slug `01-welcome`), so control page order **within a lesson** with `_meta.js`, not filename prefixes.
 
@@ -216,7 +216,7 @@ Every page needs a `pageConfig` with a `title`. It must be a **static object lit
 
 | Field         | Type      | Default         | Purpose                                                                                           |
 | ------------- | --------- | --------------- | ------------------------------------------------------------------------------------------------- |
-| `title`       | `string`  | none (required) | Page title in the navigation and LMS reports                                                      |
+| `title`       | `string`  | none (required) | Page title in the navigation and the browser tab                                                  |
 | `quiz`        | `object`  | none            | Makes the page a quiz page. See [`pageConfig.quiz` fields](#pageconfigquiz-fields)                |
 | `graded`      | `boolean` | `false`         | Page counts toward the course score. See [Per-page weighting](docs/scoring.md#per-page-weighting) |
 | `required`    | `boolean` | `true`          | Graded pages only. See [Per-page weighting](docs/scoring.md#per-page-weighting)                   |

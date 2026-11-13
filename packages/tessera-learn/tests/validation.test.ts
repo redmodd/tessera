@@ -1770,6 +1770,27 @@ describe('structure validation', () => {
     );
   });
 
+  it('warns about a lesson with no pages, once its section has pages', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/02-nested/deeper/page.svelte',
+      titledPage('<p>Too deep</p>'),
+    );
+    writeFile(
+      testRoot,
+      'pages/02-empty/01-draft/_meta.js',
+      'export default { title: "Draft" };',
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      'pages/01-section/02-nested: lesson has no pages, so it is left out of the course',
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('01-draft: lesson has no pages'),
+    );
+  });
+
   it('warns on unlisted .svelte file in lesson', () => {
     createValidProject(testRoot);
     writeFile(

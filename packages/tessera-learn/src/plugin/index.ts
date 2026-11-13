@@ -455,7 +455,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
         remember(session, ctx.validate());
       }
       // The hotUpdate hook covers files only, and a folder alone can add or
-      // remove an empty section.
+      // remove an empty-folder warning.
       const pagesDir = resolve(ctx.root, 'pages');
       const onFolderChange = (dir: string) => {
         if (isInside(pagesDir, dir)) session.changes.settle(revalidate);

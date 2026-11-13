@@ -256,6 +256,9 @@ export function validatePages(
   for (const dir of course.emptySections) {
     warnAbout(dir, 'section has no pages, so it is left out of the course');
   }
+  for (const dir of course.emptyLessons) {
+    warnAbout(dir, 'lesson has no pages, so it is left out of the course');
+  }
 
   for (const section of course.sections) {
     const sectionMeta = validateMeta(section.metaPath);
