@@ -3557,6 +3557,13 @@ describe('a11y rule 1.6 — heading order', () => {
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/heading-order')).toBe(true);
   });
+
+  it('counts headings an {@html} tag writes out', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<h2>Intro</h2>\n{@html '<h4>Details</h4>'}`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(true);
+  });
 });
 
 describe('a11y rule 1.7 — primaryColor contrast', () => {

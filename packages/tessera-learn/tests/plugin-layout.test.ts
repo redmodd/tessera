@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { normalizePath } from 'vite';
 
 import {
   LAYOUT_OVERRIDE,
+  QUIZ_OVERRIDE,
   createOverridePlugin,
 } from '../src/plugin/override-plugin.js';
 import { resolvedContext } from './helpers/plugin.js';
@@ -34,5 +35,18 @@ describe('tessera:layout virtual module', () => {
 
     expect(code).toContain(`from '${normalizePath(layoutPath)}'`);
     expect(code).toMatch(/export\s+\{\s*default\s*\}/);
+  });
+});
+
+describe('tessera:quiz virtual module', () => {
+  it('load() re-exports the built-in Quiz.svelte when no quiz.svelte exists', () => {
+    const plugin = createOverridePlugin(
+      resolvedContext(tempDir()),
+      QUIZ_OVERRIDE,
+    );
+    const code = (plugin as any).load.handler();
+    const path = /from '(.+)'/.exec(code)?.[1];
+    expect(path).toMatch(/\/src\/components\/Quiz\.svelte$/);
+    expect(existsSync(path!)).toBe(true);
   });
 });

@@ -230,7 +230,10 @@ export function findComponents(
   return collectComponents(source, root, builtIns);
 }
 
-/** The levels of a parsed `.svelte` source's `<h1>`–`<h6>` elements, in source order. */
+/**
+ * The levels of a parsed `.svelte` source's `<h1>` to `<h6>` elements, in
+ * source order, including those a `{@html}` tag writes out as text.
+ */
 export function headingLevels(source: string): number[] {
   const { root } = parseRoot(source);
   if (!root) return [];
@@ -238,6 +241,10 @@ export function headingLevels(source: string): number[] {
   walkNodes(root.fragment as Node, (node) => {
     if (node.type === 'RegularElement' && /^h[1-6]$/.test(node.name as string))
       levels.push(Number((node.name as string)[1]));
+    else if (node.type === 'HtmlTag') {
+      const html = source.slice(node.start as number, node.end as number);
+      for (const m of html.matchAll(/<h([1-6])\b/gi)) levels.push(Number(m[1]));
+    }
   });
   return levels;
 }
