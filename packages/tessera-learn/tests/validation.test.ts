@@ -3545,6 +3545,7 @@ describe('a11y rule 1.6 — heading order', () => {
 <!-- <h5>commented out</h5> -->
 <p>{'<h6>text</h6>'}</p>
 {@html '<!-- <h5>hidden</h5> --><h4-widget>x</h4-widget>'}
+{@html '<p>x</p><!-- unclosed <h6>'}
 {@html \`<style>h6 { color: red; }</style>\`}
 {@html '<p>Text</p>'.replace('<h4>unused</h4>', '')}
 {@html format('<h5>', x > 1 ? 'a' : 'b')}

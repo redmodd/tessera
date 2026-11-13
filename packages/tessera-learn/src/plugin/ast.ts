@@ -247,16 +247,18 @@ export function headingLevels(source: string): number[] {
   return levels;
 }
 
-const UNRENDERED_HTML_RE = /<!--[\s\S]*?-->|<(script|style)\b[\s\S]*?<\/\1>/gi;
-const HEADING_TAG_RE = /<h([1-6])(?=[\s/>])/gi;
+// A comment, script or style runs to its end, or to the end of the string
+// when unclosed; a heading tag matched inside one is consumed with it.
+const HTML_HEADING_RE =
+  /<!--[\s\S]*?(?:-->|$)|<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)|<h([1-6])(?=[\s/>])/gi;
 
 // Scans text, not parsed markup: the Svelte parser rejects HTML a browser
 // renders, such as an unclosed tag or a stray brace.
 function htmlHeadingLevels(expression: Node): number[] {
   return renderedStrings(expression).flatMap((text) =>
-    [...text.replace(UNRENDERED_HTML_RE, '').matchAll(HEADING_TAG_RE)].map(
-      (m) => Number(m[1]),
-    ),
+    [...text.matchAll(HTML_HEADING_RE)]
+      .filter((m) => m[2] !== undefined)
+      .map((m) => Number(m[2])),
   );
 }
 
