@@ -3544,6 +3544,8 @@ describe('a11y rule 1.6 — heading order', () => {
 <h1>Title</h1>
 <!-- <h5>commented out</h5> -->
 <p>{'<h6>text</h6>'}</p>
+{@html '<!-- <h5>hidden</h5> --><h4-widget>x</h4-widget>'}
+{@html \`<style>h6 { color: red; }</style>\`}
 {#if true}<h2>Sub</h2>{/if}
 <style>h4 { color: red; }</style>`,
     );
@@ -3560,7 +3562,10 @@ describe('a11y rule 1.6 — heading order', () => {
 
   it('counts headings an {@html} tag writes out', () => {
     createValidProject(testRoot);
-    writePage(testRoot, `<h2>Intro</h2>\n{@html '<h4>Details</h4>'}`);
+    writePage(
+      testRoot,
+      `<h2>Intro</h2>\n{@html '<h3>Title' + title + '</h3><h5>'}`,
+    );
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/heading-order')).toBe(true);
   });

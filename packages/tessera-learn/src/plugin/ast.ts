@@ -241,10 +241,29 @@ export function headingLevels(source: string): number[] {
   walkNodes(root.fragment as Node, (node) => {
     if (node.type === 'RegularElement' && /^h[1-6]$/.test(node.name as string))
       levels.push(Number((node.name as string)[1]));
-    else if (node.type === 'HtmlTag') {
-      const html = source.slice(node.start as number, node.end as number);
-      for (const m of html.matchAll(/<h([1-6])\b/gi)) levels.push(Number(m[1]));
-    }
+    else if (node.type === 'HtmlTag')
+      levels.push(...htmlHeadingLevels(node.expression as Node));
+  });
+  return levels;
+}
+
+const UNRENDERED_HTML_RE = /<!--[\s\S]*?-->|<(script|style)\b[\s\S]*?<\/\1>/gi;
+const HEADING_TAG_RE = /<h([1-6])(?=[\s/>])/gi;
+
+// Scans text, not parsed markup: the Svelte parser rejects HTML a browser
+// renders, such as an unclosed tag or a stray brace.
+function htmlHeadingLevels(expression: Node): number[] {
+  const levels: number[] = [];
+  walkNodes(expression, (node) => {
+    const text =
+      node.type === 'Literal'
+        ? node.value
+        : node.type === 'TemplateElement'
+          ? (node.value as { cooked: string | null }).cooked
+          : null;
+    if (typeof text !== 'string') return;
+    const html = text.replace(UNRENDERED_HTML_RE, '');
+    for (const m of html.matchAll(HEADING_TAG_RE)) levels.push(Number(m[1]));
   });
   return levels;
 }
