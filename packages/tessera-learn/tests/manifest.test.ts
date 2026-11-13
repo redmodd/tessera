@@ -252,7 +252,7 @@ describe('readMetaFile', () => {
     );
     expect(readMetaFile(path)).toEqual({
       meta: { title: 'Lesson' },
-      rejected: { pages: 'a' },
+      rejectedPages: 'a',
     });
   });
 
@@ -263,7 +263,6 @@ describe('readMetaFile', () => {
     );
     expect(readMetaFile(path)).toEqual({
       meta: { title: { en: 'Intro' } },
-      rejected: {},
     });
   });
 
@@ -274,7 +273,6 @@ describe('readMetaFile', () => {
     );
     expect(readMetaFile(path)).toEqual({
       meta: { title: 'Lesson' },
-      rejected: {},
     });
   });
 

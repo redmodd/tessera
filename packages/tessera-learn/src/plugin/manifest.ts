@@ -187,22 +187,18 @@ export interface MetaFile {
 /**
  * Read a _meta.js file's `export default { ... }` literal. `meta` is always
  * usable: empty when the read fails (`problem` says why), and without `pages`
- * of the wrong type (`rejected` holds it for the validator). `title` is raw.
+ * of the wrong type (`rejectedPages` holds it for the validator). `title` is raw.
  */
 export function readMetaFile(metaPath: string): {
   meta: MetaFile;
   problem?: ReadFailure['reason'];
-  rejected?: { pages?: unknown };
+  rejectedPages?: unknown;
 } {
   const read = readDefaultExport(metaPath);
   if (!read.ok) return { meta: {}, problem: read.reason };
   const { title, pages } = read.value as Record<string, unknown>;
-  const meta: MetaFile = {};
-  const rejected: { pages?: unknown } = {};
-  if (title !== undefined) meta.title = title;
-  if (isStringArray(pages)) meta.pages = pages;
-  else if (pages != null) rejected.pages = pages;
-  return { meta, rejected };
+  if (isStringArray(pages)) return { meta: { title, pages } };
+  return { meta: { title }, rejectedPages: pages ?? undefined };
 }
 
 const QUESTION_NAMES = [

@@ -260,6 +260,8 @@ export function validatePages(
     warnAbout(dir, 'lesson has no pages, so it is left out of the course');
   }
 
+  if (course.sections.length === 0) return noPages();
+
   for (const section of course.sections) {
     const sectionMeta = validateMeta(section.metaPath);
 
@@ -283,8 +285,6 @@ export function validatePages(
       }
     }
   }
-
-  if (pages.length === 0) return noPages();
 
   return { hasParseErrors, pages };
 }
@@ -326,7 +326,7 @@ function validatePageList(
 }
 
 function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
-  const { meta, problem, rejected = {} } = readMetaFile(metaPath);
+  const { meta, problem, rejectedPages } = readMetaFile(metaPath);
   if (problem === 'missing') {
     d.error(
       'missing. Every section and lesson folder with pages needs a _meta.js with a "title".',
@@ -339,9 +339,9 @@ function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
   }
 
   checkTitle('"title"', meta.title, d);
-  if ('pages' in rejected) {
+  if (rejectedPages !== undefined) {
     d.error(
-      `"pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,
+      `"pages" must be an array of page file names, got ${formatValue(rejectedPages)}`,
     );
   }
 

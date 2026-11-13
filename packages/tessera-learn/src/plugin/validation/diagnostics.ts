@@ -113,11 +113,7 @@ export function checkTitle(
   missing = `missing required ${field} field`,
 ): void {
   if (isNonBlankString(value)) return;
-  d.error(
-    value === undefined
-      ? missing
-      : typeof value === 'string'
-        ? `${field} is empty`
-        : `${field} must be a string, got ${describeType(value)}`,
-  );
+  if (value === undefined) d.error(missing);
+  else if (typeof value === 'string') d.error(`${field} is empty`);
+  else d.error(`${field} must be a string, got ${describeType(value)}`);
 }
