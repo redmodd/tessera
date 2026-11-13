@@ -253,19 +253,44 @@ const HEADING_TAG_RE = /<h([1-6])(?=[\s/>])/gi;
 // Scans text, not parsed markup: the Svelte parser rejects HTML a browser
 // renders, such as an unclosed tag or a stray brace.
 function htmlHeadingLevels(expression: Node): number[] {
-  const levels: number[] = [];
-  walkNodes(expression, (node) => {
-    const text =
-      node.type === 'Literal'
-        ? node.value
-        : node.type === 'TemplateElement'
-          ? (node.value as { cooked: string | null }).cooked
-          : null;
-    if (typeof text !== 'string') return;
-    const html = text.replace(UNRENDERED_HTML_RE, '');
-    for (const m of html.matchAll(HEADING_TAG_RE)) levels.push(Number(m[1]));
-  });
-  return levels;
+  return renderedStrings(expression).flatMap((text) =>
+    [...text.replace(UNRENDERED_HTML_RE, '').matchAll(HEADING_TAG_RE)].map(
+      (m) => Number(m[1]),
+    ),
+  );
+}
+
+/**
+ * The string literals an expression's value is built from, in source order.
+ * A string a call or member access consumes is not part of the value.
+ */
+function renderedStrings(node: Node): string[] {
+  switch (node.type) {
+    case 'Literal':
+      return typeof node.value === 'string' ? [node.value] : [];
+    case 'TemplateLiteral': {
+      const quasis = node.quasis as Node[];
+      const expressions = node.expressions as Node[];
+      return quasis.flatMap((quasi, i) => [
+        (quasi.value as { cooked: string | null }).cooked ?? '',
+        ...(i < expressions.length ? renderedStrings(expressions[i]) : []),
+      ]);
+    }
+    case 'BinaryExpression':
+      return node.operator === '+'
+        ? [node.left, node.right].flatMap((n) => renderedStrings(n as Node))
+        : [];
+    case 'LogicalExpression':
+      return (
+        node.operator === '&&' ? [node.right] : [node.left, node.right]
+      ).flatMap((n) => renderedStrings(n as Node));
+    case 'ConditionalExpression':
+      return [node.consequent, node.alternate].flatMap((n) =>
+        renderedStrings(n as Node),
+      );
+    default:
+      return [];
+  }
 }
 
 /** Names a page binds from its own modules, which shadow the built-in components. */
