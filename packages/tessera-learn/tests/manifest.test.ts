@@ -8,7 +8,6 @@ import {
   readMetaFile,
   orderPageFiles,
   stripPrefix,
-  deriveSlug,
 } from '../src/plugin/manifest.js';
 import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
 import { validateProject } from '../src/plugin/validation.js';
@@ -79,16 +78,6 @@ describe('stripPrefix', () => {
 
   it('returns unchanged if no prefix', () => {
     expect(stripPrefix('introduction')).toBe('introduction');
-  });
-});
-
-describe('deriveSlug', () => {
-  it('strips prefix for directories', () => {
-    expect(deriveSlug('02-getting-started')).toBe('getting-started');
-  });
-
-  it('strips extension for files', () => {
-    expect(deriveSlug('welcome.svelte', true)).toBe('welcome');
   });
 });
 

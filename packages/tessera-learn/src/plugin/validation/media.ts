@@ -16,11 +16,7 @@ const MEDIA_COMPONENT_NAMES: ReadonlySet<string> = new Set([
  * so media isn't treated as gradable questions.
  * Non-static (kind 'expr') values are skipped, matching the rest of the linter.
  */
-export function validateMediaComponents(
-  content: string,
-  fileRel: string,
-  d: Diagnostics,
-): void {
+export function validateMediaComponents(content: string, d: Diagnostics): void {
   const components = findComponents(content, MEDIA_COMPONENT_NAMES);
   if (!components) return;
   for (const { name, props, hasSpread } of components) {
@@ -28,12 +24,12 @@ export function validateMediaComponents(
       const alt = props.get('alt');
       const decorative = props.get('decorative');
       // A string value is truthy at runtime (so decorative="false" hides the
-      // image), but the parser sees a string, not a boolean — flag the misuse.
+      // image), but the parser sees a string, not a boolean, so flag the misuse.
       if (decorative?.kind === 'string') {
         d.error(
           tag(
             A11Y_IDS.imageAlt,
-            `${fileRel}: <Image> "decorative" must be a boolean — use decorative or decorative={true}, not the string ${formatValue(decorative.value)}`,
+            `<Image> "decorative" must be a boolean. Use decorative or decorative={true}, not the string ${formatValue(decorative.value)}`,
           ),
         );
         continue;
@@ -44,7 +40,7 @@ export function validateMediaComponents(
         d.error(
           tag(
             A11Y_IDS.imageAlt,
-            `${fileRel}: <Image> needs alt text, or mark it decorative={true} if purely ornamental`,
+            '<Image> needs alt text, or mark it decorative={true} if purely ornamental',
           ),
         );
       }
@@ -52,7 +48,7 @@ export function validateMediaComponents(
         d.warn(
           tag(
             A11Y_IDS.imageAlt,
-            `${fileRel}: <Image> is decorative but also has alt text — the alt will be dropped`,
+            '<Image> is decorative but also has alt text, so the alt will be dropped',
           ),
         );
       }
@@ -66,7 +62,7 @@ export function validateMediaComponents(
       d.error(
         tag(
           A11Y_IDS.mediaTitle,
-          `${fileRel}: <${name}> needs a title — it's the accessible name for the player`,
+          `<${name}> needs a title, which is the accessible name for the player`,
         ),
       );
     }
@@ -83,7 +79,7 @@ export function validateMediaComponents(
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
-          `${fileRel}: <Video> embeds can't carry caption tracks — provide a transcript for WCAG 1.2`,
+          "<Video> embeds can't carry caption tracks, so provide a transcript for WCAG 1.2",
         ),
       );
     }
@@ -97,7 +93,7 @@ export function validateMediaComponents(
       d.warn(
         tag(
           A11Y_IDS.mediaCaptions,
-          `${fileRel}: native <Video> has no caption tracks or transcript — add tracks={[…]} or a transcript for WCAG 1.2.2`,
+          'native <Video> has no caption tracks or transcript. Add tracks={[…]} or a transcript for WCAG 1.2.2',
         ),
       );
     }
@@ -105,7 +101,7 @@ export function validateMediaComponents(
       d.warn(
         tag(
           A11Y_IDS.mediaTranscript,
-          `${fileRel}: <Audio> has no transcript — required for WCAG 1.2.1`,
+          '<Audio> has no transcript, which WCAG 1.2.1 requires',
         ),
       );
     }
@@ -123,11 +119,14 @@ function collectAssetRefs(content: string): Set<string> {
 
 export function validateAssetRefs(
   content: string,
-  fileRel: string,
   assetsDir: string,
   d: Diagnostics,
-  existsCache = new Map<string, boolean>(),
+  {
+    existsCache = new Map<string, boolean>(),
+    field,
+  }: { existsCache?: Map<string, boolean>; field?: string } = {},
 ): void {
+  const subject = field ? `"${field}": ` : '';
   for (const assetPath of collectAssetRefs(content)) {
     const fullAssetPath = resolve(assetsDir, assetPath);
     let exists = existsCache.get(fullAssetPath);
@@ -136,9 +135,7 @@ export function validateAssetRefs(
       existsCache.set(fullAssetPath, exists);
     }
     if (!exists) {
-      d.warn(
-        `${fileRel}: "$assets/${assetPath}" not found in assets/ directory`,
-      );
+      d.warn(`${subject}"$assets/${assetPath}" not found in assets/ directory`);
     }
   }
 }

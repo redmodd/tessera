@@ -33,8 +33,11 @@ export function tag(id: string, message: string): string {
   return `[${id}] ${message}`;
 }
 
+/** The leading `[rule-id] ` tag `tag()` adds; the id is group 1. */
+export const TAG_RE = /^\[([^\]]+)\] /;
+
 function diagnosticId(message: string): string | null {
-  const m = /^\[([^\]]+)\] /.exec(message);
+  const m = TAG_RE.exec(message);
   return m ? m[1] : null;
 }
 

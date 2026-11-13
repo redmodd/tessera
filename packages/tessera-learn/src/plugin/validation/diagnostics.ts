@@ -1,5 +1,6 @@
 import JSON5 from 'json5';
 import { oneOf } from '../../runtime/types.js';
+import { TAG_RE } from './a11y.js';
 
 export interface ValidationResult {
   errors: string[];
@@ -20,23 +21,29 @@ export class Diagnostics implements ValidationResult {
   #sources = new Map<string, string>();
 
   error(message: string): void {
-    this.errors.push(message);
-    this.#record(message);
+    this.#add(this.errors, message);
   }
   warn(message: string): void {
-    this.warnings.push(message);
-    this.#record(message);
+    this.#add(this.warnings, message);
   }
   info(message: string): void {
-    this.infos.push(message);
-    this.#record(message);
+    this.#add(this.infos, message);
   }
 
-  #record(message: string): void {
-    if (this.#source !== undefined) this.#sources.set(message, this.#source);
+  #add(list: string[], message: string): void {
+    if (this.#source !== undefined) {
+      // After a leading a11y rule tag, which `a11y.ignore` matches at the start.
+      const tag = TAG_RE.exec(message)?.[0] ?? '';
+      message = `${tag}${this.#source}: ${message.slice(tag.length)}`;
+      this.#sources.set(message, this.#source);
+    }
+    list.push(message);
   }
 
-  /** Run the checks of one source file or folder, so what they raise is known to be about it. */
+  /**
+   * Run the checks of one source file or folder, so what they raise is known
+   * to be about it. Each message they raise starts with `source: `.
+   */
   within<T>(source: string, check: () => T): T {
     const outer = this.#source;
     this.#source = source;

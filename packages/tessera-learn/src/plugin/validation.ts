@@ -105,7 +105,7 @@ export function validateProject(
   d.partial = !read.ok;
 
   if (!read.ok && read.reason === 'missing') {
-    d.error(`course.config.js: ${READ_FAILURE_MESSAGES.missing}`);
+    d.within(COURSE_CONFIG_FILE, () => d.error(READ_FAILURE_MESSAGES.missing));
     return d;
   }
   const runtimeHooks = readRuntimeXAPIHooks(projectRoot, d);

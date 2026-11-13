@@ -556,7 +556,9 @@ describe('config validation', () => {
     );
     const logoWarning = (warnings: string[]) =>
       warnings.filter(
-        (w) => w.includes('branding.logo') && w.includes('$assets/logo.png'),
+        (w) =>
+          w ===
+          'course.config.js: "branding.logo": "$assets/logo.png" not found in assets/ directory',
       );
     expect(logoWarning(validateProject(testRoot).warnings)).toHaveLength(1);
 
@@ -1753,9 +1755,7 @@ describe('structure validation', () => {
     );
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
-      expect.stringContaining(
-        'extras.svelte: not listed in _meta.js pages array',
-      ),
+      'pages/01-section/01-lesson/_meta.js: pages array does not list extras.svelte, so it is appended at the end',
     );
   });
 });
@@ -3544,6 +3544,43 @@ describe('a11y rule 1.6 — heading order', () => {
     writePage(testRoot, `<h1>Title</h1>\n<h2>Sub</h2>\n<h3>Sub-sub</h3>`);
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/heading-order')).toBe(false);
+  });
+
+  it('counts only heading elements in the markup', () => {
+    createValidProject(testRoot);
+    writePage(
+      testRoot,
+      `<script>const html = '<h4>not markup</h4>';</script>
+<h1>Title</h1>
+<!-- <h5>commented out</h5> -->
+<p>{'<h6>text</h6>'}</p>
+{@html '<!-- <h5>hidden</h5> --><h4-widget>x</h4-widget>'}
+{@html '<p>x</p><!-- unclosed <h6>'}
+{@html \`<style>h6 { color: red; }</style>\`}
+{@html '<p>Text</p>'.replace('<h4>unused</h4>', '')}
+{@html format('<h5>', x > 1 ? 'a' : 'b')}
+{#if true}<h2>Sub</h2>{/if}
+<style>h4 { color: red; }</style>`,
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(false);
+  });
+
+  it('warns on a skipped level inside a block', () => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<h1>Title</h1>\n{#if true}<h4>Deep</h4>{/if}`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(true);
+  });
+
+  it.each([
+    `{@html '<h3>Title' + title + '</h3><h5>'}`,
+    `{@html ok ? \`<h3>\${title}</h3>\` : (note ?? '<h5>')}`,
+  ])('counts headings an {@html} tag writes out: %s', (tag) => {
+    createValidProject(testRoot);
+    writePage(testRoot, `<h2>Intro</h2>\n${tag}`);
+    const { warnings } = validateProject(testRoot);
+    expect(has(warnings, 'tessera/heading-order')).toBe(true);
   });
 });
 

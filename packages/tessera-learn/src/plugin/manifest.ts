@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
-import { resolve, basename, extname } from 'node:path';
+import { resolve, basename } from 'node:path';
 import JSON5 from 'json5';
 import {
   defaultExportObjectLiteral,
@@ -79,14 +79,6 @@ export function ensureSvelteSuffix(name: string): string {
 /** Strip numeric prefix and hyphen: "01-introduction" → "introduction" */
 export function stripPrefix(name: string): string {
   return name.replace(/^\d+-/, '');
-}
-
-/** Derive slug from folder/file name */
-export function deriveSlug(name: string, isFile = false): string {
-  if (isFile) {
-    return basename(name, extname(name));
-  }
-  return stripPrefix(name);
 }
 
 type ReadFailure =
@@ -424,7 +416,7 @@ export function generateManifest(
 
   for (const walkedSection of walked) {
     const sectionMeta = readMetaFile(walkedSection.metaPath).meta;
-    const sectionSlug = deriveSlug(walkedSection.name);
+    const sectionSlug = stripPrefix(walkedSection.name);
 
     const section: ManifestSection = {
       title: sectionMeta.title ?? '',
@@ -439,7 +431,7 @@ export function generateManifest(
       const lessonMeta = isFlat
         ? sectionMeta
         : readMetaFile(walkedLesson.metaPath).meta;
-      const lessonSlug = isFlat ? sectionSlug : deriveSlug(walkedLesson.name!);
+      const lessonSlug = isFlat ? sectionSlug : stripPrefix(walkedLesson.name!);
       const relDir = isFlat
         ? `/pages/${walkedSection.name}`
         : `/pages/${walkedSection.name}/${walkedLesson.name}`;
@@ -455,7 +447,7 @@ export function generateManifest(
         lessonMeta.pages,
       )) {
         const filePath = resolve(walkedLesson.dir, fileName);
-        const pageSlug = deriveSlug(fileName, true);
+        const pageSlug = basename(fileName, '.svelte');
 
         // A page deleted mid-walk must not throw: in dev a throw here skips
         // the manifest reload.
