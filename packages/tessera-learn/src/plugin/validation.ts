@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { dropUnreadParses } from './ast.js';
 import {
   COURSE_CONFIG_FILE,
@@ -67,17 +67,13 @@ function readIfPresent(path: string): string | undefined {
 
 /**
  * The content of each file `validateProject` looks at and a build then reads
- * again, by project-relative path. A section or lesson folder is listed with a
- * trailing separator and no content, so an empty one counts.
- * course.config.js is left out: a build keeps the read it validated.
+ * again, by project-relative path. course.config.js is left out: a build keeps
+ * the read it validated.
  */
 export function readValidatedSources(projectRoot: string): Map<string, string> {
   const pagesDir = resolve(projectRoot, 'pages');
   const { sections, strayFiles } = walkPages(pagesDir);
   const sources = new Map<string, string>();
-  for (const { dir } of sections.flatMap((s) => [s, ...s.lessons])) {
-    sources.set(relative(projectRoot, dir) + sep, '');
-  }
   const files = [
     ...VALIDATED_ROOT_FILES.filter((file) => file !== COURSE_CONFIG_FILE).map(
       (file) => resolve(projectRoot, file),

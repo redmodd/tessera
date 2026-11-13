@@ -232,9 +232,9 @@ export function validatePages(
 
   if (!existsSync(pagesDir)) return noPages();
 
-  const validateMeta = (metaPath: string, required: boolean) =>
+  const validateMeta = (metaPath: string) =>
     d.within(relative(projectRoot, metaPath), () =>
-      validateMetaFile(metaPath, required, d),
+      validateMetaFile(metaPath, d),
     );
   const warnAbout = (path: string, message: string) =>
     d.within(relative(projectRoot, path), () => d.warn(message));
@@ -253,20 +253,17 @@ export function validatePages(
     );
   }
 
-  for (const section of course.sections) {
-    const pagesBeforeSection = pages.length;
+  for (const dir of course.emptySections) {
+    warnAbout(dir, 'section has no pages, so it is left out of the course');
+  }
 
-    const sectionMeta = validateMeta(
-      section.metaPath,
-      section.lessons.some((lesson) => lesson.files.length > 0),
-    );
+  for (const section of course.sections) {
+    const sectionMeta = validateMeta(section.metaPath);
 
     for (const lesson of section.lessons) {
       // Flat lesson uses the section _meta, already validated above.
       const meta =
-        lesson.name === null
-          ? sectionMeta
-          : validateMeta(lesson.metaPath, lesson.files.length > 0);
+        lesson.name === null ? sectionMeta : validateMeta(lesson.metaPath);
       d.within(relative(projectRoot, lesson.metaPath), () =>
         validatePageList(lesson, meta?.pages, d),
       );
@@ -281,11 +278,6 @@ export function validatePages(
         hasParseErrors ||= parseError;
         pages.push(page);
       }
-    }
-
-    // The page-count delta covers both the no-lessons and empty-lessons cases.
-    if (pages.length === pagesBeforeSection) {
-      warnAbout(section.dir, 'section contributed no pages and will be empty');
     }
   }
 
@@ -330,18 +322,12 @@ function validatePageList(
   }
 }
 
-function validateMetaFile(
-  metaPath: string,
-  required: boolean,
-  d: Diagnostics,
-): MetaFile | null {
+function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
   const { meta, problem, rejected = {} } = readMetaFile(metaPath);
   if (problem === 'missing') {
-    if (required) {
-      d.error(
-        'missing. Every section and lesson folder with pages needs a _meta.js with a "title".',
-      );
-    }
+    d.error(
+      'missing. Every section and lesson folder with pages needs a _meta.js with a "title".',
+    );
     return null;
   }
   if (problem) {
@@ -349,9 +335,7 @@ function validateMetaFile(
     return null;
   }
 
-  if (required) {
-    checkTitle('"title"', meta.title, d);
-  }
+  checkTitle('"title"', meta.title, d);
   if ('pages' in rejected) {
     d.error(
       `"pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,

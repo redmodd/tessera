@@ -81,9 +81,13 @@ export function stripPrefix(name: string): string {
   return name.replace(/^\d+-/, '');
 }
 
+export function isTitle(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
 // Only `tessera dev` serves an untitled entry: validation fails the build.
 export function titleOf(value: unknown): string {
-  return typeof value === 'string' && value.trim() ? value : '(no title)';
+  return isTitle(value) ? value.trim() : '(no title)';
 }
 
 type ReadFailure =
@@ -350,6 +354,8 @@ interface WalkedSection {
 
 interface WalkedCourse {
   sections: WalkedSection[];
+  /** Section folders left out of the course because they hold no pages. */
+  emptySections: string[];
   /** `.svelte` files in `pages/` itself, outside the section/lesson structure. */
   strayFiles: string[];
   /** Paths of symlinks left out of the course because they do not resolve. */
@@ -359,13 +365,15 @@ interface WalkedCourse {
 /**
  * Enumerate the course's section → lesson → file structure. Section-level
  * `.svelte` files become an implicit flat lesson (`name: null`) ordered before
- * the section's explicit lesson directories. Shared by manifest generation and
- * build-time validation so the two never disagree on which files are pages.
+ * the section's explicit lesson directories. A section or lesson folder with no
+ * pages is left out. Shared by manifest generation and build-time validation so
+ * the two never disagree on which files are pages.
  */
 export function walkPages(pagesDir: string): WalkedCourse {
   const root = readEntries(pagesDir, true);
   const { unresolved } = root;
   const sections: WalkedSection[] = [];
+  const emptySections: string[] = [];
   for (const sectionName of root.dirs) {
     const dir = resolve(pagesDir, sectionName);
     const metaPath = resolve(dir, '_meta.js');
@@ -381,6 +389,7 @@ export function walkPages(pagesDir: string): WalkedCourse {
       const lessonDir = resolve(dir, lessonName);
       const lesson = readEntries(lessonDir, false);
       unresolved.push(...lesson.unresolved);
+      if (lesson.files.length === 0) continue;
       lessons.push({
         name: lessonName,
         dir: lessonDir,
@@ -389,9 +398,10 @@ export function walkPages(pagesDir: string): WalkedCourse {
       });
     }
 
-    sections.push({ name: sectionName, dir, metaPath, lessons });
+    if (lessons.length === 0) emptySections.push(dir);
+    else sections.push({ name: sectionName, dir, metaPath, lessons });
   }
-  return { sections, strayFiles: root.files, unresolved };
+  return { sections, emptySections, strayFiles: root.files, unresolved };
 }
 
 /** The `_meta.js` and page paths of walked sections. A `_meta.js` may be absent. */

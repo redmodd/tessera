@@ -169,6 +169,7 @@ If none fit, surface the limitation instead of patching around it.
 ### Hierarchy and ordering
 
 - Manifest is always **section → lesson → page**. Files directly in a section folder form one implicit untitled lesson, ordered before the section's lesson subdirectories. Both shapes can coexist.
+- A section or lesson folder with no `.svelte` pages is left out of the course and needs no `_meta.js`.
 - Sorting is alphabetical by directory/filename. Numeric prefixes on directories (`01-`, `02-`) set explicit order and are stripped from slugs (`01-getting-started/` → slug `getting-started`).
 - Page filenames keep their prefix (`01-welcome.svelte` → slug `01-welcome`), so control page order **within a lesson** with `_meta.js`, not filename prefixes.
 

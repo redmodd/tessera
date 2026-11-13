@@ -704,6 +704,31 @@ export const pageConfig = {
     expect(manifest.pages[0].title).toBe('(no title)');
   });
 
+  it('trims titles', () => {
+    createFile('01-s/01-l/_meta.js', 'export default { title: " L " };');
+    createFile(
+      '01-s/01-l/page.svelte',
+      '<script module>export const pageConfig = { title: "  P" };</script>',
+    );
+    const manifest = generateManifest(root);
+
+    expect(manifest.sections[0].lessons[0].title).toBe('L');
+    expect(manifest.pages[0].title).toBe('P');
+  });
+
+  it('leaves out section and lesson folders with no pages', () => {
+    createFile('01-s/_meta.js', 'export default { title: "S" };');
+    createFile('01-s/01-l/_meta.js', 'export default { title: "L" };');
+    createFile('01-s/01-l/page.svelte', '<h1>Hello</h1>');
+    createFile('01-s/02-draft/_meta.js', 'export default { title: "Draft" };');
+    mkdirSync(resolve(root, '01-s/img'));
+    mkdirSync(resolve(root, '02-empty/01-draft'), { recursive: true });
+    const manifest = generateManifest(root);
+
+    expect(manifest.sections.map((s) => s.slug)).toEqual(['s']);
+    expect(manifest.sections[0].lessons.map((l) => l.slug)).toEqual(['l']);
+  });
+
   it('includes section-level .svelte files as flat-shape pages', () => {
     createFile('01-intro/_meta.js', 'export default { title: "Intro" };');
     createFile('01-intro/welcome.svelte', '<h1>Welcome</h1>');

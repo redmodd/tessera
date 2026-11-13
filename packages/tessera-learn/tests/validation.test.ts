@@ -775,12 +775,12 @@ describe('_meta.js validation', () => {
     },
   );
 
-  it('allows an empty title in the _meta.js of a folder with no pages', () => {
+  it('ignores the _meta.js of a folder with no pages', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
       'pages/01-section/02-draft/_meta.js',
-      'export default { title: "" };',
+      'export default { title: 5 };',
     );
     expect(validateProject(testRoot).errors).toEqual([]);
   });
@@ -1755,7 +1755,7 @@ describe('structure validation', () => {
     );
   });
 
-  it('warns when a section contributes no pages', () => {
+  it('warns when a section has no pages', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
@@ -1765,7 +1765,7 @@ describe('structure validation', () => {
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        '02-empty: section contributed no pages and will be empty',
+        '02-empty: section has no pages, so it is left out of the course',
       ),
     );
   });

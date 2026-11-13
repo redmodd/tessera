@@ -6,6 +6,12 @@ describe('mergeCourseConfig', () => {
     expect(mergeCourseConfig({ title: 'My Course' }).title).toBe('My Course');
   });
 
+  it('trims the title', () => {
+    expect(mergeCourseConfig({ title: '  My Course ' }).title).toBe(
+      'My Course',
+    );
+  });
+
   it.each([undefined, '  ', 3])('marks a %j title as "(no title)"', (title) => {
     expect(mergeCourseConfig({ title } as any).title).toBe('(no title)');
   });

@@ -496,7 +496,6 @@ describe('sources changed after validation', () => {
 
   it.each<[string, string, (path: string) => void]>([
     ['an edited page', page, (path) => writeFileSync(path, '<h1>Edited</h1>')],
-    ['a deleted page', page, (path) => rmSync(path)],
     [
       'an added page',
       'pages/01-section/01-lesson/extra.svelte',
@@ -522,12 +521,6 @@ describe('sources changed after validation', () => {
       'pages/stray.svelte',
       (path) => writeFileSync(path, '<h1>Stray</h1>'),
     ],
-    ['an added empty section', 'pages/02-empty/', (path) => mkdirSync(path)],
-    [
-      'an added empty lesson',
-      'pages/01-section/02-empty/',
-      (path) => mkdirSync(path),
-    ],
   ])('fails the build on %s', (_change, file, change) => {
     const validation = validatedPlugin();
     change(resolve(projectRoot, file));
@@ -536,18 +529,35 @@ describe('sources changed after validation', () => {
     );
   });
 
-  it('fails the build on an added _meta.js', () => {
+  it('fails the build on a deleted page', () => {
+    const validation = validatedPlugin();
+    rmSync(resolve(projectRoot, page));
+    expect(() => buildEnd(validation)).toThrow(page);
+  });
+
+  it('fails the build on a page added to a folder that had none', () => {
     mkdirSync(resolve(projectRoot, 'pages/01-section/02-new'), {
       recursive: true,
     });
     const validation = validatedPlugin();
     writeFileSync(
+      resolve(projectRoot, 'pages/01-section/02-new/page.svelte'),
+      '<h1>New</h1>',
+    );
+    expect(() => buildEnd(validation)).toThrow(
+      '1 file(s) changed during the build, after validation: pages/01-section/02-new/page.svelte.',
+    );
+  });
+
+  it('lets a build through when a folder with no pages is added', () => {
+    const validation = validatedPlugin();
+    mkdirSync(resolve(projectRoot, 'pages/02-empty'));
+    mkdirSync(resolve(projectRoot, 'pages/01-section/02-new'));
+    writeFileSync(
       resolve(projectRoot, 'pages/01-section/02-new/_meta.js'),
       'export default { title: "New" };',
     );
-    expect(() => buildEnd(validation)).toThrow(
-      '1 file(s) changed during the build, after validation: pages/01-section/02-new/_meta.js.',
-    );
+    expect(() => buildEnd(validation)).not.toThrow();
   });
 
   it('names every file that changed', () => {
@@ -1101,7 +1111,7 @@ describe('dev revalidation', () => {
   it('reports an empty section again when its folder comes back', async () => {
     startDev();
     const warnings = vi.mocked(console.warn);
-    const expected = expect.stringContaining('section contributed no pages');
+    const expected = expect.stringContaining('section has no pages');
     const dir = 'pages/02-empty';
 
     mkdirSync(resolve(projectRoot, dir));

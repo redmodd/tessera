@@ -1,5 +1,6 @@
 import JSON5 from 'json5';
 import { oneOf } from '../../runtime/types.js';
+import { isTitle } from '../manifest.js';
 import { TAG_RE } from './a11y.js';
 
 export interface ValidationResult {
@@ -112,7 +113,7 @@ export function checkTitle(
   d: Diagnostics,
   missing = `missing required ${field} field`,
 ): void {
-  if (typeof value === 'string' && value.trim()) return;
+  if (isTitle(value)) return;
   d.error(
     value === undefined
       ? missing
