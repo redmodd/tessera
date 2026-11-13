@@ -225,7 +225,7 @@ export function validatePages(
 
   const noPages = (): PagesValidationResult => {
     d.error(
-      'No pages found. Create at least one section with a lesson and page in pages/',
+      'No pages found. Create pages/<section>/<lesson>/<page>.svelte with a pageConfig.title, and a _meta.js with a "title" in the section and lesson folders',
     );
     return { hasParseErrors: false, pages: [] };
   };
