@@ -15,7 +15,7 @@ import { tesseraPlugin } from '../src/plugin/index.js';
 import { resolveTesseraConfig } from '../src/plugin/inline-config.js';
 import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
-import { tempDir, titledMeta, titledPage, writeLessonPage } from './helpers.js';
+import { tempDir, titledPage, writeLessonPage } from './helpers.js';
 
 // svelte() keeps its options in a closure, so the wrapper records them to reach onwarn.
 const svelteOptions = vi.hoisted(() => ({ onwarn: undefined as any }));
@@ -278,7 +278,7 @@ describe('export packaging gate', () => {
       mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
       writeFileSync(
         resolve(projectRoot, 'pages', '01-quiz', '_meta.js'),
-        titledMeta('Quiz'),
+        'export default { title: "Quiz" };',
       );
       writeFileSync(
         resolve(projectRoot, 'pages', '01-quiz', 'check.svelte'),

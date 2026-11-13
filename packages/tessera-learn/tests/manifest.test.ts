@@ -256,14 +256,14 @@ describe('readMetaFile', () => {
     });
   });
 
-  it('drops a title that is not a string', () => {
+  it('keeps a title that is not a string for the validator', () => {
     const path = createFile(
       'meta-test5/_meta.js',
       'export default { title: { en: "Intro" } };',
     );
     expect(readMetaFile(path)).toEqual({
-      meta: {},
-      rejected: { title: { en: 'Intro' } },
+      meta: { title: { en: 'Intro' } },
+      rejected: {},
     });
   });
 

@@ -82,7 +82,7 @@ export function stripPrefix(name: string): string {
 }
 
 // Only `tessera dev` serves an untitled entry: validation fails the build.
-function titleOf(value: unknown): string {
+export function titleOf(value: unknown): string {
   return typeof value === 'string' && value.trim() ? value : '(no title)';
 }
 
@@ -180,27 +180,26 @@ export function resolveConfigRead(
 }
 
 export interface MetaFile {
-  title?: string;
+  title?: unknown;
   pages?: string[];
 }
 
 /**
  * Read a _meta.js file's `export default { ... }` literal. `meta` is always
- * usable: empty when the read fails (`problem` says why), and without any
- * field of the wrong type (`rejected` holds those values for the validator).
+ * usable: empty when the read fails (`problem` says why), and without `pages`
+ * of the wrong type (`rejected` holds it for the validator). `title` is raw.
  */
 export function readMetaFile(metaPath: string): {
   meta: MetaFile;
   problem?: ReadFailure['reason'];
-  rejected?: { title?: unknown; pages?: unknown };
+  rejected?: { pages?: unknown };
 } {
   const read = readDefaultExport(metaPath);
   if (!read.ok) return { meta: {}, problem: read.reason };
   const { title, pages } = read.value as Record<string, unknown>;
   const meta: MetaFile = {};
-  const rejected: { title?: unknown; pages?: unknown } = {};
-  if (typeof title === 'string') meta.title = title;
-  else if (title !== undefined) rejected.title = title;
+  const rejected: { pages?: unknown } = {};
+  if (title !== undefined) meta.title = title;
   if (isStringArray(pages)) meta.pages = pages;
   else if (pages != null) rejected.pages = pages;
   return { meta, rejected };

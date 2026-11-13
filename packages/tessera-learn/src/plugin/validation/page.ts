@@ -350,7 +350,7 @@ function validateMetaFile(
   }
 
   if (required) {
-    checkTitle('"title"', 'title' in rejected ? rejected.title : meta.title, d);
+    checkTitle('"title"', meta.title, d);
   }
   if ('pages' in rejected) {
     d.error(
@@ -373,14 +373,14 @@ function validatePageConfig(
     d.error(`pageConfig ${STATIC_LITERAL_RULE}`);
     return null;
   }
-  const pageConfig = result.kind === 'ok' ? result.value : null;
-  for (const key of Object.keys(pageConfig ?? {})) {
+  const pageConfig = result.kind === 'ok' ? result.value : {};
+  for (const key of Object.keys(pageConfig)) {
     if (!KNOWN_PAGE_FIELDS.has(key))
       d.warn(`unknown field pageConfig.${key} is ignored`);
   }
   checkTitle(
     'pageConfig.title',
-    pageConfig?.title,
+    pageConfig.title,
     d,
     "missing required pageConfig.title. Set it in `export const pageConfig = { title: '...' }` in <script module>.",
   );

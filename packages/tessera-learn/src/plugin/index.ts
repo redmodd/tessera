@@ -13,6 +13,7 @@ import {
   COURSE_CONFIG_FILE,
   generateManifest,
   pageSourcePaths,
+  titleOf,
   walkPages,
   type Manifest,
 } from './manifest.js';
@@ -317,7 +318,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     userConfig.completion?.mode === 'manual' && success.from !== 'quiz';
   return {
     ...userConfig,
-    title: typeof userConfig.title === 'string' ? userConfig.title : '',
+    title: titleOf(userConfig.title),
     language: courseLanguage(userConfig),
     resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },
