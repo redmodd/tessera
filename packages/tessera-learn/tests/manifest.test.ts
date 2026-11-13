@@ -9,7 +9,6 @@ import {
   orderPageFiles,
   stripPrefix,
   titleCase,
-  deriveSlug,
 } from '../src/plugin/manifest.js';
 import { defaultExportObjectLiteral } from '../src/plugin/ast.js';
 import { validateProject } from '../src/plugin/validation.js';
@@ -88,16 +87,6 @@ describe('titleCase', () => {
 
   it('handles single word', () => {
     expect(titleCase('welcome')).toBe('Welcome');
-  });
-});
-
-describe('deriveSlug', () => {
-  it('strips prefix for directories', () => {
-    expect(deriveSlug('02-getting-started')).toBe('getting-started');
-  });
-
-  it('strips extension for files', () => {
-    expect(deriveSlug('welcome.svelte', true)).toBe('welcome');
   });
 });
 

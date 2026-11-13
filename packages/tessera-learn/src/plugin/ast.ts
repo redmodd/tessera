@@ -230,6 +230,71 @@ export function findComponents(
   return collectComponents(source, root, builtIns);
 }
 
+/**
+ * The levels of a parsed `.svelte` source's `<h1>` to `<h6>` elements, in
+ * source order, including those a `{@html}` tag writes out as text.
+ */
+export function headingLevels(source: string): number[] {
+  const { root } = parseRoot(source);
+  if (!root) return [];
+  const levels: number[] = [];
+  walkNodes(root.fragment as Node, (node) => {
+    if (node.type === 'RegularElement' && /^h[1-6]$/.test(node.name as string))
+      levels.push(Number((node.name as string)[1]));
+    else if (node.type === 'HtmlTag')
+      levels.push(...htmlHeadingLevels(node.expression as Node));
+  });
+  return levels;
+}
+
+// A comment, script or style runs to its end, or to the end of the string
+// when unclosed; a heading tag matched inside one is consumed with it.
+const HTML_HEADING_RE =
+  /<!--[\s\S]*?(?:-->|$)|<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)|<h([1-6])(?=[\s/>])/gi;
+
+// Scans text, not parsed markup: the Svelte parser rejects HTML a browser
+// renders, such as an unclosed tag or a stray brace.
+function htmlHeadingLevels(expression: Node): number[] {
+  return renderedStrings(expression).flatMap((text) =>
+    [...text.matchAll(HTML_HEADING_RE)]
+      .filter((m) => m[2] !== undefined)
+      .map((m) => Number(m[2])),
+  );
+}
+
+/**
+ * The string literals an expression's value is built from, in source order.
+ * A string a call or member access consumes is not part of the value.
+ */
+function renderedStrings(node: Node): string[] {
+  switch (node.type) {
+    case 'Literal':
+      return typeof node.value === 'string' ? [node.value] : [];
+    case 'TemplateLiteral': {
+      const quasis = node.quasis as Node[];
+      const expressions = node.expressions as Node[];
+      return quasis.flatMap((quasi, i) => [
+        (quasi.value as { cooked: string | null }).cooked ?? '',
+        ...(i < expressions.length ? renderedStrings(expressions[i]) : []),
+      ]);
+    }
+    case 'BinaryExpression':
+      return node.operator === '+'
+        ? [node.left, node.right].flatMap((n) => renderedStrings(n as Node))
+        : [];
+    case 'LogicalExpression':
+      return (
+        node.operator === '&&' ? [node.right] : [node.left, node.right]
+      ).flatMap((n) => renderedStrings(n as Node));
+    case 'ConditionalExpression':
+      return [node.consequent, node.alternate].flatMap((n) =>
+        renderedStrings(n as Node),
+      );
+    default:
+      return [];
+  }
+}
+
 /** Names a page binds from its own modules, which shadow the built-in components. */
 function locallyImportedNames(root: Node): Set<string> {
   return new Set(

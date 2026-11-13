@@ -19,6 +19,7 @@ import {
   findComponents,
   type ComponentMatch,
   getParseError,
+  headingLevels,
   scriptImports,
   useQuestionGrading,
   usesLegacyModuleContext,
@@ -78,7 +79,7 @@ function validatePageFile(
 
   const parseError = getParseError(content);
   if (parseError) {
-    d.error(`${fileRel}: could not parse, ${parseError}`);
+    d.error(`could not parse, ${parseError}`);
     return {
       page: {
         fileRel,
@@ -91,30 +92,23 @@ function validatePageFile(
     };
   }
 
-  const pageConfig = validatePageConfig(content, fileRel, d);
+  const pageConfig = validatePageConfig(content, d);
 
   const quiz = pageConfig?.quiz;
   const isQuiz = isRecord(quiz);
   const isGradedQuiz = isQuiz && quiz.graded === true;
-  validateQuizConfig(quiz, fileRel, d);
+  validateQuizConfig(quiz, d);
 
-  checkOneOf(
-    `${fileRel}: pageConfig.completesOn`,
-    ['view'],
-    pageConfig?.completesOn,
-    d,
-  );
+  checkOneOf('pageConfig.completesOn', ['view'], pageConfig?.completesOn, d);
   const completesOnView = pageConfig?.completesOn === 'view';
   const declaresGraded =
-    validateBoolean(pageConfig?.graded, 'pageConfig.graded', fileRel, d) ??
-    false;
+    validateBoolean(pageConfig?.graded, 'pageConfig.graded', d) ?? false;
   const declaresRequired = validateBoolean(
     pageConfig?.required,
     'pageConfig.required',
-    fileRel,
     d,
   );
-  const weight = validatePageWeight(pageConfig?.weight, fileRel, d);
+  const weight = validatePageWeight(pageConfig?.weight, d);
   const graded = isGradedQuiz || declaresGraded;
   const requiredGraded = isRequiredGradedPage({
     graded,
@@ -126,7 +120,7 @@ function validatePageFile(
   const useQuestions = useQuestionGrading(content);
   if (declaresGraded && isQuiz && !isGradedQuiz) {
     d.error(
-      `${fileRel}: pageConfig.graded is set on a quiz page whose quiz is not graded. ` +
+      'pageConfig.graded is set on a quiz page whose quiz is not graded. ' +
         "The quiz ignores a question's own `graded`, so nothing on the page can earn a score " +
         'and it never completes. ' +
         'Use quiz: { graded: true }, or drop graded: true.',
@@ -138,7 +132,7 @@ function validatePageFile(
   ] as const) {
     if (value !== undefined && !graded) {
       d.warn(
-        `${fileRel}: pageConfig.${field} only applies to a graded page. ` +
+        `pageConfig.${field} only applies to a graded page. ` +
           'Without `graded: true` (or `quiz: { graded: true }`) the page never joins the rollup, ' +
           'so it is ignored.',
       );
@@ -150,7 +144,7 @@ function validatePageFile(
     splitsAcrossBranches(listedGradedQuestions(questionComponents))
   ) {
     d.warn(
-      `${fileRel}: graded questions sit in different branches of one {#if}, {#each} or {#await}. ` +
+      'graded questions sit in different branches of one {#if}, {#each} or {#await}. ' +
         'The page counts as answered only once every graded question on it is, ' +
         'so a learner shown only one branch can never finish it. ' +
         'Put each branch on its own page, or drop graded from the branch questions.',
@@ -163,17 +157,17 @@ function validatePageFile(
       questionComponents.some(isLiterallyGradedQuestion));
   if (gradesUndeclared) {
     d.error(
-      `${fileRel}: a question on this page is graded, but pageConfig does not declare graded: true, ` +
+      'a question on this page is graded, but pageConfig does not declare graded: true, ' +
         'so its score never reaches the course score or passed/failed. Add graded: true to ' +
         'pageConfig, or drop graded from the question.',
     );
   }
 
-  validateAssetRefs(content, fileRel, assetsDir, d, assetExistsCache);
-  validateQuestionComponents(questionComponents, fileRel, d, profile);
-  validateMediaComponents(content, fileRel, d);
-  validateHeadingOrder(content, fileRel, d);
-  validateContractBypass(content, fileRel, d);
+  validateAssetRefs(content, assetsDir, d, { existsCache: assetExistsCache });
+  validateQuestionComponents(questionComponents, d, profile);
+  validateMediaComponents(content, d);
+  validateHeadingOrder(content, d);
+  validateContractBypass(content, d);
   if (
     (isQuiz || declaresGraded) &&
     useQuestions === 'absent' &&
@@ -181,8 +175,8 @@ function validatePageFile(
     !hasCustomWidget
   ) {
     d.warn(
-      `${fileRel}: ${isQuiz ? 'quiz' : 'graded'} page has no question ` +
-        `components or useQuestion() calls — it will have nothing to score`,
+      `${isQuiz ? 'quiz' : 'graded'} page has no question ` +
+        'components or useQuestion() calls, so it will have nothing to score',
     );
   } else if (
     declaresGraded &&
@@ -192,8 +186,8 @@ function validatePageFile(
     (useQuestions === 'absent' || useQuestions === 'none')
   ) {
     d.warn(
-      `${fileRel}: pageConfig.graded is set but no question on the page is graded — ` +
-        `the page can never earn a score, so under completion.mode "percentage" it ` +
+      'pageConfig.graded is set but no question on the page is graded. ' +
+        'The page can never earn a score, so under completion.mode "percentage" it ' +
         `never completes. Mark at least one question component \`graded\`, or build one ` +
         `with useQuestion({ graded: true }).`,
     );
@@ -239,12 +233,10 @@ export function validatePages(
 
   const validateMeta = (metaPath: string) =>
     d.within(relative(projectRoot, metaPath), () =>
-      validateMetaFile(metaPath, projectRoot, d),
+      validateMetaFile(metaPath, d),
     );
-  const warnAbout = (path: string, message: string) => {
-    const rel = relative(projectRoot, path);
-    d.within(rel, () => d.warn(`${rel}: ${message}`));
-  };
+  const warnAbout = (path: string, message: string) =>
+    d.within(relative(projectRoot, path), () => d.warn(message));
 
   const course = walkPages(pagesDir);
   for (const entry of course.strayFiles) {
@@ -270,7 +262,7 @@ export function validatePages(
       const meta =
         lesson.name === null ? sectionMeta : validateMeta(lesson.metaPath);
       d.within(relative(projectRoot, lesson.metaPath), () =>
-        validatePageList(lesson, meta?.pages, ctx),
+        validatePageList(lesson, meta?.pages, d),
       );
 
       // Same ordering as generateManifest.
@@ -299,10 +291,9 @@ export function validatePages(
 function validatePageList(
   lesson: WalkedLesson,
   pages: string[] | undefined,
-  { projectRoot, d }: PageContext,
+  d: Diagnostics,
 ): void {
   if (!pages) return;
-  const metaRel = relative(projectRoot, lesson.metaPath);
   const listed = new Map<string, string>();
   for (const pageName of pages) {
     const fileName = ensureSvelteSuffix(pageName);
@@ -312,15 +303,13 @@ function validatePageList(
         first === pageName
           ? `${formatValue(pageName)} more than once`
           : `the same page as ${formatValue(first)} and ${formatValue(pageName)}`;
-      d.warn(
-        `${metaRel}: pages array lists ${repeated}, so only the first entry counts`,
-      );
+      d.warn(`pages array lists ${repeated}, so only the first entry counts`);
       continue;
     }
     listed.set(fileName, pageName);
     if (!lesson.files.includes(fileName)) {
       d.error(
-        `${metaRel}: pages array lists ${formatValue(pageName)} but ${fileName} not found in this directory`,
+        `pages array lists ${formatValue(pageName)} but ${fileName} not found in this directory`,
       );
     }
   }
@@ -328,37 +317,29 @@ function validatePageList(
     for (const file of lesson.files) {
       if (!listed.has(file)) {
         d.warn(
-          `${relative(projectRoot, resolve(lesson.dir, file))}: not listed in _meta.js pages array — will be appended at end`,
+          `pages array does not list ${file}, so it is appended at the end`,
         );
       }
     }
   }
 }
 
-function validateMetaFile(
-  metaPath: string,
-  projectRoot: string,
-  d: Diagnostics,
-): MetaFile | null {
+function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
   const { meta, problem, rejected = {} } = readMetaFile(metaPath);
   if (problem === 'missing') return null;
-
-  const metaRel = relative(projectRoot, metaPath);
   if (problem) {
-    d.error(`${metaRel}: ${READ_FAILURE_MESSAGES[problem]}`);
+    d.error(READ_FAILURE_MESSAGES[problem]);
     return null;
   }
 
   if ('title' in rejected) {
-    d.error(
-      `${metaRel}: "title" must be a string, got ${describeType(rejected.title)}`,
-    );
+    d.error(`"title" must be a string, got ${describeType(rejected.title)}`);
   } else if (!meta.title) {
-    d.error(`${metaRel}: missing required "title" field`);
+    d.error('missing required "title" field');
   }
   if ('pages' in rejected) {
     d.error(
-      `${metaRel}: "pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,
+      `"pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,
     );
   }
 
@@ -367,24 +348,21 @@ function validateMetaFile(
 
 function validatePageConfig(
   content: string,
-  fileRel: string,
   d: Diagnostics,
 ): Partial<Record<keyof PageConfig, unknown>> | null {
   if (usesLegacyModuleContext(content)) {
-    d.error(
-      `${fileRel}: <script context="module"> is not supported; use <script module>`,
-    );
+    d.error('<script context="module"> is not supported; use <script module>');
   }
   const result = parsePageConfigFromSource(content);
   if (result.kind === 'ok') {
     for (const key of Object.keys(result.value)) {
       if (!KNOWN_PAGE_FIELDS.has(key))
-        d.warn(`${fileRel}: unknown field pageConfig.${key} is ignored`);
+        d.warn(`unknown field pageConfig.${key} is ignored`);
     }
     return result.value;
   }
   if (result.kind === 'invalid') {
-    d.error(`${fileRel}: pageConfig ${STATIC_LITERAL_RULE}`);
+    d.error(`pageConfig ${STATIC_LITERAL_RULE}`);
   }
   return null;
 }
@@ -424,23 +402,21 @@ function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
 function validateBoolean(
   value: unknown,
   label: string,
-  fileRel: string,
   d: Diagnostics,
 ): boolean | undefined {
   if (value === undefined || typeof value === 'boolean') return value;
-  d.error(`${fileRel}: ${label} must be a boolean, got ${formatValue(value)}`);
+  d.error(`${label} must be a boolean, got ${formatValue(value)}`);
   return undefined;
 }
 
 function validatePageWeight(
   weight: unknown,
-  fileRel: string,
   d: Diagnostics,
 ): number | undefined {
   if (weight === undefined) return undefined;
   if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
     d.warn(
-      `${fileRel}: pageConfig.weight ${formatValue(weight)} is not a positive finite number and is ignored (treated as 1)`,
+      `pageConfig.weight ${formatValue(weight)} is not a positive finite number and is ignored (treated as 1)`,
     );
     return undefined;
   }
@@ -462,16 +438,10 @@ const PAGE_LEVEL_FIELDS = new Set<string>([
   'completesOn',
 ] satisfies (keyof PageConfig)[]);
 
-function validateQuizConfig(
-  quiz: unknown,
-  fileRel: string,
-  d: Diagnostics,
-): void {
+function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
   if (quiz == null || quiz === false) return;
   if (!isRecord(quiz)) {
-    d.error(
-      `${fileRel}: pageConfig.quiz must be an object, got ${describeType(quiz)}`,
-    );
+    d.error(`pageConfig.quiz must be an object, got ${describeType(quiz)}`);
     return;
   }
 
@@ -479,72 +449,41 @@ function validateQuizConfig(
     const val = quiz.maxAttempts;
     if (typeof val !== 'number' || !(val > 0)) {
       d.error(
-        `${fileRel}: quiz.maxAttempts must be a positive number or Infinity, got ${formatValue(val)}`,
+        `quiz.maxAttempts must be a positive number or Infinity, got ${formatValue(val)}`,
       );
     }
   }
 
   for (const field of ['graded', 'gatesProgress']) {
-    validateBoolean(quiz[field], `quiz.${field}`, fileRel, d);
+    validateBoolean(quiz[field], `quiz.${field}`, d);
   }
 
   for (const key of Object.keys(quiz)) {
     if (KNOWN_QUIZ_FIELDS.has(key)) continue;
     d.warn(
       PAGE_LEVEL_FIELDS.has(key)
-        ? `${fileRel}: quiz.${key} is ignored. Set ${key} on pageConfig, beside quiz.`
-        : `${fileRel}: unknown field quiz.${key} is ignored`,
+        ? `quiz.${key} is ignored. Set ${key} on pageConfig, beside quiz.`
+        : `unknown field quiz.${key} is ignored`,
     );
   }
 
-  checkOneOf(
-    `${fileRel}: quiz.feedbackMode`,
-    FEEDBACK_MODES,
-    quiz.feedbackMode,
-    d,
-  );
-  checkOneOf(`${fileRel}: quiz.retryMode`, RETRY_MODES, quiz.retryMode, d);
-}
-
-/** Remove HTML/Svelte comments so commented-out markup isn't scanned as live. */
-const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
-
-const SCRIPT_STYLE_RE = /<(script|style)\b[\s\S]*?<\/\1>/gi;
-
-// Loop until stable: one pass can leave a reconstructed tag behind (e.g. `<scr<script></script>ipt>`).
-function stripRepeated(input: string, patterns: RegExp[]): string {
-  let out = input;
-  for (const pattern of patterns) {
-    let prev: string;
-    do {
-      prev = out;
-      out = out.replace(pattern, '');
-    } while (out !== prev);
-  }
-  return out;
+  checkOneOf('quiz.feedbackMode', FEEDBACK_MODES, quiz.feedbackMode, d);
+  checkOneOf('quiz.retryMode', RETRY_MODES, quiz.retryMode, d);
 }
 
 /**
- * Rule 1.6: warn on a skipped heading level (e.g. h2 → h4). Scripts, styles, and comments
- * are stripped first so string literals, CSS, and commented-out markup can't be
- * miscounted. No "one h1 per page" check — the layout owns the page h1 and child
- * components emit headings a static scan can't see; that belongs to the Tier-2
- * audit.
+ * Rule 1.6: warn on a skipped heading level (e.g. h2 → h4). No "one h1 per
+ * page" check: the layout owns the page h1 and child components emit headings
+ * a static scan can't see; that belongs to the Tier-2 audit.
  */
-function validateHeadingOrder(
-  content: string,
-  fileRel: string,
-  d: Diagnostics,
-): void {
-  const html = stripRepeated(content, [SCRIPT_STYLE_RE, HTML_COMMENT_RE]);
-  const levels = [...html.matchAll(/<h([1-6])\b/gi)].map((h) => Number(h[1]));
+function validateHeadingOrder(content: string, d: Diagnostics): void {
   let prevSeen: number | null = null;
-  for (const level of levels) {
+  for (const level of headingLevels(content)) {
     if (prevSeen !== null && level - prevSeen > 1) {
       d.warn(
         tag(
           A11Y_IDS.headingOrder,
-          `${fileRel}: heading level jumps from h${prevSeen} to h${level} — don't skip levels (WCAG 1.3.1)`,
+          `heading level jumps from h${prevSeen} to h${level}. Don't skip levels (WCAG 1.3.1)`,
         ),
       );
     }
@@ -558,23 +497,19 @@ const RUNTIME_INTERNAL_IMPORT_RE = /from\s+['"]tessera-learn\/runtime\//;
 
 /**
  * Detect ways an author file can bypass the LMS data contract. These check
- * source text for known escape hatches — they never inspect course content,
+ * source text for known escape hatches; they never inspect course content,
  * so they constrain how you wire things up, not what you build.
  */
-function validateContractBypass(
-  content: string,
-  fileRel: string,
-  d: Diagnostics,
-): void {
+function validateContractBypass(content: string, d: Diagnostics): void {
   if (QUIZ_COMPLETE_DISPATCH_RE.test(content)) {
     d.error(
-      `${fileRel}: dispatches "tessera-quiz-complete" directly. The event is a ` +
+      'dispatches "tessera-quiz-complete" directly. The event is a ' +
         `notification, not the scoring path; call useQuiz().submit() instead`,
     );
   }
   if (RUNTIME_INTERNAL_IMPORT_RE.test(content)) {
     d.error(
-      `${fileRel}: imports from tessera-learn/runtime/* — use the public hooks ` +
+      'imports from tessera-learn/runtime/*. Use the public hooks ' +
         `(useQuiz, useQuestion, useNavigation, …) instead`,
     );
   }
@@ -586,7 +521,9 @@ export function validateShells(projectRoot: string, d: Diagnostics): void {
   for (const shellFile of SHELL_FILES) {
     const shellPath = resolve(projectRoot, shellFile);
     if (existsSync(shellPath)) {
-      validateContractBypass(readFileSync(shellPath, 'utf-8'), shellFile, d);
+      d.within(shellFile, () =>
+        validateContractBypass(readFileSync(shellPath, 'utf-8'), d),
+      );
     }
   }
 }
