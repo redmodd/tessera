@@ -121,13 +121,14 @@ export default {
 
 ```
 my-course/
-├── course.config.js          # Course configuration
+├── course.config.js          # Course configuration, with a title
 └── pages/                     # at least one section dir with .svelte files
     └── intro/
-        └── welcome.svelte
+        ├── _meta.js           # Section title
+        └── welcome.svelte     # pageConfig with a title
 ```
 
-`pages/` must contain one or more **section directories**, each with one or more `.svelte` files (directly or in lesson subdirectories).
+`pages/` must contain one or more **section directories**, each with a `_meta.js` and one or more `.svelte` files (directly or in lesson subdirectories, which need a `_meta.js` too).
 
 ### Optional
 
@@ -141,10 +142,10 @@ my-course/
 ├── styles/                    # Custom CSS overrides
 └── pages/
     └── 01-intro/              # Numeric prefix → controls order
-        ├── _meta.js           # Section title; page order
+        ├── _meta.js           # Section title (required); page order
         ├── welcome.svelte     # Page directly in the section ("flat" shape)
         └── 01-getting-started/  # Lesson subdirectory ("nested" shape)
-            ├── _meta.js
+            ├── _meta.js       # Lesson title (required); page order
             └── overview.svelte
 ```
 

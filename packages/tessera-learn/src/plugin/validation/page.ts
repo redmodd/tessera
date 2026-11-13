@@ -349,7 +349,9 @@ function validateMetaFile(
     return null;
   }
 
-  checkTitle('"title"', 'title' in rejected ? rejected.title : meta.title, d);
+  if (required) {
+    checkTitle('"title"', 'title' in rejected ? rejected.title : meta.title, d);
+  }
   if ('pages' in rejected) {
     d.error(
       `"pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,

@@ -694,6 +694,16 @@ export const pageConfig = {
     expect(manifest.pages[0].quiz).toBeNull();
   });
 
+  it('marks a missing or blank title as "(no title)"', () => {
+    createFile('01-s/01-l/_meta.js', 'export default { title: "  " };');
+    createFile('01-s/01-l/page.svelte', '<h1>Hello</h1>');
+    const manifest = generateManifest(root);
+
+    expect(manifest.sections[0].title).toBe('(no title)');
+    expect(manifest.sections[0].lessons[0].title).toBe('(no title)');
+    expect(manifest.pages[0].title).toBe('(no title)');
+  });
+
   it('includes section-level .svelte files as flat-shape pages', () => {
     createFile('01-intro/_meta.js', 'export default { title: "Intro" };');
     createFile('01-intro/welcome.svelte', '<h1>Welcome</h1>');

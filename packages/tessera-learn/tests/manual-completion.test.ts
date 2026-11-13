@@ -8,6 +8,7 @@ import {
   createConfig,
   manualConfig,
   tempDir,
+  titledMeta,
   titledPage,
 } from './helpers.js';
 
@@ -53,7 +54,7 @@ describe('manual completion — validation', () => {
       'intro.svelte': titledPage('<h1>Intro</h1>', 'Intro'),
       'outro.svelte': titledPage('<h1>Outro</h1>', 'Outro'),
     },
-    lessonMeta = 'export default { title: "L" };',
+    lessonMeta = titledMeta('L'),
   ): void {
     writeFile('course.config.js', configBody);
     mkdirSync(join(testRoot, 'assets'));

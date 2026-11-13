@@ -81,6 +81,11 @@ export function stripPrefix(name: string): string {
   return name.replace(/^\d+-/, '');
 }
 
+// Only `tessera dev` serves an untitled entry: validation fails the build.
+function titleOf(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value : '(no title)';
+}
+
 type ReadFailure =
   | { ok: false; reason: 'missing' | 'parse-error' | 'no-export' }
   | { ok: false; reason: 'not-data'; source: string };
@@ -419,7 +424,7 @@ export function generateManifest(
     const sectionSlug = stripPrefix(walkedSection.name);
 
     const section: ManifestSection = {
-      title: sectionMeta.title ?? '',
+      title: titleOf(sectionMeta.title),
       slug: sectionSlug,
       lessons: [],
     };
@@ -437,7 +442,7 @@ export function generateManifest(
         : `/pages/${walkedSection.name}/${walkedLesson.name}`;
 
       const lesson: ManifestLesson = {
-        title: isFlat ? '' : (lessonMeta.title ?? ''),
+        title: isFlat ? '' : titleOf(lessonMeta.title),
         slug: lessonSlug,
         pages: [],
       };
@@ -469,7 +474,7 @@ export function generateManifest(
             : [];
         const page: ManifestPage = {
           index: pageIndex,
-          title: typeof pageConfig.title === 'string' ? pageConfig.title : '',
+          title: titleOf(pageConfig.title),
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
           quiz,

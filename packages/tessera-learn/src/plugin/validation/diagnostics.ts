@@ -114,8 +114,10 @@ export function checkTitle(
 ): void {
   if (typeof value === 'string' && value.trim()) return;
   d.error(
-    value === undefined || typeof value === 'string'
+    value === undefined
       ? missing
-      : `${field} must be a string, got ${describeType(value)}`,
+      : typeof value === 'string'
+        ? `${field} is empty`
+        : `${field} must be a string, got ${describeType(value)}`,
   );
 }

@@ -490,19 +490,17 @@ describe('config validation', () => {
   });
 
   it.each([
-    ['missing', ''],
-    ['empty', 'title: "",'],
-    ['only whitespace', 'title: "   ",'],
-  ])('errors when title is %s', (_, title) => {
+    ['missing', '', 'missing required "title" field'],
+    ['empty', 'title: "",', '"title" is empty'],
+    ['only whitespace', 'title: "   ",', '"title" is empty'],
+  ])('errors when title is %s', (_, title, message) => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
       `export default { ${title} language: "en", export: { standard: "web" } };`,
     );
     const { errors } = validateProject(testRoot);
-    expect(errors).toContain(
-      'course.config.js: missing required "title" field',
-    );
+    expect(errors).toContain(`course.config.js: ${message}`);
   });
 
   it('errors when title is not a string', () => {
@@ -753,9 +751,7 @@ describe('_meta.js validation', () => {
       'export default { title: "  " };',
     );
     const { errors } = validateProject(testRoot);
-    expect(errors).toContain(
-      'pages/01-section/_meta.js: missing required "title" field',
-    );
+    expect(errors).toContain('pages/01-section/_meta.js: "title" is empty');
   });
 
   it.each(['pages/01-section/_meta.js', 'pages/01-section/01-lesson/_meta.js'])(
@@ -779,23 +775,35 @@ describe('_meta.js validation', () => {
     },
   );
 
+  it('allows an empty title in the _meta.js of a folder with no pages', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/02-draft/_meta.js',
+      'export default { title: "" };',
+    );
+    expect(validateProject(testRoot).errors).toEqual([]);
+  });
+
   it.each([
-    ['has no pageConfig', '<h1>Hi</h1>'],
+    ['has no pageConfig', '<h1>Hi</h1>', 'missing required pageConfig.title'],
     [
       'has no pageConfig.title',
       '<script module>export const pageConfig = { required: false };</script>',
+      'missing required pageConfig.title',
     ],
     [
       'has an empty pageConfig.title',
       '<script module>export const pageConfig = { title: " " };</script>',
+      'pageConfig.title is empty',
     ],
-  ])('errors when a page %s', (_, source) => {
+  ])('errors when a page %s', (_, source, message) => {
     createValidProject(testRoot);
     writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', source);
     const { errors } = validateProject(testRoot);
     expect(errors).toContainEqual(
       expect.stringContaining(
-        'pages/01-section/01-lesson/page.svelte: missing required pageConfig.title',
+        `pages/01-section/01-lesson/page.svelte: ${message}`,
       ),
     );
   });
