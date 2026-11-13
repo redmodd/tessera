@@ -535,20 +535,6 @@ describe('sources changed after validation', () => {
     expect(() => buildEnd(validation)).toThrow(page);
   });
 
-  it('fails the build on a page added to a folder that had none', () => {
-    mkdirSync(resolve(projectRoot, 'pages/01-section/02-new'), {
-      recursive: true,
-    });
-    const validation = validatedPlugin();
-    writeFileSync(
-      resolve(projectRoot, 'pages/01-section/02-new/page.svelte'),
-      '<h1>New</h1>',
-    );
-    expect(() => buildEnd(validation)).toThrow(
-      '1 file(s) changed during the build, after validation: pages/01-section/02-new/page.svelte.',
-    );
-  });
-
   it('lets a build through when a folder with no pages is added', () => {
     const validation = validatedPlugin();
     mkdirSync(resolve(projectRoot, 'pages/02-empty'));

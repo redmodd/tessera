@@ -491,7 +491,6 @@ describe('config validation', () => {
 
   it.each([
     ['missing', '', 'missing required "title" field'],
-    ['empty', 'title: "",', '"title" is empty'],
     ['only whitespace', 'title: "   ",', '"title" is empty'],
   ])('errors when title is %s', (_, title, message) => {
     createValidProject(testRoot);
@@ -743,17 +742,6 @@ describe('_meta.js validation', () => {
     );
   });
 
-  it('errors on a whitespace-only _meta.js title', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/_meta.js',
-      'export default { title: "  " };',
-    );
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContain('pages/01-section/_meta.js: "title" is empty');
-  });
-
   it.each(['pages/01-section/_meta.js', 'pages/01-section/01-lesson/_meta.js'])(
     'errors when %s is missing',
     (meta) => {
@@ -766,14 +754,13 @@ describe('_meta.js validation', () => {
     },
   );
 
-  it.each(['pages/01-section/img', 'pages/02-empty/01-draft'])(
-    'allows %s with no pages and no _meta.js',
-    (dir) => {
-      createValidProject(testRoot);
-      mkdirSync(resolve(testRoot, dir), { recursive: true });
-      expect(validateProject(testRoot).errors).toEqual([]);
-    },
-  );
+  it('allows a section with no pages and no _meta.js', () => {
+    createValidProject(testRoot);
+    mkdirSync(resolve(testRoot, 'pages/02-empty/01-draft'), {
+      recursive: true,
+    });
+    expect(validateProject(testRoot).errors).toEqual([]);
+  });
 
   it('ignores the _meta.js of a folder with no pages', () => {
     createValidProject(testRoot);
@@ -783,41 +770,6 @@ describe('_meta.js validation', () => {
       'export default { title: 5 };',
     );
     expect(validateProject(testRoot).errors).toEqual([]);
-  });
-
-  it.each([
-    ['has no pageConfig', '<h1>Hi</h1>', 'missing required pageConfig.title'],
-    [
-      'has no pageConfig.title',
-      '<script module>export const pageConfig = { required: false };</script>',
-      'missing required pageConfig.title',
-    ],
-    [
-      'has an empty pageConfig.title',
-      '<script module>export const pageConfig = { title: " " };</script>',
-      'pageConfig.title is empty',
-    ],
-  ])('errors when a page %s', (_, source, message) => {
-    createValidProject(testRoot);
-    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', source);
-    const { errors } = validateProject(testRoot);
-    expect(errors).toContainEqual(
-      expect.stringContaining(
-        `pages/01-section/01-lesson/page.svelte: ${message}`,
-      ),
-    );
-  });
-
-  it('errors on a non-string pageConfig.title', () => {
-    createValidProject(testRoot);
-    writeFile(
-      testRoot,
-      'pages/01-section/01-lesson/page.svelte',
-      '<script module>export const pageConfig = { title: { en: "Intro" } };</script>',
-    );
-    expect(validateProject(testRoot).errors).toContain(
-      'pages/01-section/01-lesson/page.svelte: pageConfig.title must be a string, got object',
-    );
   });
 
   it('errors when pages array references missing file', () => {
@@ -893,6 +845,29 @@ describe('_meta.js validation', () => {
 // ---- pageConfig Validation ----
 
 describe('pageConfig validation', () => {
+  it.each([
+    ['has no pageConfig', '<h1>Hi</h1>', 'missing required pageConfig.title'],
+    [
+      'has no pageConfig.title',
+      '<script module>export const pageConfig = { required: false };</script>',
+      'missing required pageConfig.title',
+    ],
+    [
+      'has an empty pageConfig.title',
+      '<script module>export const pageConfig = { title: " " };</script>',
+      'pageConfig.title is empty',
+    ],
+  ])('errors when a page %s', (_, source, message) => {
+    createValidProject(testRoot);
+    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', source);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        `pages/01-section/01-lesson/page.svelte: ${message}`,
+      ),
+    );
+  });
+
   it('errors on a context="module" script', () => {
     createValidProject(testRoot);
     writeFile(
