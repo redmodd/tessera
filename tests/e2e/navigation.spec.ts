@@ -204,12 +204,7 @@ test.describe('Navigation — Free Mode', () => {
   });
 
   for (const [name, property, value, shadedFrom] of [
-    [
-      'follow the primary color on <html>',
-      '--tessera-primary',
-      '#b91c1c',
-      '#b91c1c',
-    ],
+    ['follow the primary color', '--tessera-primary', '#b91c1c', '#b91c1c'],
     [
       'keep the default for an unparseable primary color',
       '--tessera-primary',
@@ -219,20 +214,15 @@ test.describe('Navigation — Free Mode', () => {
     ['mix toward --tessera-text', '--tessera-text', '#000000', '#2563eb'],
   ]) {
     test(`the current page shades ${name}`, async ({ page }) => {
-      const expected = await page.evaluate(
-        ([property, value, shadedFrom]) => {
-          document.documentElement.style.setProperty(property, value);
-          const probe = document.body.appendChild(
-            document.createElement('div'),
-          );
-          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, transparent)`;
-          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, var(--tessera-text))`;
-          const { backgroundColor, color } = getComputedStyle(probe);
-          probe.remove();
-          return { backgroundColor, color };
-        },
-        [property, value, shadedFrom],
-      );
+      await page.addStyleTag({ content: `:root { ${property}: ${value}; }` });
+      const expected = await page.evaluate((shadedFrom) => {
+        const probe = document.body.appendChild(document.createElement('div'));
+        probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, transparent)`;
+        probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, var(--tessera-text))`;
+        const { backgroundColor, color } = getComputedStyle(probe);
+        probe.remove();
+        return { backgroundColor, color };
+      }, shadedFrom);
       const current = page.locator('.tessera-nav-page[aria-current="page"]');
       await expect(current).toHaveCSS(
         'background-color',

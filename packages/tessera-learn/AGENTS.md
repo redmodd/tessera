@@ -89,12 +89,12 @@ cd courses/<name> && npx tessera dev    # inside a course: npx, not pnpm, and om
 
 ### What `new` scaffolds
 
-| File                         | Contents                                                                                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `course.config.js`           | `title`, a generated `id`, `language`, `branding.primaryColor`, free navigation, percentage completion at 100, `passingScore: 70`, web export |
-| `layout.svelte`              | Custom chrome: header, Previous/Next. No sidebar and no Exit button                                                                           |
-| `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                                                                              |
-| `styles/custom.css`          | Empty stylesheet for overrides                                                                                                                |
+| File                         | Contents                                                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `course.config.js`           | `title`, a generated `id`, `language`, free navigation, percentage completion at 100, `passingScore: 70`, web export |
+| `layout.svelte`              | Custom chrome: header, Previous/Next. No sidebar and no Exit button                                                  |
+| `pages/01-getting-started/…` | One section, one lesson, one page, each folder with a `_meta.js`                                                     |
+| `styles/custom.css`          | `--tessera-primary` on `:root`, for overrides                                                                        |
 
 Delete `layout.svelte` to get the default chrome (sidebar, plus an Exit button under an LMS). See [Custom Layouts](docs/recipes.md#custom-layouts).
 
@@ -539,18 +539,19 @@ Feedback text and the quiz score label render in `--tessera-success` / `--tesser
 
 ```css
 :root {
-  --tessera-text: #111827;
+  --tessera-primary: #0066cc;
   --tessera-content-max-width: 960px;
 }
 ```
 
-**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `--tessera-primary-bg`, `-hover` and `-on-bg-strong` shades and the success and error tints mix from the `:root` values of the color tokens, so set color tokens on `:root` for them to follow. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
+The `--tessera-primary-bg`, `-hover` and `-on-bg-strong` shades and the success and error tints mix from the `:root` values of the color tokens, so set color tokens on `:root` for them to follow. The properties with a hex default above take a color only: any other value, a gradient included, falls back to that default.
 
-**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary, and darken to `--tessera-primary-hover` on hover. Links, outlined buttons, hints and selection indicators (selected borders, the radio dot, the progress bar) use `--tessera-primary-on-bg` on `--tessera-bg` and `--tessera-bg-secondary`. It's unset so it follows a `--tessera-primary` set on any element: in your own CSS, write `var(--tessera-primary-on-bg, var(--tessera-primary))`. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast, `-on-bg` against both backgrounds. Darkening can push the hover fill under 4.5:1 with dark `--tessera-on-primary` text (orange does), so set `--tessera-primary-hover` to a fill that holds it. `tessera/primary-contrast` checks only `branding.primaryColor` against white and still warns: add it to `a11y.ignore` and run `tessera a11y`. That checks text as rendered, not hover states, so check the button hover fill yourself.
+**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary, and darken to `--tessera-primary-hover` on hover. Links, outlined buttons, hints and selection indicators (selected borders, the radio dot, the progress bar) use `--tessera-primary-on-bg` on `--tessera-bg` and `--tessera-bg-secondary`. It's unset so it follows a `--tessera-primary` set on any element: in your own CSS, write `var(--tessera-primary-on-bg, var(--tessera-primary))`. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast, `-on-bg` against both backgrounds. Darkening can push the hover fill under 4.5:1 with dark `--tessera-on-primary` text (orange does), so set `--tessera-primary-hover` to a fill that holds it. Run `tessera a11y` to check text as rendered. It doesn't check hover states, so check the button hover fill yourself.
 
 ```css
 :root {
-  --tessera-on-primary: #1f2937; /* on a #facc15 primary */
+  --tessera-primary: #facc15;
+  --tessera-on-primary: #1f2937;
   --tessera-primary-on-bg: #854d0e;
 }
 ```
@@ -587,8 +588,6 @@ export default {
 
   branding: {
     logo: '', // e.g. "$assets/logo.png"
-    primaryColor: '#2563eb',
-    fontFamily: 'Inter, sans-serif',
   },
 
   chrome: 'default', // "default" | "custom" (pages render with no chrome); layout.svelte outranks it
@@ -688,16 +687,15 @@ Two passes plus components that are accessible by construction.
 
 **Static checks** run inside `validate` / `dev` / `export`, with no setup. `a11y_*` comes from the Svelte compiler, so `validate`, which compiles nothing, never reports it: `dev` prints it as pages compile, and `export`, `a11y` and `check` gate it. Each diagnostic starts with its rule ID, which is what `a11y.ignore` and `a11y.level` match:
 
-| Rule ID                    | Checks                                                    |
-| -------------------------- | --------------------------------------------------------- |
-| `tessera/image-alt`        | `<Image>` has `alt` or `decorative`, not both             |
-| `tessera/media-title`      | `<Video>` / `<Audio>` has a `title`                       |
-| `tessera/media-captions`   | native `<Video>` has `tracks` or a `transcript`           |
-| `tessera/media-transcript` | `<Audio>` and embedded `<Video>` have a `transcript`      |
-| `tessera/question-label`   | question prompts are not empty                            |
-| `tessera/heading-order`    | page headings skip no level                               |
-| `tessera/primary-contrast` | `branding.primaryColor` has enough contrast against white |
-| `a11y_*`                   | the Svelte compiler's accessibility warnings              |
+| Rule ID                    | Checks                                               |
+| -------------------------- | ---------------------------------------------------- |
+| `tessera/image-alt`        | `<Image>` has `alt` or `decorative`, not both        |
+| `tessera/media-title`      | `<Video>` / `<Audio>` has a `title`                  |
+| `tessera/media-captions`   | native `<Video>` has `tracks` or a `transcript`      |
+| `tessera/media-transcript` | `<Audio>` and embedded `<Video>` have a `transcript` |
+| `tessera/question-label`   | question prompts are not empty                       |
+| `tessera/heading-order`    | page headings skip no level                          |
+| `a11y_*`                   | the Svelte compiler's accessibility warnings         |
 
 **Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast) and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
 

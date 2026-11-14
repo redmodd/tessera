@@ -29,9 +29,7 @@ import {
   type ManualCompletion,
   type PercentageCompletion,
 } from '../../runtime/types.js';
-import { contrastRatio } from '../a11y/contrast.js';
 import { isCspOverrides } from '../csp.js';
-import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
   checkTitle,
@@ -61,6 +59,11 @@ const KNOWN_CONFIG_FIELDS = new Set(
     xapi: true,
     a11y: true,
   } satisfies Record<keyof CourseConfig, true>),
+);
+const KNOWN_BRANDING_FIELDS = new Set(
+  Object.keys({
+    logo: true,
+  } satisfies Record<keyof NonNullable<CourseConfig['branding']>, true>),
 );
 
 const FIND_LANGUAGE_TAG =
@@ -272,28 +275,9 @@ function isJson5(text: string | null): boolean {
   }
 }
 
-// Permissive approximation of the browser's accepted color set: hex 3/4/6/8,
-// any CSS functional notation (rgb/hsl/hwb/lab/lch/oklab/oklch/color), or a
-// bare keyword (named colors, transparent, currentColor). Only the browser can
-// parse a color for sure, and it ignores one it can't, so an unrecognized
-// value is advisory, never an error. Lean permissive to avoid rejecting values
-// the browser would accept.
-const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-const FUNC_COLOR_RE =
-  /^(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color)\(.*\)$/i;
-const NAMED_COLOR_RE = /^[a-zA-Z]+$/;
-
-function isPlausibleColor(value: string): boolean {
-  const v = value.trim();
-  return (
-    HEX_COLOR_RE.test(v) || FUNC_COLOR_RE.test(v) || NAMED_COLOR_RE.test(v)
-  );
-}
-
 /**
- * Format checks on the branding block (advisory) plus rule 1.7's contrast check
- * on primaryColor. Runtime failures are mild: an unresolved logo ships a broken
- * <img src>, an unparseable color falls back to theme defaults.
+ * Format checks on the branding block (advisory). Runtime failures are mild: an
+ * unresolved logo ships a broken <img src>.
  */
 function validateBranding(
   branding: unknown,
@@ -307,6 +291,12 @@ function validateBranding(
     return;
   }
 
+  for (const key of Object.keys(branding)) {
+    if (!KNOWN_BRANDING_FIELDS.has(key)) {
+      d.warn(`unknown field "branding.${key}" will be ignored`);
+    }
+  }
+
   const logo = branding.logo;
   if (logo !== undefined) {
     if (typeof logo !== 'string') {
@@ -316,39 +306,6 @@ function validateBranding(
         field: 'branding.logo',
       });
     }
-  }
-
-  const primaryColor = branding.primaryColor;
-  if (primaryColor !== undefined) {
-    if (typeof primaryColor !== 'string') {
-      d.warn(
-        `"branding.primaryColor" must be a string, got ${describeType(primaryColor)}`,
-      );
-    } else if (!isPlausibleColor(primaryColor)) {
-      d.warn(
-        `"branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color. If the browser can't parse it, the course ignores it`,
-      );
-    } else {
-      // Rule 1.7 checks the default theme: primary text on a white page and white
-      // text on a primary fill, one symmetric ratio. It can't see token overrides in
-      // styles/, so it still fires; Tier 2 checks the rendered colors.
-      const ratio = contrastRatio(primaryColor, '#ffffff');
-      if (ratio !== null && ratio < 4.5) {
-        d.warn(
-          tag(
-            A11Y_IDS.primaryContrast,
-            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white, and WCAG AA needs 4.5:1 for links on the page and white text on buttons. To keep a light primary, set the color tokens in styles/ (see "Light primary colors" in the authoring guide), then add "${A11Y_IDS.primaryContrast}" to a11y.ignore and run tessera a11y`,
-          ),
-        );
-      }
-    }
-  }
-
-  const fontFamily = branding.fontFamily;
-  if (fontFamily !== undefined && typeof fontFamily !== 'string') {
-    d.warn(
-      `"branding.fontFamily" must be a string, got ${describeType(fontFamily)}`,
-    );
   }
 }
 

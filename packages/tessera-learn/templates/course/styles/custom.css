@@ -3,3 +3,7 @@
  * default theme. For deeper customisation, see the "Styling" section in
  * AGENTS.md.
  */
+
+:root {
+  --tessera-primary: #0066cc;
+}
