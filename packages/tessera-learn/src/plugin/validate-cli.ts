@@ -29,7 +29,7 @@ export function runValidate(
     );
   } else {
     console.log(
-      `${styleText('green', '[tessera]')} Validation passed — no issues found.`,
+      `${styleText('green', '[tessera]')} Validation passed with no issues.`,
     );
   }
   if (showA11yTip) {

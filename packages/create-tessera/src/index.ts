@@ -60,18 +60,14 @@ interface ParseResult {
 }
 
 export function parseArgs(argv: string[]): ParseResult {
-  let parsed;
+  if (argv.includes('--help') || argv.includes('-h')) return { help: true };
+
+  let positionals;
   try {
-    parsed = parseArgv({
-      args: argv,
-      options: { help: { type: 'boolean', short: 'h' } },
-      allowPositionals: true,
-    });
+    ({ positionals } = parseArgv({ args: argv, allowPositionals: true }));
   } catch (error) {
     return { error: (error as Error).message.split('. ')[0] };
   }
-  const { values, positionals } = parsed;
-  if (values.help) return { help: true };
   if (positionals.length > 1) {
     return { error: `Unexpected argument "${positionals[1]}"` };
   }

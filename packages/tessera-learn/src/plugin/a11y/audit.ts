@@ -501,7 +501,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
   const thresholdRank = IMPACT_LEVELS.indexOf(report.threshold);
   for (const p of report.pages) {
     if (p.loadFailed) {
-      console.log(`${styleText('red', '  ✗')} ${p.title} — failed to load`);
+      console.log(`${styleText('red', '  ✗')} ${p.title}: failed to load`);
       continue;
     }
     if (p.violations.length === 0) {
@@ -528,7 +528,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
         console.log(
           styleText(
             'gray',
-            `        … and ${hidden} more — see a11y-report.json`,
+            `        … and ${hidden} more (see a11y-report.json)`,
           ),
         );
       }
@@ -545,7 +545,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
   }
   if (report.passed) {
     console.log(
-      `${styleText('green', '[tessera a11y] Passed')} —${report.totalViolations} total finding(s), none at/above "${report.threshold}".`,
+      `${styleText('green', '[tessera a11y] Passed')}: ${report.totalViolations} total finding(s), none at/above "${report.threshold}".`,
     );
   } else {
     const reasons: string[] = [];
@@ -558,7 +558,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
       reasons.push(`${report.pagesFailedToLoad} page(s) failed to load`);
     }
     console.log(
-      `${styleText('red', '[tessera a11y] Failed')} —${reasons.join('; ')}.`,
+      `${styleText('red', '[tessera a11y] Failed')}: ${reasons.join('; ')}.`,
     );
   }
 }

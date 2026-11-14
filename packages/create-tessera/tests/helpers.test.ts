@@ -9,6 +9,7 @@ describe('parseArgs', () => {
   it('returns help when --help is passed', () => {
     expect(parseArgs(['--help'])).toEqual({ help: true });
     expect(parseArgs(['-h'])).toEqual({ help: true });
+    expect(parseArgs(['--bogus', '--help'])).toEqual({ help: true });
   });
 
   it('parses the workspace name', () => {
