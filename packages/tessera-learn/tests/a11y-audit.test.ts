@@ -10,7 +10,6 @@ import {
   launchWithInstall,
   mapNodeDetail,
   mapViolation,
-  runAudit,
 } from '../src/plugin/a11y/audit.js';
 
 const spawn = vi.hoisted(() => vi.fn());
@@ -18,17 +17,6 @@ vi.mock('node:child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:child_process')>()),
   spawn,
 }));
-vi.mock('@axe-core/playwright', () => ({ default: class {} }));
-
-describe('runAudit', () => {
-  it('asks for an upgrade when @axe-core/playwright predates 4.3', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(await runAudit('.', '.')).toBe(1);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('4.3 or later'),
-    );
-  });
-});
 
 describe('axeTags', () => {
   it('maps each standard to its cumulative tag list', () => {
@@ -120,7 +108,12 @@ describe('mapViolation', () => {
 
 describe('auditFindings', () => {
   it('adds a prohibited label from incomplete, and nothing else from it', () => {
-    const rule = (id: string) => ({ id, help: 'h', helpUrl: 'u', nodes: [] });
+    const rule = (id: string) => ({
+      id,
+      help: 'h',
+      helpUrl: 'u',
+      nodes: [{ target: ['p'] }],
+    });
     const ids = auditFindings({
       violations: [rule('color-contrast')],
       incomplete: [rule('aria-prohibited-attr'), rule('color-contrast')],

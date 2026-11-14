@@ -156,13 +156,14 @@ export default {};
     const embedUrl = `http://localhost:${(embed.address() as AddressInfo).port}/`;
     const dir = copyVariant('page-weight', 'audit-frames');
     const config = resolve(dir, 'course.config.js');
-    writeFileSync(
-      config,
-      readFileSync(config, 'utf-8').replace(
-        'export: {',
-        "export: { csp: { 'frame-src': ['http://localhost:*'] },",
-      ),
+    const source = readFileSync(config, 'utf-8');
+    const withCsp = source.replace(
+      'export: {',
+      "export: { csp: { 'frame-src': ['http://localhost:*'] },",
     );
+    // Without the CSP entry the embed is blocked and has no button to skip.
+    expect(withCsp).not.toBe(source);
+    writeFileSync(config, withCsp);
     // The first page: the audit's networkidle wait doesn't settle after
     // navigating to a page that adds a local frame (#442).
     writeFileSync(

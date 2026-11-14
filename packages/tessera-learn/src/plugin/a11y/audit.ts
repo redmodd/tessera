@@ -122,7 +122,40 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
   return [
     ...out.violations,
     ...out.incomplete.filter((r) => r.id === 'aria-prohibited-attr'),
-  ].map(mapViolation);
+  ]
+    .filter((r) => r.nodes.length > 0)
+    .map(mapViolation);
+}
+
+// A node inside a cross-origin frame is a third-party embed's markup (Video's
+// YouTube or Vimeo player) that the author can't fix. The <iframe> stays checked.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function dropCrossOriginNodes(page: any, results: any[]): Promise<void> {
+  const framed = results
+    .flatMap((r) => r.nodes)
+    .filter((n) => n.target.length > 1);
+  if (framed.length === 0) return;
+  const crossOrigin: boolean[] = await page.evaluate(
+    (paths: (string | string[])[][]) =>
+      paths.map((path) => {
+        let doc = document;
+        for (const selector of path) {
+          // A selector array walks into shadow roots.
+          const [host, ...shadow] = [selector].flat();
+          let el = doc.querySelector(host);
+          for (const s of shadow) el = el?.shadowRoot?.querySelector(s) ?? null;
+          if (!el || !('contentDocument' in el)) return false;
+          const inner = (el as HTMLIFrameElement).contentDocument;
+          if (!inner) return true;
+          doc = inner;
+        }
+        return false;
+      }),
+    framed.map((n) => n.target.slice(0, -1)),
+  );
+  const dropped = new Set(framed.filter((_, i) => crossOrigin[i]));
+  for (const r of results)
+    r.nodes = r.nodes.filter((n: unknown) => !dropped.has(n));
 }
 
 export function isMissingBrowserError(message: string): boolean {
@@ -295,7 +328,9 @@ interface LoadedDeps {
   AxeBuilder: any;
 }
 
-async function loadDeps(): Promise<LoadedDeps | undefined> {
+async function loadDeps(): Promise<
+  { ok: true; deps: LoadedDeps } | { ok: false; missing: string }
+> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let chromium: any;
   for (const spec of PLAYWRIGHT_SPECS) {
@@ -309,19 +344,16 @@ async function loadDeps(): Promise<LoadedDeps | undefined> {
       // try the next specifier
     }
   }
-  if (!chromium) return undefined;
+  if (!chromium) return { ok: false, missing: 'playwright' };
 
   try {
     const mod = (await tryImport('@axe-core/playwright')) as {
-      default?: { prototype?: { setLegacyMode?: unknown } };
+      default?: unknown;
     };
-    // setLegacyMode arrived in 4.3; an older copy only warns as a peer.
-    if (typeof mod.default?.prototype?.setLegacyMode !== 'function') {
-      return undefined;
-    }
-    return { chromium, AxeBuilder: mod.default };
+    if (!mod.default) return { ok: false, missing: '@axe-core/playwright' };
+    return { ok: true, deps: { chromium, AxeBuilder: mod.default } };
   } catch {
-    return undefined;
+    return { ok: false, missing: '@axe-core/playwright' };
   }
 }
 
@@ -338,16 +370,16 @@ export async function runAudit(
   const threshold: ImpactLevel = options.threshold ?? 'serious';
 
   const deps = await loadDeps();
-  if (!deps) {
+  if (!deps.ok) {
     console.error(
-      `${stderrTag()} Tier 2 needs Playwright and @axe-core/playwright 4.3 or later.\n` +
-        `  Install or upgrade them to run the runtime audit:\n` +
+      `${stderrTag()} Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
+        `  Install them to run the runtime audit:\n` +
         `    pnpm add -D playwright @axe-core/playwright\n` +
         `    ${INSTALL_CHROMIUM}`,
     );
     return 1;
   }
-  const { chromium, AxeBuilder } = deps;
+  const { chromium, AxeBuilder } = deps.deps;
 
   const vite = await import('vite');
   const { resolveTesseraConfig } = await import('../inline-config.js');
@@ -424,11 +456,14 @@ export async function runAudit(
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
 
       const scan = async (): Promise<AxeViolation[]> => {
-        // Legacy mode skips cross-origin frames (Video's YouTube/Vimeo
-        // player); the <iframe> itself is still checked (frame-title).
-        const builder = new AxeBuilder({ page }).setLegacyMode().withTags(tags);
+        const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
-        return auditFindings(await builder.analyze());
+        const out = await builder.analyze();
+        await dropCrossOriginNodes(page, [
+          ...out.violations,
+          ...out.incomplete,
+        ]);
+        return auditFindings(out);
       };
 
       const recordPage = async (
