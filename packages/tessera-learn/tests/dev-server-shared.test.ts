@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, type ViteDevServer } from 'vite';
 import { buildInlineConfig } from '../src/plugin/inline-config.js';
-import { tempDir } from './helpers.js';
+import { tempDir, titledPage } from './helpers.js';
 
 // Boots the real buildInlineConfig and serves a $shared asset from outside
 // the course root. tmpdir is deliberate: an ancestor pnpm-lock.yaml/.git
@@ -45,7 +45,7 @@ function setupWorkspace(): void {
   );
   write(
     join(courseRoot, 'pages/01-section/01-lesson/page.svelte'),
-    `<h1>Demo</h1>`,
+    titledPage('<h1>Demo</h1>', 'Demo'),
   );
 }
 

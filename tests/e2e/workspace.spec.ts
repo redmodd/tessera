@@ -58,7 +58,10 @@ function writeCourse(name: string, title: string, standard: string): void {
   );
   writeFileEnsuring(
     join(root, 'pages', '01-section', '01-lesson', 'page.svelte'),
-    `<script>
+    `<script module>
+  export const pageConfig = { title: '${title}' };
+</script>
+<script>
   import Button from '$shared/Button.svelte';
 </script>
 

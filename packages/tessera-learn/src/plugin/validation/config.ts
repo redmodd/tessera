@@ -34,6 +34,7 @@ import { isCspOverrides } from '../csp.js';
 import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
+  checkTitle,
   describeType,
   formatValue,
   oneOfError,
@@ -116,22 +117,7 @@ export function parseConfig(
     }
   }
 
-  // Validate title against the runtime merge `userConfig.title || "Untitled
-  // Course"`: a missing or empty string falls back to the default (warn), a
-  // whitespace-only string is truthy and ships verbatim (warn), and a
-  // non-string is a misconfiguration: a truthy one ships as-is, a falsy one
-  // falls back, but either way the author should fix it (error).
-  if (config.title !== undefined && typeof config.title !== 'string') {
-    d.error(`"title" must be a string, got ${describeType(config.title)}`);
-  } else if (config.title === undefined || config.title === '') {
-    d.warn(
-      '"title" is missing or empty, so the course will ship as "Untitled Course"',
-    );
-  } else if (config.title.trim() === '') {
-    d.warn(
-      '"title" is only whitespace. It ships verbatim and will not fall back to "Untitled Course"',
-    );
-  }
+  checkTitle('"title"', config.title, d);
 
   if (config.branding !== undefined) {
     validateBranding(config.branding, projectRoot, d);

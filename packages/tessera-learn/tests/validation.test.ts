@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
 import { readCourseConfig } from '../src/plugin/manifest.js';
-import { tempDir } from './helpers.js';
+import { tempDir, titledPage } from './helpers.js';
 
 let testRoot: string;
 
@@ -60,7 +60,11 @@ function createValidProject(root: string): void {
     'pages/01-section/01-lesson/_meta.js',
     'export default { title: "Lesson" };',
   );
-  writeFile(root, 'pages/01-section/01-lesson/page.svelte', '<h1>Hello</h1>');
+  writeFile(
+    root,
+    'pages/01-section/01-lesson/page.svelte',
+    titledPage('<h1>Hello</h1>'),
+  );
 }
 
 function writeGradedPage(
@@ -485,60 +489,17 @@ describe('config validation', () => {
     );
   });
 
-  it('warns when title is missing', () => {
+  it.each([
+    ['missing', '', 'missing required "title" field'],
+    ['only whitespace', 'title: "   ",', '"title" is empty'],
+  ])('errors when title is %s', (_, title, message) => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
-      `export default {
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
+      `export default { ${title} language: "en", export: { standard: "web" } };`,
     );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"title" is missing or empty'),
-    );
-  });
-
-  it('warns when title is an empty string', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"title" is missing or empty'),
-    );
-  });
-
-  it('warns that a whitespace-only title ships verbatim, not as the default', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "   ",
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining('"title" is only whitespace'),
-    );
-    expect(warnings).not.toContainEqual(
-      expect.stringContaining('"title" is missing or empty'),
-    );
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContain(`course.config.js: ${message}`);
   });
 
   it('errors when title is not a string', () => {
@@ -781,6 +742,36 @@ describe('_meta.js validation', () => {
     );
   });
 
+  it.each(['pages/01-section/_meta.js', 'pages/01-section/01-lesson/_meta.js'])(
+    'errors when %s is missing',
+    (meta) => {
+      createValidProject(testRoot);
+      rmSync(resolve(testRoot, meta));
+      const { errors } = validateProject(testRoot);
+      expect(errors).toContain(
+        `${meta}: missing. Every section and lesson folder with pages needs a _meta.js with a "title".`,
+      );
+    },
+  );
+
+  it('allows a section with no pages and no _meta.js', () => {
+    createValidProject(testRoot);
+    mkdirSync(resolve(testRoot, 'pages/02-empty/01-draft'), {
+      recursive: true,
+    });
+    expect(validateProject(testRoot).errors).toEqual([]);
+  });
+
+  it('ignores the _meta.js of a folder with no pages', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/02-draft/_meta.js',
+      'export default { title: 5 };',
+    );
+    expect(validateProject(testRoot).errors).toEqual([]);
+  });
+
   it('errors when pages array references missing file', () => {
     createValidProject(testRoot);
     writeFile(
@@ -854,6 +845,29 @@ describe('_meta.js validation', () => {
 // ---- pageConfig Validation ----
 
 describe('pageConfig validation', () => {
+  it.each([
+    ['has no pageConfig', '<h1>Hi</h1>', 'missing required pageConfig.title'],
+    [
+      'has no pageConfig.title',
+      '<script module>export const pageConfig = { required: false };</script>',
+      'missing required pageConfig.title',
+    ],
+    [
+      'has an empty pageConfig.title',
+      '<script module>export const pageConfig = { title: " " };</script>',
+      'pageConfig.title is empty',
+    ],
+  ])('errors when a page %s', (_, source, message) => {
+    createValidProject(testRoot);
+    writeFile(testRoot, 'pages/01-section/01-lesson/page.svelte', source);
+    const { errors } = validateProject(testRoot);
+    expect(errors).toContainEqual(
+      expect.stringContaining(
+        `pages/01-section/01-lesson/page.svelte: ${message}`,
+      ),
+    );
+  });
+
   it('errors on a context="module" script', () => {
     createValidProject(testRoot);
     writeFile(
@@ -1705,7 +1719,7 @@ describe('structure validation', () => {
     writeFile(
       testRoot,
       'pages/01-section/flat-page.svelte',
-      '<p>Flat page</p>',
+      titledPage('<p>Flat page</p>'),
     );
     const { errors, warnings } = validateProject(testRoot);
     expect(errors).toEqual([]);
@@ -1716,7 +1730,7 @@ describe('structure validation', () => {
     );
   });
 
-  it('warns when a section contributes no pages', () => {
+  it('warns when a section has no pages', () => {
     createValidProject(testRoot);
     writeFile(
       testRoot,
@@ -1726,8 +1740,29 @@ describe('structure validation', () => {
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining(
-        '02-empty: section contributed no pages and will be empty',
+        '02-empty: section has no pages, so it is left out of the course',
       ),
+    );
+  });
+
+  it('warns about a lesson with no pages, once its section has pages', () => {
+    createValidProject(testRoot);
+    writeFile(
+      testRoot,
+      'pages/01-section/02-nested/deeper/page.svelte',
+      titledPage('<p>Too deep</p>'),
+    );
+    writeFile(
+      testRoot,
+      'pages/02-empty/01-draft/_meta.js',
+      'export default { title: "Draft" };',
+    );
+    const { warnings } = validateProject(testRoot);
+    expect(warnings).toContainEqual(
+      'pages/01-section/02-nested: lesson has no pages, so it is left out of the course',
+    );
+    expect(warnings).not.toContainEqual(
+      expect.stringContaining('01-draft: lesson has no pages'),
     );
   });
 

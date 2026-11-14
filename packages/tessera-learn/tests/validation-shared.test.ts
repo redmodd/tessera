@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
-import { tempDir } from './helpers.js';
+import { tempDir, titledPage } from './helpers.js';
 
 function makeCourse(): string {
   const root = tempDir();
@@ -36,13 +36,16 @@ describe('validation with $shared imports', () => {
     const course = makeCourse();
     writeFileSync(
       join(course, 'pages', '01-section', '01-lesson', 'page.svelte'),
-      `<script>
+      titledPage(
+        `<script>
   import Button from '$shared/Button.svelte';
   import '$shared/tokens.css';
 </script>
 
 <h1>Hello</h1>
 <Button>Click</Button>`,
+        'Hello',
+      ),
     );
 
     const { errors } = validateProject(course);

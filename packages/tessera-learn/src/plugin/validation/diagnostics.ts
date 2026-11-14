@@ -1,5 +1,5 @@
 import JSON5 from 'json5';
-import { oneOf } from '../../runtime/types.js';
+import { isNonBlankString, oneOf } from '../../runtime/types.js';
 import { TAG_RE } from './a11y.js';
 
 export interface ValidationResult {
@@ -104,4 +104,16 @@ export function checkOneOf(
   if (value !== undefined && !oneOf(values, value)) {
     d.error(oneOfError(field, values, value));
   }
+}
+
+export function checkTitle(
+  field: string,
+  value: unknown,
+  d: Diagnostics,
+  missing = `missing required ${field} field`,
+): void {
+  if (isNonBlankString(value)) return;
+  if (value === undefined) d.error(missing);
+  else if (typeof value === 'string') d.error(`${field} is empty`);
+  else d.error(`${field} must be a string, got ${describeType(value)}`);
 }

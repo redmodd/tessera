@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { validateProject } from '../src/plugin/validation.js';
-import { tempDir } from './helpers.js';
+import { tempDir, titledPage } from './helpers.js';
 
 function writeFile(root: string, relPath: string, content: string): void {
   const fullPath = resolve(root, relPath);
@@ -39,7 +39,11 @@ function projectWith(xapiLiteral: string, standard = 'web'): string {
     'pages/01-section/01-lesson/_meta.js',
     'export default { title: "L" };',
   );
-  writeFile(root, 'pages/01-section/01-lesson/page.svelte', '<h1>Hi</h1>');
+  writeFile(
+    root,
+    'pages/01-section/01-lesson/page.svelte',
+    titledPage('<h1>Hi</h1>'),
+  );
   return root;
 }
 
