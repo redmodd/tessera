@@ -15,7 +15,7 @@ import { tesseraPlugin } from '../src/plugin/index.js';
 import { resolveTesseraConfig } from '../src/plugin/inline-config.js';
 import * as validationModule from '../src/plugin/validation.js';
 import { resolvedPlugins, type Command } from './helpers/plugin.js';
-import { tempDir, writeLessonPage } from './helpers.js';
+import { tempDir, titledPage, writeLessonPage } from './helpers.js';
 
 // svelte() keeps its options in a closure, so the wrapper records them to reach onwarn.
 const svelteOptions = vi.hoisted(() => ({ onwarn: undefined as any }));
@@ -277,6 +277,10 @@ describe('export packaging gate', () => {
     if (pageConfig) {
       mkdirSync(resolve(projectRoot, 'pages', '01-quiz'), { recursive: true });
       writeFileSync(
+        resolve(projectRoot, 'pages', '01-quiz', '_meta.js'),
+        'export default { title: "Quiz" };',
+      );
+      writeFileSync(
         resolve(projectRoot, 'pages', '01-quiz', 'check.svelte'),
         `<script module>\nexport const pageConfig = ${pageConfig}\n</script>\n<h1>Check</h1>`,
         'utf-8',
@@ -306,7 +310,7 @@ describe('export packaging gate', () => {
   it('asks for a Passed when a graded page is required', async () => {
     const xml = await exportCmi5(
       quizVerdictConfig,
-      '{ quiz: { graded: true } }',
+      '{ title: "Check", quiz: { graded: true } }',
     );
     expect(xml).toContain('moveOn="CompletedAndPassed"');
   });
@@ -314,7 +318,7 @@ describe('export packaging gate', () => {
   it('satisfies on Completed when every graded page is optional', async () => {
     const xml = await exportCmi5(
       quizVerdictConfig,
-      '{ required: false, quiz: { graded: true } }',
+      '{ title: "Check", required: false, quiz: { graded: true } }',
     );
     expect(xml).toContain('moveOn="Completed"');
   });
@@ -492,16 +496,15 @@ describe('sources changed after validation', () => {
 
   it.each<[string, string, (path: string) => void]>([
     ['an edited page', page, (path) => writeFileSync(path, '<h1>Edited</h1>')],
-    ['a deleted page', page, (path) => rmSync(path)],
     [
       'an added page',
       'pages/01-section/01-lesson/extra.svelte',
       (path) => writeFileSync(path, '<h1>Extra</h1>'),
     ],
     [
-      'an added _meta.js',
+      'an edited _meta.js',
       'pages/01-section/_meta.js',
-      (path) => writeFileSync(path, 'export default { title: "Section" };'),
+      (path) => writeFileSync(path, 'export default { title: "Renamed" };'),
     ],
     [
       'an added layout.svelte',
@@ -518,18 +521,29 @@ describe('sources changed after validation', () => {
       'pages/stray.svelte',
       (path) => writeFileSync(path, '<h1>Stray</h1>'),
     ],
-    ['an added empty section', 'pages/02-empty/', (path) => mkdirSync(path)],
-    [
-      'an added empty lesson',
-      'pages/01-section/02-empty/',
-      (path) => mkdirSync(path),
-    ],
   ])('fails the build on %s', (_change, file, change) => {
     const validation = validatedPlugin();
     change(resolve(projectRoot, file));
     expect(() => buildEnd(validation)).toThrow(
       `1 file(s) changed during the build, after validation: ${file}.`,
     );
+  });
+
+  it('fails the build on a deleted page', () => {
+    const validation = validatedPlugin();
+    rmSync(resolve(projectRoot, page));
+    expect(() => buildEnd(validation)).toThrow(page);
+  });
+
+  it('lets a build through when a folder with no pages is added', () => {
+    const validation = validatedPlugin();
+    mkdirSync(resolve(projectRoot, 'pages/02-empty'));
+    mkdirSync(resolve(projectRoot, 'pages/01-section/02-new'));
+    writeFileSync(
+      resolve(projectRoot, 'pages/01-section/02-new/_meta.js'),
+      'export default { title: "New" };',
+    );
+    expect(() => buildEnd(validation)).not.toThrow();
   });
 
   it('names every file that changed', () => {
@@ -1083,7 +1097,7 @@ describe('dev revalidation', () => {
   it('reports an empty section again when its folder comes back', async () => {
     startDev();
     const warnings = vi.mocked(console.warn);
-    const expected = expect.stringContaining('section contributed no pages');
+    const expected = expect.stringContaining('section has no pages');
     const dir = 'pages/02-empty';
 
     mkdirSync(resolve(projectRoot, dir));
@@ -1106,14 +1120,14 @@ describe('dev revalidation', () => {
       await hotUpdate(validation, `${lessonDir}/${name}`);
     };
     const weighted =
-      '<script module>export const pageConfig = { weight: 2 };</script>';
+      '<script module>export const pageConfig = { title: "Other", weight: 2 };</script>';
 
     await savePage(
       'broken.svelte',
       '<script module>export const pageConfig = {</script>',
     );
     await savePage('other.svelte', weighted);
-    await savePage('other.svelte', '<h1>Other</h1>');
+    await savePage('other.svelte', titledPage('<h1>Other</h1>', 'Other'));
     warnings.mockClear();
 
     await savePage('other.svelte', weighted);

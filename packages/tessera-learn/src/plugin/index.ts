@@ -13,6 +13,7 @@ import {
   COURSE_CONFIG_FILE,
   generateManifest,
   pageSourcePaths,
+  titleOf,
   walkPages,
   type Manifest,
 } from './manifest.js';
@@ -317,7 +318,7 @@ export function mergeCourseConfig(userConfig: Partial<CourseConfig>) {
     userConfig.completion?.mode === 'manual' && success.from !== 'quiz';
   return {
     ...userConfig,
-    title: userConfig.title || 'Untitled Course',
+    title: titleOf(userConfig.title),
     language: courseLanguage(userConfig),
     resume: userConfig.resume ?? 'auto',
     navigation: { mode: 'free', ...userConfig.navigation },
@@ -454,7 +455,7 @@ function tesseraValidationPlugin(ctx: BuildContext): Plugin {
         remember(session, ctx.validate());
       }
       // The hotUpdate hook covers files only, and a folder alone can add or
-      // remove an empty section.
+      // remove an empty-folder warning.
       const pagesDir = resolve(ctx.root, 'pages');
       const onFolderChange = (dir: string) => {
         if (isInside(pagesDir, dir)) session.changes.settle(revalidate);

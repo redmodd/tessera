@@ -26,9 +26,9 @@ function courseConfig(
 
 const MANUAL_CONFIG = courseConfig('mode: "manual"');
 
-function page(pageConfig: string): string {
+function page(fields = ''): string {
   return `<script module>
-  export const pageConfig = ${pageConfig};
+  export const pageConfig = { title: "Page", ${fields} };
 </script>
 <h1>Page</h1>`;
 }
@@ -49,8 +49,8 @@ describe('manual completion — validation', () => {
   function createProject(
     configBody: string,
     pages: Record<string, string> = {
-      'intro.svelte': '<h1>Intro</h1>',
-      'outro.svelte': '<h1>Outro</h1>',
+      'intro.svelte': page(),
+      'outro.svelte': page(),
     },
     lessonMeta = 'export default { title: "L" };',
   ): void {
@@ -83,8 +83,8 @@ describe('manual completion — validation', () => {
   it('accepts completion.trigger: "page" with a completesOn page present', () => {
     expect(
       validate(courseConfig('mode: "manual", trigger: "page"'), {
-        'intro.svelte': '<h1>Intro</h1>',
-        'finale.svelte': page('{ title: "Finale", completesOn: "view" }'),
+        'intro.svelte': page(),
+        'finale.svelte': page('completesOn: "view"'),
       }).errors,
     ).toHaveLength(0);
   });
@@ -134,7 +134,7 @@ describe('manual completion — validation', () => {
   it('warns (not errors) when a page has quiz.graded:true under manual mode', () => {
     createProject(MANUAL_CONFIG, {
       'check.svelte': page(
-        '{ quiz: { graded: true, gatesProgress: false, maxAttempts: 3 } }',
+        'quiz: { graded: true, gatesProgress: false, maxAttempts: 3 }',
       ),
     });
     const { errors, warnings } = validateProject(testRoot);
@@ -149,7 +149,7 @@ describe('manual completion — validation', () => {
   it('errors when pageConfig.completesOn is not "view"', () => {
     expect(
       validate(MANUAL_CONFIG, {
-        'finale.svelte': page('{ completesOn: "scroll" }'),
+        'finale.svelte': page('completesOn: "scroll"'),
       }).errors,
     ).toContainEqual(
       expect.stringContaining('pageConfig.completesOn must be "view"'),
@@ -173,7 +173,7 @@ describe('manual completion — validation', () => {
           'free',
           '\n  scoring: { passingScore: 70 },',
         ),
-        { 'finale.svelte': page('{ completesOn: "view" }') },
+        { 'finale.svelte': page('completesOn: "view"') },
       ).warnings,
     ).toContainEqual(
       expect.stringMatching(/pageConfig\.completesOn is ignored/),
@@ -183,9 +183,9 @@ describe('manual completion — validation', () => {
   it('warns when a page has both completesOn:"view" and a quiz block', () => {
     expect(
       validate(MANUAL_CONFIG, {
-        'intro.svelte': '<h1>Intro</h1>',
+        'intro.svelte': page(),
         'finale.svelte': page(
-          '{ completesOn: "view", quiz: { graded: false, maxAttempts: 1 } }',
+          'completesOn: "view", quiz: { graded: false, maxAttempts: 1 }',
         ),
       }).warnings,
     ).toContainEqual(
@@ -199,14 +199,14 @@ describe('manual completion — validation', () => {
     [
       'sequential',
       {
-        'intro.svelte': page('{ completesOn: "view" }'),
-        'outro.svelte': '<h1>Outro</h1>',
+        'intro.svelte': page('completesOn: "view"'),
+        'outro.svelte': page(),
       },
       'export default { title: "L", pages: ["intro", "outro"] };',
     ],
     [
       'free',
-      { 'a.svelte': page('{ completesOn: "view" }') },
+      { 'a.svelte': page('completesOn: "view"') },
       'export default { title: "L", pages: ["a"] };',
     ],
   ])(

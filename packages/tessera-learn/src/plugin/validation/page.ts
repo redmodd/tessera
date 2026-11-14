@@ -35,6 +35,7 @@ import {
 import { A11Y_IDS, tag } from './a11y.js';
 import {
   checkOneOf,
+  checkTitle,
   describeType,
   formatValue,
   type Diagnostics,
@@ -224,7 +225,7 @@ export function validatePages(
 
   const noPages = (): PagesValidationResult => {
     d.error(
-      'No pages found. Create at least one section with a lesson and page in pages/',
+      'No pages found. Create pages/<section>/<lesson>/<page>.svelte with a pageConfig.title, and a _meta.js with a "title" in the section and lesson folders',
     );
     return { hasParseErrors: false, pages: [] };
   };
@@ -252,9 +253,16 @@ export function validatePages(
     );
   }
 
-  for (const section of course.sections) {
-    const pagesBeforeSection = pages.length;
+  for (const dir of course.emptySections) {
+    warnAbout(dir, 'section has no pages, so it is left out of the course');
+  }
+  for (const dir of course.emptyLessons) {
+    warnAbout(dir, 'lesson has no pages, so it is left out of the course');
+  }
 
+  if (course.sections.length === 0) return noPages();
+
+  for (const section of course.sections) {
     const sectionMeta = validateMeta(section.metaPath);
 
     for (const lesson of section.lessons) {
@@ -276,14 +284,7 @@ export function validatePages(
         pages.push(page);
       }
     }
-
-    // The page-count delta covers both the no-lessons and empty-lessons cases.
-    if (pages.length === pagesBeforeSection) {
-      warnAbout(section.dir, 'section contributed no pages and will be empty');
-    }
   }
-
-  if (pages.length === 0) return noPages();
 
   return { hasParseErrors, pages };
 }
@@ -325,21 +326,22 @@ function validatePageList(
 }
 
 function validateMetaFile(metaPath: string, d: Diagnostics): MetaFile | null {
-  const { meta, problem, rejected = {} } = readMetaFile(metaPath);
-  if (problem === 'missing') return null;
+  const { meta, problem, rejectedPages } = readMetaFile(metaPath);
+  if (problem === 'missing') {
+    d.error(
+      'missing. Every section and lesson folder with pages needs a _meta.js with a "title".',
+    );
+    return null;
+  }
   if (problem) {
     d.error(READ_FAILURE_MESSAGES[problem]);
     return null;
   }
 
-  if ('title' in rejected) {
-    d.error(`"title" must be a string, got ${describeType(rejected.title)}`);
-  } else if (!meta.title) {
-    d.error('missing required "title" field');
-  }
-  if ('pages' in rejected) {
+  checkTitle('"title"', meta.title, d);
+  if (rejectedPages !== undefined) {
     d.error(
-      `"pages" must be an array of page file names, got ${formatValue(rejected.pages)}`,
+      `"pages" must be an array of page file names, got ${formatValue(rejectedPages)}`,
     );
   }
 
@@ -354,17 +356,22 @@ function validatePageConfig(
     d.error('<script context="module"> is not supported; use <script module>');
   }
   const result = parsePageConfigFromSource(content);
-  if (result.kind === 'ok') {
-    for (const key of Object.keys(result.value)) {
-      if (!KNOWN_PAGE_FIELDS.has(key))
-        d.warn(`unknown field pageConfig.${key} is ignored`);
-    }
-    return result.value;
-  }
   if (result.kind === 'invalid') {
     d.error(`pageConfig ${STATIC_LITERAL_RULE}`);
+    return null;
   }
-  return null;
+  const pageConfig = result.kind === 'ok' ? result.value : {};
+  for (const key of Object.keys(pageConfig)) {
+    if (!KNOWN_PAGE_FIELDS.has(key))
+      d.warn(`unknown field pageConfig.${key} is ignored`);
+  }
+  checkTitle(
+    'pageConfig.title',
+    pageConfig.title,
+    d,
+    "missing required pageConfig.title. Set it in `export const pageConfig = { title: '...' }` in <script module>.",
+  );
+  return pageConfig;
 }
 
 const KNOWN_PAGE_FIELDS = new Set(

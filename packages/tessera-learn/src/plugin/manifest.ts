@@ -10,7 +10,7 @@ import {
   type PropValue,
 } from './ast.js';
 import {
-  isQuestionId,
+  isNonBlankString,
   isRecord,
   isStringArray,
   type CourseConfig,
@@ -81,12 +81,9 @@ export function stripPrefix(name: string): string {
   return name.replace(/^\d+-/, '');
 }
 
-/** Title-case a slug: "getting-started" → "Getting Started" */
-export function titleCase(slug: string): string {
-  return slug
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+// Only `tessera dev` serves an untitled entry: validation fails the build.
+export function titleOf(value: unknown): string {
+  return isNonBlankString(value) ? value.trim() : '(no title)';
 }
 
 type ReadFailure =
@@ -183,30 +180,25 @@ export function resolveConfigRead(
 }
 
 export interface MetaFile {
-  title?: string;
+  title?: unknown;
   pages?: string[];
 }
 
 /**
  * Read a _meta.js file's `export default { ... }` literal. `meta` is always
- * usable: empty when the read fails (`problem` says why), and without any
- * field of the wrong type (`rejected` holds those values for the validator).
+ * usable: empty when the read fails (`problem` says why), and without `pages`
+ * of the wrong type (`rejectedPages` holds it for the validator). `title` is raw.
  */
 export function readMetaFile(metaPath: string): {
   meta: MetaFile;
   problem?: ReadFailure['reason'];
-  rejected?: { title?: unknown; pages?: unknown };
+  rejectedPages?: unknown;
 } {
   const read = readDefaultExport(metaPath);
   if (!read.ok) return { meta: {}, problem: read.reason };
   const { title, pages } = read.value as Record<string, unknown>;
-  const meta: MetaFile = {};
-  const rejected: { title?: unknown; pages?: unknown } = {};
-  if (typeof title === 'string') meta.title = title;
-  else if (title !== undefined) rejected.title = title;
-  if (isStringArray(pages)) meta.pages = pages;
-  else if (pages != null) rejected.pages = pages;
-  return { meta, rejected };
+  if (isStringArray(pages)) return { meta: { title, pages } };
+  return { meta: { title }, rejectedPages: pages ?? undefined };
 }
 
 const QUESTION_NAMES = [
@@ -241,7 +233,7 @@ export function literalValue(
 /** The id a built-in question renders with, or null when the source doesn't fix it. */
 export function staticQuestionId({ props }: ComponentMatch): string | null {
   const id = literalValue(props.get('id'))?.value;
-  return isQuestionId(id) ? id : null;
+  return isNonBlankString(id) ? id : null;
 }
 
 export function isLiterallyGradedQuestion({ props }: ComponentMatch): boolean {
@@ -354,6 +346,10 @@ interface WalkedSection {
 
 interface WalkedCourse {
   sections: WalkedSection[];
+  /** Section folders left out of the course because they hold no pages. */
+  emptySections: string[];
+  /** Lesson folders in a non-empty section left out because they hold no pages. */
+  emptyLessons: string[];
   /** `.svelte` files in `pages/` itself, outside the section/lesson structure. */
   strayFiles: string[];
   /** Paths of symlinks left out of the course because they do not resolve. */
@@ -363,19 +359,23 @@ interface WalkedCourse {
 /**
  * Enumerate the course's section → lesson → file structure. Section-level
  * `.svelte` files become an implicit flat lesson (`name: null`) ordered before
- * the section's explicit lesson directories. Shared by manifest generation and
- * build-time validation so the two never disagree on which files are pages.
+ * the section's explicit lesson directories. A section or lesson folder with no
+ * pages is left out. Shared by manifest generation and build-time validation so
+ * the two never disagree on which files are pages.
  */
 export function walkPages(pagesDir: string): WalkedCourse {
   const root = readEntries(pagesDir, true);
   const { unresolved } = root;
   const sections: WalkedSection[] = [];
+  const emptySections: string[] = [];
+  const emptyLessons: string[] = [];
   for (const sectionName of root.dirs) {
     const dir = resolve(pagesDir, sectionName);
     const metaPath = resolve(dir, '_meta.js');
     const section = readEntries(dir, true);
     unresolved.push(...section.unresolved);
     const lessons: WalkedLesson[] = [];
+    const pageless: string[] = [];
 
     if (section.files.length > 0) {
       lessons.push({ name: null, dir, metaPath, files: section.files });
@@ -385,6 +385,10 @@ export function walkPages(pagesDir: string): WalkedCourse {
       const lessonDir = resolve(dir, lessonName);
       const lesson = readEntries(lessonDir, false);
       unresolved.push(...lesson.unresolved);
+      if (lesson.files.length === 0) {
+        pageless.push(lessonDir);
+        continue;
+      }
       lessons.push({
         name: lessonName,
         dir: lessonDir,
@@ -393,9 +397,20 @@ export function walkPages(pagesDir: string): WalkedCourse {
       });
     }
 
-    sections.push({ name: sectionName, dir, metaPath, lessons });
+    if (lessons.length === 0) {
+      emptySections.push(dir);
+    } else {
+      sections.push({ name: sectionName, dir, metaPath, lessons });
+      emptyLessons.push(...pageless);
+    }
   }
-  return { sections, strayFiles: root.files, unresolved };
+  return {
+    sections,
+    emptySections,
+    emptyLessons,
+    strayFiles: root.files,
+    unresolved,
+  };
 }
 
 /** The `_meta.js` and page paths of walked sections. A `_meta.js` may be absent. */
@@ -427,7 +442,7 @@ export function generateManifest(
     const sectionSlug = stripPrefix(walkedSection.name);
 
     const section: ManifestSection = {
-      title: sectionMeta.title || titleCase(sectionSlug),
+      title: titleOf(sectionMeta.title),
       slug: sectionSlug,
       lessons: [],
     };
@@ -445,7 +460,7 @@ export function generateManifest(
         : `/pages/${walkedSection.name}/${walkedLesson.name}`;
 
       const lesson: ManifestLesson = {
-        title: isFlat ? '' : lessonMeta.title || titleCase(lessonSlug),
+        title: isFlat ? '' : titleOf(lessonMeta.title),
         slug: lessonSlug,
         pages: [],
       };
@@ -477,7 +492,7 @@ export function generateManifest(
             : [];
         const page: ManifestPage = {
           index: pageIndex,
-          title: pageConfig.title || titleCase(pageSlug),
+          title: titleOf(pageConfig.title),
           slug: pageSlug,
           importPath: `${relDir}/${fileName}`,
           quiz,

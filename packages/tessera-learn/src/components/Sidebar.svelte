@@ -28,7 +28,7 @@
   {#if course.logo}
     <img src={course.logo} alt={course.title} class="tessera-sidebar-logo" />
   {/if}
-  <h1 class="tessera-sidebar-title">{course.title || '(no title)'}</h1>
+  <h1 class="tessera-sidebar-title">{course.title}</h1>
 </div>
 
 <nav class="tessera-sidebar-nav" aria-label="Course navigation">
