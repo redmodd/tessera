@@ -251,19 +251,22 @@ test.describe('Component — RevealModal', () => {
     await expect(page.locator('html')).toHaveCSS('overflow', 'visible');
   });
 
-  test('focus is trapped inside modal', async ({ page }) => {
+  test('focus never reaches the page behind the modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Tab several times — focus should stay inside modal
+    // A modal dialog may hand focus to the browser UI (activeElement is body);
+    // Firefox does on Tab past the last control.
     for (let i = 0; i < 5; i++) {
       await page.keyboard.press('Tab');
+      const escaped = await page.evaluate(() => {
+        const el = document.activeElement;
+        return (
+          !!el && el !== document.body && !el.closest('dialog.tessera-modal')
+        );
+      });
+      expect(escaped).toBe(false);
     }
-
-    const isInModal = await page.evaluate(
-      () => !!document.activeElement?.closest('dialog.tessera-modal'),
-    );
-    expect(isInModal).toBe(true);
   });
 
   test('clicking the backdrop closes it', async ({ page }) => {
