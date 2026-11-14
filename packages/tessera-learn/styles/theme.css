@@ -73,7 +73,12 @@
       var(--tessera-primary) 70%,
       black
     );
-    --tessera-primary-text: var(--tessera-primary);
+    --tessera-primary-on-bg: var(--tessera-primary);
+    --tessera-primary-on-bg-strong: color-mix(
+      in srgb,
+      var(--tessera-primary-on-bg) 70%,
+      var(--tessera-text)
+    );
     --tessera-success-bg: color-mix(
       in srgb,
       var(--tessera-success) 8%,

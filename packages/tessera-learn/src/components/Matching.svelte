@@ -372,11 +372,11 @@
     }
 
     .tessera-matching-item:hover:not(:disabled, .matched) {
-      border-color: var(--tessera-primary);
+      border-color: var(--tessera-primary-on-bg);
     }
 
     .tessera-matching-item.selected {
-      border-color: var(--tessera-primary);
+      border-color: var(--tessera-primary-on-bg);
       background: var(--tessera-primary-light);
       transform: scale(1.02);
     }

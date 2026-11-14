@@ -234,12 +234,12 @@ test.describe('Navigation — Free Mode', () => {
     });
   }
 
-  test('the page nav buttons follow --tessera-primary-text and --tessera-on-primary', async ({
+  test('the page nav buttons follow --tessera-primary-on-bg and --tessera-on-primary', async ({
     page,
   }) => {
     await page.addStyleTag({
       content:
-        ':root { --tessera-primary-text: #854d0e; --tessera-on-primary: #1f2937; }',
+        ':root { --tessera-primary-on-bg: #854d0e; --tessera-on-primary: #1f2937; }',
     });
     const next = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await expect(next).toHaveCSS('color', 'rgb(133, 77, 14)');

@@ -164,13 +164,9 @@
 
   .tessera-nav-page[aria-current='page'] {
     background-color: var(--tessera-primary-light);
-    color: color-mix(
-      in srgb,
-      var(--tessera-primary-text) 70%,
-      var(--tessera-text)
-    );
+    color: var(--tessera-primary-on-bg-strong);
     font-weight: 600;
-    border-left-color: var(--tessera-primary);
+    border-left-color: var(--tessera-primary-on-bg);
   }
 
   /* The inset halo starts inside the border, so the border gives way to padding. */
@@ -252,9 +248,9 @@
     padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--tessera-primary-text);
+    color: var(--tessera-primary-on-bg);
     background: none;
-    border: 1px solid var(--tessera-primary-text);
+    border: 1px solid var(--tessera-primary-on-bg);
     border-radius: 6px;
     cursor: pointer;
     transition:
@@ -291,7 +287,7 @@
 
   .tessera-progress-fill {
     height: 100%;
-    background-color: var(--tessera-primary);
+    background-color: var(--tessera-primary-on-bg);
     border-radius: 2px;
     transition: width var(--tessera-transition-normal);
   }

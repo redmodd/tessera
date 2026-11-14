@@ -164,12 +164,12 @@
     }
 
     .tessera-mc-option:hover:not(:has(input:disabled)) {
-      border-color: var(--tessera-primary);
+      border-color: var(--tessera-primary-on-bg);
       background: var(--tessera-bg-secondary);
     }
 
     .tessera-mc-option.selected {
-      border-color: var(--tessera-primary);
+      border-color: var(--tessera-primary-on-bg);
       background: var(--tessera-primary-light);
     }
 
@@ -204,7 +204,7 @@
     }
 
     .tessera-mc-option.selected .tessera-mc-radio-custom {
-      border-color: var(--tessera-primary);
+      border-color: var(--tessera-primary-on-bg);
     }
 
     .tessera-mc-option.selected .tessera-mc-radio-custom::after {
@@ -215,7 +215,7 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: var(--tessera-primary);
+      background: var(--tessera-primary-on-bg);
     }
 
     .tessera-mc-option.correct .tessera-mc-radio-custom {

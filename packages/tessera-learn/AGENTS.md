@@ -506,10 +506,11 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
 | `--tessera-primary`                            | `#2563eb`                             |
-| `--tessera-primary-text`                       | `var(--tessera-primary)`              |
+| `--tessera-primary-on-bg`                      | `var(--tessera-primary)`              |
+| `--tessera-primary-on-bg-strong`               | the `-on-bg` at 70% over the text     |
 | `--tessera-on-primary`                         | `#ffffff`                             |
 | `--tessera-primary-light`                      | the primary at 15% over the bg        |
-| `--tessera-primary-dark`                       | the primary at 70% over black         |
+| `--tessera-primary-dark` (button hover)        | the primary at 70% over black         |
 | `--tessera-text`                               | `#1f2937`                             |
 | `--tessera-text-light`                         | `#6b7280`                             |
 | `--tessera-bg`                                 | `#ffffff`                             |
@@ -543,18 +544,18 @@ Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-s
 }
 ```
 
-**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-text`, `-light` and `-dark` defaults derive from the `:root` value of `--tessera-primary`, so override it on `:root` for them to follow. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
+**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-on-bg`, `-light` and `-dark` defaults derive from the `:root` value of `--tessera-primary`, so override it on `:root` for them to follow. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
 
-**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary. Links, outlined buttons and hints use `--tessera-primary-text` on the page background. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast. `tessera/primary-contrast` checks only `branding.primaryColor` against white and still warns: add it to `a11y.ignore`, then run `tessera a11y` to check the rendered colors.
+**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary, and darken to `--tessera-primary-dark` on hover. Links, outlined buttons, hints and selection indicators (selected borders, the radio dot, the progress bar) use `--tessera-primary-on-bg` on the page background. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast. Darkening can push the hover fill under 4.5:1 with dark `--tessera-on-primary` text (orange does), so set `--tessera-primary-dark` to a fill that holds it. `tessera/primary-contrast` checks only `branding.primaryColor` against white and still warns: add it to `a11y.ignore`, then run `tessera a11y` to check the rendered colors.
 
 ```css
 :root {
   --tessera-on-primary: #1f2937; /* on a #facc15 primary */
-  --tessera-primary-text: #854d0e;
+  --tessera-primary-on-bg: #854d0e;
 }
 ```
 
-**Dark themes.** Set `color-scheme: dark` with the color tokens, or scrollbars and your own `<input>`, `<select>` and `<textarea>` stay light and show `--tessera-text` on a white field. Lighten `--tessera-primary-text`, `--tessera-success` and `--tessera-error` to keep 4.5:1 on the dark background.
+**Dark themes.** Set `color-scheme: dark` with the color tokens, or scrollbars and your own `<input>`, `<select>` and `<textarea>` stay light and show `--tessera-text` on a white field. Lighten `--tessera-primary-on-bg`, `--tessera-success` and `--tessera-error` to keep 4.5:1 on the dark background.
 
 ```css
 :root {
@@ -564,7 +565,7 @@ Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-s
   --tessera-text: #f3f4f6;
   --tessera-text-light: #9ca3af;
   --tessera-border: #374151;
-  --tessera-primary-text: #93c5fd;
+  --tessera-primary-on-bg: #93c5fd;
   --tessera-success: #4ade80;
   --tessera-error: #f87171;
 }
