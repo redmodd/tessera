@@ -73,10 +73,11 @@
       var(--tessera-primary) 70%,
       black
     );
-    --tessera-primary-on-bg: var(--tessera-primary);
+    /* --tessera-primary-on-bg stays unset and falls back to --tessera-primary
+       where it's used, so it follows a primary set on any element. */
     --tessera-primary-on-bg-strong: color-mix(
       in srgb,
-      var(--tessera-primary-on-bg) 70%,
+      var(--tessera-primary-on-bg, var(--tessera-primary)) 70%,
       var(--tessera-text)
     );
     --tessera-success-bg: color-mix(

@@ -118,7 +118,7 @@
     }
 
     .tessera-fitb-input:focus {
-      border-color: var(--tessera-primary-on-bg);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
     }
 
     .tessera-fitb-input:disabled {

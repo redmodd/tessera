@@ -337,7 +337,7 @@ function validateBranding(
         d.warn(
           tag(
             A11Y_IDS.primaryContrast,
-            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white, and WCAG AA needs 4.5:1. By default it colors links, outlined buttons and selection indicators on the page background, and fills buttons behind white text. Set --tessera-primary-on-bg and --tessera-on-primary in styles/ to colors that pass, then add "${A11Y_IDS.primaryContrast}" to a11y.ignore and check the result with tessera a11y`,
+            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white, and WCAG AA needs 4.5:1. By default it colors links, outlined buttons and selection indicators on the page background, and fills buttons behind white text. Set --tessera-primary-on-bg and --tessera-on-primary in styles/ to colors that pass, and --tessera-primary-dark if the button hover fill drops under 4.5:1 with that text. Then add "${A11Y_IDS.primaryContrast}" to a11y.ignore and run tessera a11y, which checks rendered text but not hover states`,
           ),
         );
       }

@@ -91,7 +91,7 @@
   }
 
   a {
-    color: var(--tessera-primary-on-bg);
+    color: var(--tessera-primary-on-bg, var(--tessera-primary));
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 2px;

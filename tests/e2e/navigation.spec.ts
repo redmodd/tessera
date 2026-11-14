@@ -248,6 +248,31 @@ test.describe('Navigation — Free Mode', () => {
     await expect(next).toHaveCSS('color', 'rgb(31, 41, 55)');
   });
 
+  test('the page nav buttons follow a primary set on their container', async ({
+    page,
+  }) => {
+    await page.addStyleTag({
+      content: '.tessera-page-nav { --tessera-primary: #b91c1c; }',
+    });
+    const next = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
+    await expect(next).toHaveCSS('color', 'rgb(185, 28, 28)');
+    await expect(next).toHaveCSS('border-color', 'rgb(185, 28, 28)');
+  });
+
+  test('the current page tint mixes over --tessera-bg', async ({ page }) => {
+    await page.addStyleTag({ content: ':root { --tessera-bg: #111827; }' });
+    const expected = await page.evaluate(() => {
+      const probe = document.body.appendChild(document.createElement('div'));
+      probe.style.backgroundColor = 'color-mix(in srgb, #2563eb 15%, #111827)';
+      const { backgroundColor } = getComputedStyle(probe);
+      probe.remove();
+      return backgroundColor;
+    });
+    await expect(
+      page.locator('.tessera-nav-page[aria-current="page"]'),
+    ).toHaveCSS('background-color', expected);
+  });
+
   test('current page is highlighted in sidebar', async ({ page }) => {
     // The first page should have aria-current
     const activePage = page.locator('.tessera-nav-page[aria-current="page"]');

@@ -349,13 +349,13 @@
     }
 
     .tessera-sorting-card:hover {
-      border-color: var(--tessera-primary-on-bg);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
       --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
       transform: translateY(-1px);
     }
 
     .tessera-sorting-card.selected {
-      border-color: var(--tessera-primary-on-bg);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
       background: var(--tessera-primary-light);
       --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
       transform: translateY(-2px) scale(1.02);
@@ -364,7 +364,7 @@
 
     /* The card's shadows outrank the global halo, so stack the halo on them. */
     .tessera-sorting-card:focus-visible {
-      border-color: var(--tessera-primary-on-bg);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
       box-shadow: var(--tessera-focus-halo), var(--card-shadow);
     }
 
@@ -381,7 +381,7 @@
 
     .tessera-sorting-hint {
       font-size: 0.8125rem;
-      color: var(--tessera-primary-on-bg);
+      color: var(--tessera-primary-on-bg, var(--tessera-primary));
       font-weight: 500;
       margin: 0;
     }
@@ -426,14 +426,14 @@
     }
 
     .tessera-sorting-target.drag-over {
-      border-color: var(--tessera-primary-on-bg);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
       background: var(--tessera-primary-light);
       border-style: solid;
     }
 
     .tessera-sorting-target.clickable {
       cursor: pointer;
-      border-color: var(--tessera-primary-on-bg);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
       border-style: dashed;
     }
 
