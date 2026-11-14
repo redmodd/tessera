@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { styleText } from 'node:util';
+import { styleErr } from '../cli-args.js';
 import type { Plugin, PreviewServer } from 'vite';
 import type { ContextPluginApi } from '../build-context.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
@@ -127,9 +130,13 @@ export function isMissingDepsError(message: string): boolean {
 const INSTALL_CHROMIUM = 'pnpm exec playwright install chromium';
 const PLAYWRIGHT_SPECS = ['playwright', '@playwright/test'] as const;
 
+function stderrTag(color: 'red' | 'yellow' = 'red'): string {
+  return styleErr(color, '[tessera a11y]');
+}
+
 function reportManualInstall(lead: string): void {
   console.error(
-    `\x1b[31m[tessera a11y]\x1b[0m ${lead}\n` +
+    `${stderrTag()} ${lead}\n` +
       `  Install it once:\n` +
       `    ${INSTALL_CHROMIUM}`,
   );
@@ -166,41 +173,33 @@ export async function installChromium(workspaceRoot: string): Promise<boolean> {
   const bin = resolvePlaywrightBin();
   if (!bin) {
     console.error(
-      `\x1b[31m[tessera a11y]\x1b[0m Could not locate the Playwright CLI to install Chromium.`,
+      `${stderrTag()} Could not locate the Playwright CLI to install Chromium.`,
     );
     return false;
   }
 
-  return new Promise<boolean>((resolvePromise) => {
-    const child = spawn(bin.command, bin.args, {
-      stdio: 'inherit',
-      cwd: workspaceRoot,
-    });
-    let settled = false;
-    const finish = (ok: boolean) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolvePromise(ok);
-    };
-    const timer = setTimeout(() => {
-      console.error(
-        `\x1b[31m[tessera a11y]\x1b[0m Chromium install timed out after ${Math.round(
-          INSTALL_TIMEOUT_MS / 60_000,
-        )} min; aborting.`,
-      );
-      child.kill('SIGKILL');
-      finish(false);
-    }, INSTALL_TIMEOUT_MS);
-    timer.unref();
-    child.on('error', (err) => {
-      console.error(
-        `\x1b[31m[tessera a11y]\x1b[0m Failed to start the Chromium install: ${err.message}`,
-      );
-      finish(false);
-    });
-    child.on('exit', (code) => finish(code === 0));
+  const child = spawn(bin.command, bin.args, {
+    stdio: 'inherit',
+    cwd: workspaceRoot,
+    timeout: INSTALL_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   });
+  try {
+    const [code] = await once(child, 'exit');
+    // Only spawn's timeout kills the child, so `killed` means it timed out.
+    if (child.killed) {
+      console.error(
+        `${stderrTag()} Chromium install timed out after ${INSTALL_TIMEOUT_MS / 60_000} min; aborting.`,
+      );
+      return false;
+    }
+    return code === 0;
+  } catch (err) {
+    console.error(
+      `${stderrTag()} Failed to start the Chromium install: ${errorMessage(err)}`,
+    );
+    return false;
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -208,7 +207,7 @@ type LaunchResult = { ok: true; browser: any } | { ok: false; code: number };
 
 function reportLaunchFailure(message: string, isLinux: boolean): void {
   console.error(
-    `\x1b[31m[tessera a11y]\x1b[0m Chromium is installed but failed to launch.\n` +
+    `${stderrTag()} Chromium is installed but failed to launch.\n` +
       (isLinux
         ? `  Install system dependencies:\n    pnpm exec playwright install --with-deps chromium\n`
         : ``) +
@@ -274,7 +273,7 @@ function isFailing(v: AxeViolation, thresholdRank: number): boolean {
 }
 
 // Optional deps loaded by variable specifier so tsc doesn't require them to be
-// installed — Tier 2 is opt-in and the absence is handled with a clear message.
+// installed; Tier 2 is opt-in and the absence is handled with a clear message.
 async function tryImport(specifier: string): Promise<unknown> {
   return import(specifier);
 }
@@ -330,7 +329,7 @@ export async function runAudit(
   const deps = await loadDeps();
   if (!deps.ok) {
     console.error(
-      `\x1b[31m[tessera a11y]\x1b[0m Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
+      `${stderrTag()} Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
         `  Install them to run the runtime audit:\n` +
         `    pnpm add -D playwright @axe-core/playwright\n` +
         `    ${INSTALL_CHROMIUM}`,
@@ -485,7 +484,7 @@ export async function runAudit(
     return report.passed ? 0 : 1;
   } catch (err) {
     console.error(
-      `\x1b[31m[tessera a11y]\x1b[0m Audit could not complete: ${errorMessage(err)}`,
+      `${stderrTag()} Audit could not complete: ${errorMessage(err)}`,
     );
     return 1;
   } finally {
@@ -493,7 +492,7 @@ export async function runAudit(
     else process.env[AUDIT_ENV_FLAG] = prevEnv;
     await server?.close().catch((err: unknown) => {
       console.warn(
-        `\x1b[33m[tessera a11y]\x1b[0m Could not close the preview server: ${errorMessage(err)}`,
+        `${stderrTag('yellow')} Could not close the preview server: ${errorMessage(err)}`,
       );
     });
   }
@@ -503,30 +502,35 @@ function printSummary(report: AuditReport, reportPath: string): void {
   const thresholdRank = IMPACT_LEVELS.indexOf(report.threshold);
   for (const p of report.pages) {
     if (p.loadFailed) {
-      console.log(`\x1b[31m  ✗\x1b[0m ${p.title} — failed to load`);
+      console.log(`${styleText('red', '  ✗')} ${p.title}: failed to load`);
       continue;
     }
     if (p.violations.length === 0) {
-      console.log(`\x1b[32m  ✓\x1b[0m ${p.title}`);
+      console.log(`${styleText('green', '  ✓')} ${p.title}`);
       continue;
     }
     const failing = p.violations.some((v) => isFailing(v, thresholdRank));
-    const mark = failing ? '\x1b[31m  ✗\x1b[0m' : '\x1b[33m  ⚠\x1b[0m';
+    const mark = failing ? styleText('red', '  ✗') : styleText('yellow', '  ⚠');
     console.log(`${mark} ${p.title}`);
     for (const v of p.violations) {
       console.log(
-        `      [${v.impact ?? 'n/a'}] ${v.id} — ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,
+        `      [${v.impact ?? 'n/a'}] ${v.id}: ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,
       );
       for (const el of v.elements.slice(0, MAX_ELEMENTS_SHOWN)) {
         console.log(
-          `\x1b[90m        → ${el.target || '(unknown element)'}\x1b[0m`,
+          styleText('gray', `        → ${el.target || '(unknown element)'}`),
         );
-        if (el.summary) console.log(`\x1b[90m          ${el.summary}\x1b[0m`);
+        if (el.summary) {
+          console.log(styleText('gray', `          ${el.summary}`));
+        }
       }
       const hidden = v.elements.length - MAX_ELEMENTS_SHOWN;
       if (hidden > 0) {
         console.log(
-          `\x1b[90m        … and ${hidden} more — see a11y-report.json\x1b[0m`,
+          styleText(
+            'gray',
+            `        … and ${hidden} more (see a11y-report.json)`,
+          ),
         );
       }
     }
@@ -542,7 +546,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
   }
   if (report.passed) {
     console.log(
-      `\x1b[32m[tessera a11y] Passed\x1b[0m — ${report.totalViolations} total finding(s), none at/above "${report.threshold}".`,
+      `${styleText('green', '[tessera a11y] Passed')}: ${report.totalViolations} total finding(s), none at/above "${report.threshold}".`,
     );
   } else {
     const reasons: string[] = [];
@@ -555,7 +559,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
       reasons.push(`${report.pagesFailedToLoad} page(s) failed to load`);
     }
     console.log(
-      `\x1b[31m[tessera a11y] Failed\x1b[0m — ${reasons.join('; ')}.`,
+      `${styleText('red', '[tessera a11y] Failed')}: ${reasons.join('; ')}.`,
     );
   }
 }

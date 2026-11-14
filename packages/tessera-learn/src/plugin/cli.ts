@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { parseArgs, type ParseArgsOptionsConfig } from 'node:util';
+import type { ParseArgsOptionsConfig } from 'node:util';
+import { parseCliArgs, wantsHelp } from './cli-args.js';
 import { runValidate } from './validate-cli.js';
 import { IMPACT_LEVELS, runAudit, type ImpactLevel } from './a11y/audit.js';
 import { runNew } from './new-cli.js';
@@ -165,26 +166,19 @@ const USAGE = formatUsage();
 function parseCommandArgs(
   { args: synopsis, flag }: { args: string[]; flag?: Flag },
   args: string[],
-):
-  | { error: string }
-  | { help: true }
-  | { help: false; positionals: string[]; flagValue?: string } {
-  if (args.includes('--help') || args.includes('-h')) {
-    return { help: true };
-  }
-
+): { error: string } | { positionals: string[]; flagValue?: string } {
   const options: ParseArgsOptionsConfig = {};
   if (flag) options[flag.name] = { type: 'string' };
 
-  let parsed;
-  try {
-    parsed = parseArgs({ args, options, allowPositionals: true });
-  } catch (error) {
-    const { code, message } = error as Error & { code?: string };
-    if (flag && code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
+  const parsed = parseCliArgs(args, {
+    options,
+    maxPositionals: synopsis.length,
+  });
+  if ('error' in parsed) {
+    if (flag && parsed.code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
       return { error: `--${flag.name} requires a value` };
     }
-    return { error: message.split('. ')[0] };
+    return { error: parsed.error };
   }
   const { values, positionals } = parsed;
 
@@ -192,19 +186,16 @@ function parseCommandArgs(
   if (positionals.length < required) {
     return { error: `Missing argument: ${synopsis[positionals.length]}` };
   }
-  if (positionals.length > synopsis.length) {
-    return { error: `Unexpected argument: ${positionals[synopsis.length]}` };
-  }
 
-  if (!flag) return { help: false, positionals };
+  if (!flag) return { positionals };
   const flagValue = values[flag.name];
-  if (typeof flagValue !== 'string') return { help: false, positionals };
+  if (typeof flagValue !== 'string') return { positionals };
   if (!flag.choices.includes(flagValue)) {
     return {
       error: `--${flag.name} must be ${quoteList(flag.choices)}, got ${formatValue(flagValue)}`,
     };
   }
-  return { help: false, positionals, flagValue };
+  return { positionals, flagValue };
 }
 
 export async function main(
@@ -213,7 +204,10 @@ export async function main(
 ): Promise<number> {
   const [sub, ...rest] = argv;
 
-  if (sub === '--help' || sub === '-h') {
+  // Help wins over a bad option, but not over a mistyped command name.
+  const typo =
+    sub !== undefined && !sub.startsWith('-') && !Object.hasOwn(COMMANDS, sub);
+  if (wantsHelp(argv) && !typo) {
     console.log(USAGE);
     return 0;
   }
@@ -231,10 +225,6 @@ export async function main(
   if ('error' in parsed) {
     console.error(`[tessera ${sub}] ${parsed.error}`);
     return 1;
-  }
-  if (parsed.help) {
-    console.log(USAGE);
-    return 0;
   }
   if (!command.course) return command.run(parsed.positionals, cwd);
 

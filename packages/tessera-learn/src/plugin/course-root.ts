@@ -53,7 +53,7 @@ function scanCourses(workspaceRoot: string): {
 }
 
 const NOT_A_WORKSPACE =
-  'Not inside a Tessera workspace — no `courses/` directory was found at or above the current directory.';
+  'Not inside a Tessera workspace: no `courses/` directory was found at or above the current directory.';
 
 function malformedHint(malformed: string[]): string {
   if (malformed.length === 0) return '';
@@ -89,7 +89,7 @@ export function resolveCourse(cwd: string, name?: string): ResolveResult {
     if (nameError) {
       return {
         ok: false,
-        error: `Invalid course name "${name}" — ${nameError}.`,
+        error: `Invalid course name "${name}": ${nameError}.`,
       };
     }
     const workspaceRoot = findWorkspaceRoot(here);

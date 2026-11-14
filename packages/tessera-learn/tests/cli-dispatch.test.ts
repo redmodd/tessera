@@ -154,10 +154,13 @@ describe('usage', () => {
     expect(stderr()).toContain('Usage: tessera');
   });
 
-  it('returns non-zero and prints usage for an unknown subcommand', async () => {
-    expect(await main(['frobnicate'])).toBe(1);
-    expect(stderr()).toContain('Unknown command: frobnicate');
-  });
+  it.each(['frobnicate', 'frobnicate --help'])(
+    'returns non-zero and prints usage for `%s`',
+    async (command) => {
+      expect(await main(command.split(' '))).toBe(1);
+      expect(stderr()).toContain('Unknown command: frobnicate');
+    },
+  );
 
   it.each([
     'a11y --help',
@@ -166,6 +169,7 @@ describe('usage', () => {
     'duplicate --help',
     'duplicate src -h',
     'export --bogus --help',
+    '--bogus -h',
   ])('prints usage and exits 0 for `%s`', async (command) => {
     expect(await main(command.split(' '))).toBe(0);
     expect(stdout()).toContain('Usage: tessera');
