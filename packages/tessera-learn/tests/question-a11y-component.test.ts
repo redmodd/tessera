@@ -8,6 +8,7 @@ import Sorting from '../src/components/Sorting.svelte';
 import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
 import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
+import QuestionQuiz from './fixtures/question-quiz.svelte';
 import type { QuizConfig } from '../src/runtime/types.js';
 import type { QuizPageState } from '../src/runtime/contexts.js';
 import { mountQuestion } from './helpers/mount.js';
@@ -44,6 +45,37 @@ function mountWidget(
   };
   return { target, button, name, click, unmount };
 }
+
+const labelOf = (el: Element) =>
+  document.getElementById(el.getAttribute('aria-labelledby')!)?.textContent;
+
+describe.each([
+  {
+    name: 'Sorting',
+    widget: Sorting,
+    props: { items: ['Apple'], targets: ['Fruit'], correct: [0] },
+  },
+  {
+    name: 'Matching',
+    widget: Matching,
+    props: { pairs: [{ left: 'A', right: 'Alpha' }] },
+  },
+])('$name question group', ({ widget, props }) => {
+  it.each([
+    ['standalone', () => mountWidget(widget, { ...props, question: 'Q?' })],
+    [
+      'quiz',
+      () => mountWidget(QuestionQuiz, { widget, ...props, question: 'Q?' }, {}),
+    ],
+  ])('is a group named by the visible question (%s)', (_, mount) => {
+    const { target } = mount();
+    flushSync();
+    const shell = target.querySelector('.tessera-question-shell')!;
+    expect(shell.getAttribute('role')).toBe('group');
+    expect(shell.hasAttribute('aria-label')).toBe(false);
+    expect(labelOf(shell)).toBe('Q?');
+  });
+});
 
 describe('Sorting accessible names', () => {
   it('names the card and targets from their visible text', () => {
@@ -176,13 +208,14 @@ describe('Matching accessible names', () => {
       pairs: [...pairs, { left: 'C', right: 'Gamma' }],
     });
     const groups = [
-      ...target.querySelectorAll<HTMLElement>('[role="group"]'),
-    ].filter((g) => g.querySelector('.tessera-matching-item'));
-    const heading = (g: HTMLElement) =>
-      document
-        .getElementById(g.getAttribute('aria-labelledby')!)
-        ?.textContent?.trim();
-    expect(groups.map(heading)).toEqual(['Match from', 'Match to']);
+      ...target.querySelectorAll<HTMLElement>(
+        '.tessera-matching-column[role="group"]',
+      ),
+    ];
+    expect(groups.map((g) => labelOf(g)?.trim())).toEqual([
+      'Match from',
+      'Match to',
+    ]);
 
     const [left] = groups;
     const items = [...left.querySelectorAll<HTMLElement>('button')];

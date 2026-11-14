@@ -2,6 +2,7 @@ import { test, expect, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {
   answerGradedQuiz,
+  expectAxeClean,
   navigateToPage,
   waitForTesseraContent,
 } from './helpers.js';
@@ -442,17 +443,11 @@ test.describe('Navigation — Accessibility', () => {
   });
 
   test('sidebar passes axe audit', async ({ page }) => {
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-sidebar')
-      .analyze();
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(new AxeBuilder({ page }).include('.tessera-sidebar'));
   });
 
   test('full page (welcome) passes axe audit', async ({ page }) => {
-    const results = await new AxeBuilder({ page })
-      // Iframes embed third-party content we don't control.
-      .exclude('iframe')
-      .analyze();
-    expect(results.violations).toEqual([]);
+    // Iframes embed third-party content we don't control.
+    await expectAxeClean(new AxeBuilder({ page }).exclude('iframe'));
   });
 });

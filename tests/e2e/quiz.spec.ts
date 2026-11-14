@@ -6,6 +6,7 @@ import {
   answerMultipleChoice,
   completePracticeQuiz,
   expectAAText,
+  expectAxeClean,
   navigateToPage,
   primaryBtn,
   readSavedState,
@@ -365,13 +366,10 @@ test.describe('Quiz — Accessibility', () => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
 
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-quiz')
-      .analyze();
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(new AxeBuilder({ page }).include('.tessera-quiz'));
   });
 
-  test('matched pair buttons pass axe audit before and after submit', async ({
+  test('Matching passes axe audit before and after submit', async ({
     page,
   }) => {
     await navigateToPage(page, 'Graded Assessment');
@@ -386,9 +384,11 @@ test.describe('Quiz — Accessibility', () => {
       '.tessera-quiz-question-wrapper.active .tessera-matching',
     );
     const audit = () =>
-      new AxeBuilder({ page })
-        .include('.tessera-quiz-question-wrapper.active .tessera-matching-grid')
-        .analyze();
+      expectAxeClean(
+        new AxeBuilder({ page }).include(
+          '.tessera-quiz-question-wrapper.active .tessera-matching',
+        ),
+      );
 
     await expect(matching.locator('[aria-live="polite"]')).toHaveText(
       'All pairs matched.',
@@ -405,7 +405,7 @@ test.describe('Quiz — Accessibility', () => {
         exact: true,
       }),
     ).toBeVisible();
-    expect((await audit()).violations).toEqual([]);
+    await audit();
 
     await primaryBtn(page).click();
     await expect(
@@ -420,18 +420,18 @@ test.describe('Quiz — Accessibility', () => {
         exact: true,
       }),
     ).toBeDisabled();
-    expect((await audit()).violations).toEqual([]);
+    await audit();
   });
 
   test('success and error feedback meets AA contrast', async ({ page }) => {
     await navigateToPage(page, 'Graded Assessment');
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
-    const audit = async (scope = '') =>
-      (
-        await new AxeBuilder({ page })
-          .include(`.tessera-quiz-question-wrapper.active ${scope}`)
-          .analyze()
-      ).violations;
+    const audit = (scope = '') =>
+      expectAxeClean(
+        new AxeBuilder({ page }).include(
+          `.tessera-quiz-question-wrapper.active ${scope}`,
+        ),
+      );
     const btn = primaryBtn(page);
     const activeQ = page.locator('.tessera-quiz-question-wrapper.active');
 
@@ -448,13 +448,13 @@ test.describe('Quiz — Accessibility', () => {
     await expect(
       activeQ.locator('.tessera-question-feedback.incorrect'),
     ).toBeVisible();
-    expect(await audit()).toEqual([]);
+    await audit();
     await btn.click();
 
     await answerMatching(page, { '1': 'One', '2': 'Two', '3': 'Three' });
     await btn.click();
     await expect(activeQ.locator('.tessera-question-review')).toBeVisible();
-    expect(await audit('.tessera-question-review')).toEqual([]);
+    await audit('.tessera-question-review');
     await expectAAText(activeQ.locator('.tessera-matching-badge'));
   });
 
@@ -511,10 +511,9 @@ test.describe('Quiz — Accessibility', () => {
     await page.waitForSelector('.tessera-quiz', { timeout: 10000 });
     await completeGradedQuiz(page);
 
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-quiz-results')
-      .analyze();
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(
+      new AxeBuilder({ page }).include('.tessera-quiz-results'),
+    );
   });
 });
 

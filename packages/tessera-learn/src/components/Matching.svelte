@@ -39,6 +39,7 @@
   const componentId = $props.id();
   const leftHeadingId = `matching-${componentId}-from`;
   const rightHeadingId = `matching-${componentId}-to`;
+  const questionId = `matching-${componentId}-question`;
   const hintId = `matching-${componentId}-hint`;
   const startHintId = `matching-${componentId}-start-hint`;
 
@@ -162,8 +163,13 @@
   }
 </script>
 
-<QuestionShell {q} class="tessera-matching" aria-label={question}>
-  <p class="tessera-matching-question">{question}</p>
+<QuestionShell
+  {q}
+  class="tessera-matching"
+  role="group"
+  aria-labelledby={questionId}
+>
+  <p id={questionId} class="tessera-matching-question">{question}</p>
 
   <div class="tessera-matching-grid">
     <!-- Left column -->
