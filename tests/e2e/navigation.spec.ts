@@ -215,19 +215,14 @@ test.describe('Navigation — Free Mode', () => {
   ]) {
     test(`the current page shades ${name}`, async ({ page }) => {
       await page.addStyleTag({ content: `:root { ${property}: ${value}; }` });
-      const expected = await page.evaluate(
-        ([shadedFrom]) => {
-          const probe = document.body.appendChild(
-            document.createElement('div'),
-          );
-          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, transparent)`;
-          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, var(--tessera-text))`;
-          const { backgroundColor, color } = getComputedStyle(probe);
-          probe.remove();
-          return { backgroundColor, color };
-        },
-        [shadedFrom],
-      );
+      const expected = await page.evaluate((shadedFrom) => {
+        const probe = document.body.appendChild(document.createElement('div'));
+        probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, transparent)`;
+        probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, var(--tessera-text))`;
+        const { backgroundColor, color } = getComputedStyle(probe);
+        probe.remove();
+        return { backgroundColor, color };
+      }, shadedFrom);
       const current = page.locator('.tessera-nav-page[aria-current="page"]');
       await expect(current).toHaveCSS(
         'background-color',
