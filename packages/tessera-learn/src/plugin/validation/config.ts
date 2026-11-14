@@ -60,6 +60,11 @@ const KNOWN_CONFIG_FIELDS = new Set(
     a11y: true,
   } satisfies Record<keyof CourseConfig, true>),
 );
+const KNOWN_BRANDING_FIELDS = new Set(
+  Object.keys({
+    logo: true,
+  } satisfies Record<keyof NonNullable<CourseConfig['branding']>, true>),
+);
 
 const FIND_LANGUAGE_TAG =
   'Use the BCP-47 tag of the course\'s language: a language, then an optional script and region, such as "en", "fr-CA" or "zh-Hant-TW". Look one up at https://r12a.github.io/app-subtags/';
@@ -287,7 +292,7 @@ function validateBranding(
   }
 
   for (const key of Object.keys(branding)) {
-    if (key !== 'logo') {
+    if (!KNOWN_BRANDING_FIELDS.has(key)) {
       d.warn(`unknown field "branding.${key}" will be ignored`);
     }
   }
