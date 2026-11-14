@@ -423,10 +423,11 @@ export async function runAudit(
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
 
       const scan = async (): Promise<AxeViolation[]> => {
-        // A frame's document isn't course markup (Video embeds YouTube/Vimeo);
-        // the <iframe> element itself is still checked (frame-title).
+        // Legacy mode keeps axe to same-origin frames: a cross-origin embed
+        // (Video's YouTube/Vimeo player) isn't course markup. The <iframe>
+        // element itself is still checked (frame-title).
         const builder = new AxeBuilder({ page })
-          .options({ iframes: false })
+          .setLegacyMode(true)
           .withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
         return auditFindings(await builder.analyze());

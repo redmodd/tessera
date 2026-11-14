@@ -145,9 +145,7 @@ export default {};
     expect(report.pages.at(-1).title).toBe('Added');
   });
 
-  // Needs @axe-core/playwright after 4.14.0, which honors iframes: false
-  // (dequelabs/axe-core-npm#1485); 4.14.0 still scans the frame's document.
-  test.fixme('checks the iframe element but not its document', async () => {
+  test('scans same-origin frames but not cross-origin ones', async () => {
     test.setTimeout(120_000);
     const dir = resolve(VARIANTS_ROOT, 'page-weight', 'audit-frames');
     rmSync(dir, { recursive: true, force: true });
@@ -158,11 +156,14 @@ export default {};
       resolve(dir, 'pages/01-assessment/_meta.js'),
       `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
     );
+    // "Opaque" stands in for a YouTube embed: a sandbox without
+    // allow-same-origin makes it cross-origin, and the CSP blocks data: frames.
     writeFileSync(
       resolve(dir, 'pages/01-assessment/frames.svelte'),
       `<script module>export const pageConfig = { title: "Frames" };</script>
 <h1>Frames</h1>
-<iframe title="Embed" srcdoc="<button></button>"></iframe>
+<iframe title="Local" srcdoc="<button></button>"></iframe>
+<iframe title="Opaque" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
 <iframe srcdoc="<p>Untitled</p>"></iframe>
 `,
     );
@@ -174,8 +175,11 @@ export default {};
     );
     const page = report.pages[0];
     expect(page.title).toBe('Frames');
-    expect(page.violations.map((v: { id: string }) => v.id)).toEqual([
-      'frame-title',
-    ]);
+    const ids = page.violations.map((v: { id: string }) => v.id);
+    expect(ids.sort()).toEqual(['button-name', 'frame-title']);
+    const buttonName = page.violations.find(
+      (v: { id: string }) => v.id === 'button-name',
+    );
+    expect(buttonName.nodes).toBe(1);
   });
 });
