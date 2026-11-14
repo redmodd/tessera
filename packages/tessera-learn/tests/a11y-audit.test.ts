@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { describe, it, expect, vi } from 'vitest';
 import {
+  auditFindings,
   axeTags,
   axeIgnoreRules,
   installChromium,
@@ -102,6 +103,17 @@ describe('mapViolation', () => {
     });
     expect(result.impact).toBeNull();
     expect(result.elements).toEqual([]);
+  });
+});
+
+describe('auditFindings', () => {
+  it('adds a prohibited label from incomplete, and nothing else from it', () => {
+    const rule = (id: string) => ({ id, help: 'h', helpUrl: 'u', nodes: [] });
+    const ids = auditFindings({
+      violations: [rule('color-contrast')],
+      incomplete: [rule('aria-prohibited-attr'), rule('color-contrast')],
+    }).map((v) => v.id);
+    expect(ids).toEqual(['color-contrast', 'aria-prohibited-attr']);
   });
 });
 

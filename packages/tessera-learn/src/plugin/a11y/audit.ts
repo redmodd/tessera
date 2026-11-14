@@ -115,6 +115,16 @@ export function mapViolation(v: any): AxeViolation {
   };
 }
 
+// axe files a label on a role-less element under `incomplete` when the element
+// has text, but screen readers still drop the label.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
+  return [
+    ...out.violations,
+    ...out.incomplete.filter((r) => r.id === 'aria-prohibited-attr'),
+  ].map(mapViolation);
+}
+
 export function isMissingBrowserError(message: string): boolean {
   return /Executable doesn't exist|playwright install/i.test(message);
 }
@@ -415,8 +425,7 @@ export async function runAudit(
       const scan = async (): Promise<AxeViolation[]> => {
         const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
-        const out = await builder.analyze();
-        return out.violations.map(mapViolation);
+        return auditFindings(await builder.analyze());
       };
 
       const recordPage = async (
