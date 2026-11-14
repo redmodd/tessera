@@ -173,6 +173,7 @@ async function crossesOrigin(
       selector,
     );
     frame = await iframe.asElement()?.contentFrame();
+    await iframe.dispose();
     if (!frame) return false;
     const origin = URL.parse(frame.url())?.origin ?? 'null';
     if (origin !== 'null' && origin !== courseOrigin) return true;

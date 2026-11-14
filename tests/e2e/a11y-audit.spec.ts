@@ -151,29 +151,30 @@ export default {};
       res.setHeader('Content-Type', 'text/html');
       res.end('<button></button><img src="data:,">');
     });
-    embed.listen(0);
-    await once(embed, 'listening');
-    const embedUrl = `http://localhost:${(embed.address() as AddressInfo).port}/`;
-    const dir = copyVariant('page-weight', 'audit-frames');
-    const config = resolve(dir, 'course.config.js');
-    const source = readFileSync(config, 'utf-8');
-    const withCsp = source.replace(
-      'export: {',
-      "export: { csp: { 'frame-src': ['http://localhost:*'] },",
-    );
-    // Without the CSP entry the embed is blocked and has no button to skip.
-    expect(withCsp).not.toBe(source);
-    writeFileSync(config, withCsp);
-    // The first page: the audit's networkidle wait doesn't settle after
-    // navigating to a page that adds a local frame (#442).
-    writeFileSync(
-      resolve(dir, 'pages/01-assessment/_meta.js'),
-      `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
-    );
-    // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
-    writeFileSync(
-      resolve(dir, 'pages/01-assessment/frames.svelte'),
-      `<script module>export const pageConfig = { title: "Frames" };</script>
+    try {
+      embed.listen(0);
+      await once(embed, 'listening');
+      const embedUrl = `http://localhost:${(embed.address() as AddressInfo).port}/`;
+      const dir = copyVariant('page-weight', 'audit-frames');
+      const config = resolve(dir, 'course.config.js');
+      const source = readFileSync(config, 'utf-8');
+      const withCsp = source.replace(
+        'export: {',
+        "export: { csp: { 'frame-src': ['http://localhost:*'] },",
+      );
+      // Without the CSP entry the embed is blocked and has no button to skip.
+      expect(withCsp).not.toBe(source);
+      writeFileSync(config, withCsp);
+      // The first page: the audit's networkidle wait doesn't settle after
+      // navigating to a page that adds a local frame (#442).
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/_meta.js'),
+        `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
+      );
+      // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/frames.svelte'),
+        `<script module>export const pageConfig = { title: "Frames" };</script>
 <h1>Frames</h1>
 <iframe title="Local" srcdoc="<button></button>"></iframe>
 <iframe title="Sandboxed" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
@@ -183,24 +184,23 @@ export default {};
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
 `,
-    );
+      );
 
-    try {
       await audit(dir);
+
+      const report = readReport(dir);
+      const page = report.pages[0];
+      expect(page.title).toBe('Frames');
+      expect(
+        Object.fromEntries(
+          page.violations.map((v: { id: string; nodes: number }) => [
+            v.id,
+            v.nodes,
+          ]),
+        ),
+      ).toEqual({ 'button-name': 2, 'frame-title': 1 });
     } finally {
       embed.close();
     }
-
-    const report = readReport(dir);
-    const page = report.pages[0];
-    expect(page.title).toBe('Frames');
-    expect(
-      Object.fromEntries(
-        page.violations.map((v: { id: string; nodes: number }) => [
-          v.id,
-          v.nodes,
-        ]),
-      ),
-    ).toEqual({ 'button-name': 2, 'frame-title': 1 });
   });
 });
