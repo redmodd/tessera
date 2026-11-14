@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { styleText } from 'node:util';
+import { styleErr } from '../cli-args.js';
 import type { Plugin, PreviewServer } from 'vite';
 import type { ContextPluginApi } from '../build-context.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
@@ -130,7 +131,7 @@ const INSTALL_CHROMIUM = 'pnpm exec playwright install chromium';
 const PLAYWRIGHT_SPECS = ['playwright', '@playwright/test'] as const;
 
 function stderrTag(color: 'red' | 'yellow' = 'red'): string {
-  return styleText(color, '[tessera a11y]', { stream: process.stderr });
+  return styleErr(color, '[tessera a11y]');
 }
 
 function reportManualInstall(lead: string): void {

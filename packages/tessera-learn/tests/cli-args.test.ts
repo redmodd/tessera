@@ -1,14 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { parseCliArgs } from '../src/plugin/cli-args.js';
+import { parseCliArgs, wantsHelp } from '../src/plugin/cli-args.js';
+
+describe('wantsHelp', () => {
+  it('finds --help or -h anywhere before --', () => {
+    expect(wantsHelp(['--bogus', '-h'])).toBe(true);
+    expect(wantsHelp(['a', '--help'])).toBe(true);
+    expect(wantsHelp(['--', '-h'])).toBe(false);
+    expect(wantsHelp(['a'])).toBe(false);
+  });
+});
 
 describe('parseCliArgs', () => {
-  it('lets --help win over other arguments', () => {
-    expect(parseCliArgs(['--bogus', '-h'])).toEqual({ help: true });
-  });
-
   it('treats arguments after -- as positionals', () => {
     expect(parseCliArgs(['--', '-h'])).toEqual({
-      help: false,
       values: {},
       positionals: ['-h'],
     });

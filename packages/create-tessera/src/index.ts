@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseCliArgs } from 'tessera-learn/cli-args';
+import { parseCliArgs, wantsHelp } from 'tessera-learn/cli-args';
 import { validateProjectName, toTitleCase } from 'tessera-learn/project-name';
 import { copyTemplate } from 'tessera-learn/template-copy';
 
@@ -53,9 +53,9 @@ type ParseResult =
   { help: true } | { error: string } | { projectName?: string };
 
 export function parseArgs(argv: string[]): ParseResult {
+  if (wantsHelp(argv)) return { help: true };
   const parsed = parseCliArgs(argv);
   if ('error' in parsed) return { error: parsed.error };
-  if (parsed.help) return { help: true };
 
   const { positionals } = parsed;
   if (positionals.length > 1) {

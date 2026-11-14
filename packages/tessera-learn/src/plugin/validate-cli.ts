@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import { styleText } from 'node:util';
+import { styleErr } from './cli-args.js';
 import { validateProject, reportValidationIssues } from './validation.js';
 import type { StandardId } from '../runtime/standards.js';
 
@@ -19,7 +20,7 @@ export function runValidate(
       `Validation failed with ${errors.length} error(s)` +
       (warnings.length > 0 ? ` and ${warnings.length} warning(s)` : '') +
       '.';
-    console.error(`\n${styleText('red', summary, { stream: process.stderr })}`);
+    console.error(`\n${styleErr('red', summary)}`);
     return 1;
   }
 

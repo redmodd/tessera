@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import type { ParseArgsOptionsConfig } from 'node:util';
-import { parseCliArgs } from './cli-args.js';
+import { parseCliArgs, wantsHelp } from './cli-args.js';
 import { runValidate } from './validate-cli.js';
 import { IMPACT_LEVELS, runAudit, type ImpactLevel } from './a11y/audit.js';
 import { runNew } from './new-cli.js';
@@ -166,10 +166,7 @@ const USAGE = formatUsage();
 function parseCommandArgs(
   { args: synopsis, flag }: { args: string[]; flag?: Flag },
   args: string[],
-):
-  | { error: string }
-  | { help: true }
-  | { help: false; positionals: string[]; flagValue?: string } {
+): { error: string } | { positionals: string[]; flagValue?: string } {
   const options: ParseArgsOptionsConfig = {};
   if (flag) options[flag.name] = { type: 'string' };
 
@@ -180,7 +177,6 @@ function parseCommandArgs(
     }
     return { error: parsed.error };
   }
-  if (parsed.help) return { help: true };
   const { values, positionals } = parsed;
 
   const required = synopsis.filter((arg) => arg.startsWith('<')).length;
@@ -191,15 +187,15 @@ function parseCommandArgs(
     return { error: `Unexpected argument: ${positionals[synopsis.length]}` };
   }
 
-  if (!flag) return { help: false, positionals };
+  if (!flag) return { positionals };
   const flagValue = values[flag.name];
-  if (typeof flagValue !== 'string') return { help: false, positionals };
+  if (typeof flagValue !== 'string') return { positionals };
   if (!flag.choices.includes(flagValue)) {
     return {
       error: `--${flag.name} must be ${quoteList(flag.choices)}, got ${formatValue(flagValue)}`,
     };
   }
-  return { help: false, positionals, flagValue };
+  return { positionals, flagValue };
 }
 
 export async function main(
@@ -208,7 +204,7 @@ export async function main(
 ): Promise<number> {
   const [sub, ...rest] = argv;
 
-  if (sub === '--help' || sub === '-h') {
+  if (wantsHelp(argv)) {
     console.log(USAGE);
     return 0;
   }
@@ -226,10 +222,6 @@ export async function main(
   if ('error' in parsed) {
     console.error(`[tessera ${sub}] ${parsed.error}`);
     return 1;
-  }
-  if (parsed.help) {
-    console.log(USAGE);
-    return 0;
   }
   if (!command.course) return command.run(parsed.positionals, cwd);
 

@@ -166,6 +166,8 @@ describe('usage', () => {
     'duplicate --help',
     'duplicate src -h',
     'export --bogus --help',
+    'frobnicate --help',
+    '--bogus -h',
   ])('prints usage and exits 0 for `%s`', async (command) => {
     expect(await main(command.split(' '))).toBe(0);
     expect(stdout()).toContain('Usage: tessera');
