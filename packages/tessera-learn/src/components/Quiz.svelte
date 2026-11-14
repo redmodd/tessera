@@ -445,25 +445,13 @@
     }
 
     .tessera-quiz-score-label.passed {
-      color: color-mix(
-        in srgb,
-        var(--tessera-success) 55%,
-        var(--tessera-text)
-      );
-      background: color-mix(
-        in srgb,
-        var(--tessera-success) 12%,
-        var(--tessera-bg)
-      );
+      color: var(--tessera-success);
+      background: var(--tessera-success-bg);
     }
 
     .tessera-quiz-score-label.failed {
-      color: color-mix(in srgb, var(--tessera-error) 55%, var(--tessera-text));
-      background: color-mix(
-        in srgb,
-        var(--tessera-error) 12%,
-        var(--tessera-bg)
-      );
+      color: var(--tessera-error);
+      background: var(--tessera-error-bg);
     }
 
     .tessera-quiz-results-detail {

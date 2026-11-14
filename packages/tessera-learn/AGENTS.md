@@ -510,7 +510,7 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | `--tessera-primary-on-bg-strong`               | the `-on-bg` at 70% over the text     |
 | `--tessera-on-primary`                         | `#ffffff`                             |
 | `--tessera-primary-light`                      | the primary at 15% over the bg        |
-| `--tessera-primary-dark` (button hover)        | the primary at 70% over black         |
+| `--tessera-primary-dark`                       | the primary at 70% over black         |
 | `--tessera-text`                               | `#1f2937`                             |
 | `--tessera-text-light`                         | `#6b7280`                             |
 | `--tessera-bg`                                 | `#ffffff`                             |
@@ -535,7 +535,7 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 
 Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. A `tabindex="-1"` wrapper the page change focuses (see [Custom Layouts](docs/recipes.md#custom-layouts)) does show it. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
-Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-success-bg` / `--tessera-error-bg`, an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
+Feedback text and the quiz score label render in `--tessera-success` / `--tessera-error` on `--tessera-success-bg` / `--tessera-error-bg`, an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
 ```css
 :root {

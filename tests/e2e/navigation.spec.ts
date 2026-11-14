@@ -203,27 +203,37 @@ test.describe('Navigation — Free Mode', () => {
     await expect(nextBtn).toBeDisabled();
   });
 
-  for (const [name, primary, shadedFrom] of [
-    ['follow the primary color on <html>', '#b91c1c', '#b91c1c'],
-    ['keep the default for an unparseable primary color', '#12345', '#2563eb'],
+  for (const [name, property, value, shadedFrom, bg] of [
+    [
+      'follow the primary color on <html>',
+      '--tessera-primary',
+      '#b91c1c',
+      '#b91c1c',
+      'white',
+    ],
+    [
+      'keep the default for an unparseable primary color',
+      '--tessera-primary',
+      '#12345',
+      '#2563eb',
+      'white',
+    ],
+    ['mix over --tessera-bg', '--tessera-bg', '#111827', '#2563eb', '#111827'],
   ]) {
     test(`the current page shades ${name}`, async ({ page }) => {
       const expected = await page.evaluate(
-        ([primary, shadedFrom]) => {
-          document.documentElement.style.setProperty(
-            '--tessera-primary',
-            primary,
-          );
+        ([property, value, shadedFrom, bg]) => {
+          document.documentElement.style.setProperty(property, value);
           const probe = document.body.appendChild(
             document.createElement('div'),
           );
-          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, white)`;
+          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, ${bg})`;
           probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, #1f2937)`;
           const { backgroundColor, color } = getComputedStyle(probe);
           probe.remove();
           return { backgroundColor, color };
         },
-        [primary, shadedFrom],
+        [property, value, shadedFrom, bg],
       );
       const current = page.locator('.tessera-nav-page[aria-current="page"]');
       await expect(current).toHaveCSS(
@@ -257,20 +267,6 @@ test.describe('Navigation — Free Mode', () => {
     const next = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
     await expect(next).toHaveCSS('color', 'rgb(185, 28, 28)');
     await expect(next).toHaveCSS('border-color', 'rgb(185, 28, 28)');
-  });
-
-  test('the current page tint mixes over --tessera-bg', async ({ page }) => {
-    await page.addStyleTag({ content: ':root { --tessera-bg: #111827; }' });
-    const expected = await page.evaluate(() => {
-      const probe = document.body.appendChild(document.createElement('div'));
-      probe.style.backgroundColor = 'color-mix(in srgb, #2563eb 15%, #111827)';
-      const { backgroundColor } = getComputedStyle(probe);
-      probe.remove();
-      return backgroundColor;
-    });
-    await expect(
-      page.locator('.tessera-nav-page[aria-current="page"]'),
-    ).toHaveCSS('background-color', expected);
   });
 
   test('current page is highlighted in sidebar', async ({ page }) => {

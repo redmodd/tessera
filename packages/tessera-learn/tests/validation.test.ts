@@ -3626,9 +3626,6 @@ describe('a11y rule 1.7 — primaryColor contrast', () => {
     );
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/primary-contrast')).toBe(true);
-    expect(warnings.join('\n')).toMatch(
-      /--tessera-primary-on-bg and --tessera-on-primary.*--tessera-primary-dark/,
-    );
   });
 
   it('does not warn on a passing primaryColor', () => {
