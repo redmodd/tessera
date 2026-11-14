@@ -1,5 +1,36 @@
 # tessera-learn
 
+## 0.14.0
+
+### Minor Changes
+
+- c2c1e2a: Course text sent to the LMS or LRS (the cmi5.xml and tincan.xml course name and description, question and option text, and the SCORM 2004 interaction description) is tagged with the course `language` in canonical form (`EN-gb` becomes `en-GB`) instead of `en-US`. SCORM 2004 shortens the tag to a form Moodle accepts, such as `ca-ES` for `ca-ES-valencia`.
+  
+  **Breaking:** `language` is required. A missing or malformed tag (such as `en-x` or `en_US`), or one that names no language (`und`, `mul`, `zxx`), fails the build, and `a11y.ignore` no longer covers it. To upgrade, set `language` to the course's tag, such as `en` or `fr-CA`.
+  
+  **Behavior change:** a course with `language: 'en'` now reports these texts under `en` rather than `en-US`. Set `language: 'en-US'` to keep `en-US`. Verb names stay `en-US`.
+- a4f35f5: **Breaking:** the course, every section and lesson `_meta.js`, and every page `pageConfig` need a non-empty `title`, and the build fails without one. Titles are no longer made from file and folder names. A section or lesson folder with no pages is left out of the course with a warning and needs no `_meta.js`.
+
+### Patch Changes
+
+- bc9b048: The `--tessera-primary-light` and `--tessera-primary-dark` shades and the `Callout` backgrounds now derive from the theme colors in CSS, so a `--tessera-primary` set on `:root` in a course stylesheet tints them too. A `branding.primaryColor` the browser can't parse is ignored with a console warning, and a base theme color in a course stylesheet that isn't a color, such as a gradient on `--tessera-bg`, falls back to its default.
+- 3251cbe: The built-in quiz and question widgets share their setup code. Courses behave the same.
+- 190433c: - `@vitest/coverage-v8` 5.0.5 → 5.1.0
+  - `playwright` 1.64.1 → 1.65.0
+  - `svelte-check` 4.7.7 → 4.7.8
+  - `tsdown` 0.23.4 → 0.23.7
+  - `vitest` 5.0.5 → 5.1.0
+- 1319b3a: - `vite` 8.3.5 → 8.3.6
+- 20e3db1: Under cmi5 and xAPI, closing the window sends Terminated, and any statements still waiting, even when the saved state is large. The exit state still goes first, but without `keepalive` when it does not fit in what they leave of the browser's 64 KiB quota. When the last save failed, the Exit button now sends the exit state the same way and waits for it before sending Terminated.
+- 831bd4d: `Video` uses the browser's native lazy loading and no longer shows a placeholder; a native video holds a 16:9 box with no preview frame until played. The `Sorting` card is a native `<button>`. An `AccordionItem` trigger no longer submits a surrounding form.
+- cdf8d49: CLI output skips color codes when it isn't going to a terminal or `NO_COLOR` is set. `tessera` shows help for `--help` even after an unknown option.
+- 20ebaf5: Removes unused internal code from the runtime and the build plugin. Courses behave the same.
+- d3721d8: When an LRS rejects a statement on the retry after a 401, the error now includes the LRS response, as it does on the first attempt. A network error on that retry is now retried with backoff instead of dropping the statement.
+- 48c8c13: The build's skipped-heading-level warning (such as `<h2>` followed by `<h4>`) now looks only at real heading elements on the page. Text that merely looks like a heading tag, such as the string in `{'<h4>'}`, no longer triggers it.
+  
+  The warning for a page missing from a lesson's `pages` array now names the lesson's `_meta.js` file, where the fix goes.
+- 557a712: Internal test simplifications.
+
 ## 0.13.0
 
 ### Minor Changes
