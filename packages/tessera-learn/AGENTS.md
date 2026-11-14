@@ -697,6 +697,6 @@ Two passes plus components that are accessible by construction.
 | `tessera/heading-order`    | page headings skip no level                          |
 | `a11y_*`                   | the Svelte compiler's accessibility warnings         |
 
-**Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast) and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
+**Runtime audit** (`tessera a11y`, or via `pnpm check`) is the opt-in deep pass: builds the course, renders **every** page headless (incl. quiz-gated), runs [axe-core](https://github.com/dequelabs/axe-core), writes `a11y-report.json` (git-ignored), exits non-zero at/above the impact threshold (default `serious`; `--threshold minor` is stricter). It catches what static can't (computed ARIA, focus order, rendered contrast), checks each `<iframe>` but not the page it embeds, and uses the web adapter, so it works regardless of `export.standard`. First run auto-installs Chromium.
 
 Ruleset and severity come from the `a11y` block: see [Field behaviour](#field-behaviour).

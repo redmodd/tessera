@@ -423,7 +423,11 @@ export async function runAudit(
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
 
       const scan = async (): Promise<AxeViolation[]> => {
-        const builder = new AxeBuilder({ page }).withTags(tags);
+        // A frame's document isn't course markup (Video embeds YouTube/Vimeo);
+        // the <iframe> element itself is still checked (frame-title).
+        const builder = new AxeBuilder({ page })
+          .options({ iframes: false })
+          .withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
         return auditFindings(await builder.analyze());
       };

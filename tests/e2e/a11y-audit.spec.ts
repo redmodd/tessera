@@ -144,4 +144,38 @@ export default {};
     expect(report.totalPages).toBe(3);
     expect(report.pages.at(-1).title).toBe('Added');
   });
+
+  // Needs @axe-core/playwright after 4.14.0, which honors iframes: false
+  // (dequelabs/axe-core-npm#1485); 4.14.0 still scans the frame's document.
+  test.fixme('checks the iframe element but not its document', async () => {
+    test.setTimeout(120_000);
+    const dir = resolve(VARIANTS_ROOT, 'page-weight', 'audit-frames');
+    rmSync(dir, { recursive: true, force: true });
+    cpSync(variantDir('page-weight', 'scorm12'), dir, { recursive: true });
+    // The first page: the audit's networkidle wait doesn't settle after
+    // navigating to a page that adds a local frame.
+    writeFileSync(
+      resolve(dir, 'pages/01-assessment/_meta.js'),
+      `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
+    );
+    writeFileSync(
+      resolve(dir, 'pages/01-assessment/frames.svelte'),
+      `<script module>export const pageConfig = { title: "Frames" };</script>
+<h1>Frames</h1>
+<iframe title="Embed" srcdoc="<button></button>"></iframe>
+<iframe srcdoc="<p>Untitled</p>"></iframe>
+`,
+    );
+
+    await audit(dir);
+
+    const report = JSON.parse(
+      readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
+    );
+    const page = report.pages[0];
+    expect(page.title).toBe('Frames');
+    expect(page.violations.map((v: { id: string }) => v.id)).toEqual([
+      'frame-title',
+    ]);
+  });
 });
