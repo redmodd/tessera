@@ -9,15 +9,4 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   fixedExtension: false,
-  deps: {
-    neverBundle: [
-      'svelte',
-      'vite',
-      '@sveltejs/vite-plugin-svelte',
-      'json5',
-      'playwright',
-      '@playwright/test',
-      '@axe-core/playwright',
-    ],
-  },
 });

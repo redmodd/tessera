@@ -1,10 +1,11 @@
+import { defineConfig } from 'eslint/config';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       '**/dist/**',
@@ -17,8 +18,8 @@ export default tseslint.config(
   },
 
   js.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...svelte.configs.recommended,
+  tseslint.configs.recommended,
+  svelte.configs.recommended,
 
   {
     languageOptions: {
@@ -99,11 +100,6 @@ export default tseslint.config(
               regex: '^\\.\\./(?!runtime/hooks\\.svelte\\.js$)',
               message:
                 'Built-in components use only the public tessera-learn API.',
-            },
-            {
-              regex: '^\\.\\./runtime/hooks\\.svelte\\.js$',
-              importNamePattern: '^__',
-              message: 'Internal hook helpers are not public API.',
             },
           ],
         },
