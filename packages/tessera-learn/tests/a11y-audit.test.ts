@@ -10,6 +10,7 @@ import {
   launchWithInstall,
   mapNodeDetail,
   mapViolation,
+  runAudit,
 } from '../src/plugin/a11y/audit.js';
 
 const spawn = vi.hoisted(() => vi.fn());
@@ -17,6 +18,16 @@ vi.mock('node:child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:child_process')>()),
   spawn,
 }));
+vi.mock('@axe-core/playwright', () => ({ default: class {} }));
+
+describe('runAudit', () => {
+  it('asks for an upgrade when @axe-core/playwright predates 4.3', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await runAudit('.', '.')).toBe(1);
+    expect(error.mock.calls[0]?.[0]).toContain('4.3 or later');
+    error.mockRestore();
+  });
+});
 
 describe('axeTags', () => {
   it('maps each standard to its cumulative tag list', () => {

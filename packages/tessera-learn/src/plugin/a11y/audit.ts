@@ -315,9 +315,12 @@ async function loadDeps(): Promise<
 
   try {
     const mod = (await tryImport('@axe-core/playwright')) as {
-      default?: unknown;
+      default?: { prototype?: { setLegacyMode?: unknown } };
     };
-    if (!mod.default) return { ok: false, missing: '@axe-core/playwright' };
+    // setLegacyMode arrived in 4.3; an older copy only warns as a peer.
+    if (typeof mod.default?.prototype?.setLegacyMode !== 'function') {
+      return { ok: false, missing: '@axe-core/playwright' };
+    }
     return { ok: true, deps: { chromium, AxeBuilder: mod.default } };
   } catch {
     return { ok: false, missing: '@axe-core/playwright' };
@@ -339,8 +342,8 @@ export async function runAudit(
   const deps = await loadDeps();
   if (!deps.ok) {
     console.error(
-      `${stderrTag()} Tier 2 needs Playwright + axe-core, which aren't installed.\n` +
-        `  Install them to run the runtime audit:\n` +
+      `${stderrTag()} Tier 2 needs Playwright and @axe-core/playwright 4.3 or later.\n` +
+        `  Install or upgrade them to run the runtime audit:\n` +
         `    pnpm add -D playwright @axe-core/playwright\n` +
         `    ${INSTALL_CHROMIUM}`,
     );

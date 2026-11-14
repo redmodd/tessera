@@ -6,6 +6,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
 import { VARIANTS_ROOT, variantDir } from './global-setup.js';
 import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
@@ -147,28 +149,49 @@ export default {};
 
   test('scans same-origin frames but not cross-origin ones', async () => {
     test.setTimeout(120_000);
+    // localhost is another site than the preview server's 127.0.0.1, so these
+    // embeds are out-of-process cross-origin frames, like a YouTube Video.
+    const embed = createServer((_, res) => {
+      res.setHeader('Content-Type', 'text/html');
+      res.end('<button></button>');
+    });
+    await new Promise<void>((done) => embed.listen(0, done));
+    const embedUrl = `http://localhost:${(embed.address() as AddressInfo).port}/`;
     const dir = resolve(VARIANTS_ROOT, 'page-weight', 'audit-frames');
     rmSync(dir, { recursive: true, force: true });
     cpSync(variantDir('page-weight', 'scorm12'), dir, { recursive: true });
+    const config = resolve(dir, 'course.config.js');
+    writeFileSync(
+      config,
+      readFileSync(config, 'utf-8').replace(
+        'export: {',
+        "export: { csp: { 'frame-src': ['http://localhost:*'] },",
+      ),
+    );
     // The first page: the audit's networkidle wait doesn't settle after
-    // navigating to a page that adds a local frame.
+    // navigating to a page that adds a local frame (#442).
     writeFileSync(
       resolve(dir, 'pages/01-assessment/_meta.js'),
       `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
     );
-    // "Opaque" stands in for a YouTube embed: a sandbox without
-    // allow-same-origin makes it cross-origin, and the CSP blocks data: frames.
+    // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
     writeFileSync(
       resolve(dir, 'pages/01-assessment/frames.svelte'),
       `<script module>export const pageConfig = { title: "Frames" };</script>
 <h1>Frames</h1>
 <iframe title="Local" srcdoc="<button></button>"></iframe>
-<iframe title="Opaque" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
+<iframe title="Embed" src="${embedUrl}"></iframe>
 <iframe srcdoc="<p>Untitled</p>"></iframe>
+<div style="height: 30000px"></div>
+<iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
 `,
     );
 
-    await audit(dir);
+    try {
+      await audit(dir);
+    } finally {
+      embed.close();
+    }
 
     const report = JSON.parse(
       readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
