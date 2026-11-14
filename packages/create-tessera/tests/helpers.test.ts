@@ -13,19 +13,21 @@ describe('parseArgs', () => {
   });
 
   it('parses the workspace name', () => {
-    expect(parseArgs(['my-course']).args).toEqual({
-      projectName: 'my-course',
-    });
+    expect(parseArgs(['my-course'])).toEqual({ projectName: 'my-course' });
   });
 
   it('rejects unknown flags', () => {
-    expect(parseArgs(['--version']).error).toMatch(/Unknown option/);
-    expect(parseArgs(['my-course', '--template=bare']).error).toMatch(
-      /Unknown option/,
-    );
+    expect(parseArgs(['--version'])).toEqual({
+      error: "Unknown option '--version'",
+    });
+    expect(parseArgs(['my-course', '--template=bare'])).toEqual({
+      error: "Unknown option '--template'",
+    });
   });
 
   it('rejects multiple positional arguments', () => {
-    expect(parseArgs(['a', 'b']).error).toMatch(/Unexpected argument/);
+    expect(parseArgs(['a', 'b'])).toEqual({
+      error: 'Unexpected argument: b',
+    });
   });
 });

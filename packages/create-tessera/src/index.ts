@@ -49,15 +49,8 @@ Then bump the dependency from the workspace root:
   pnpm add tessera-learn@latest
 `;
 
-interface ParsedArgs {
-  projectName?: string;
-}
-
-interface ParseResult {
-  args?: ParsedArgs;
-  error?: string;
-  help?: boolean;
-}
+type ParseResult =
+  { help: true } | { error: string } | { projectName?: string };
 
 export function parseArgs(argv: string[]): ParseResult {
   if (argv.includes('--help') || argv.includes('-h')) return { help: true };
@@ -69,9 +62,9 @@ export function parseArgs(argv: string[]): ParseResult {
     return { error: (error as Error).message.split('. ')[0] };
   }
   if (positionals.length > 1) {
-    return { error: `Unexpected argument "${positionals[1]}"` };
+    return { error: `Unexpected argument: ${positionals[1]}` };
   }
-  return { args: { projectName: positionals[0] } };
+  return { projectName: positionals[0] };
 }
 
 // __UPPER__ delimiters can't collide with Svelte `{...}` or JS `${...}`;
@@ -101,23 +94,22 @@ function fail(message: string): never {
 function main() {
   const result = parseArgs(process.argv.slice(2));
 
-  if (result.help) {
+  if ('help' in result) {
     process.stdout.write(USAGE);
     process.exit(0);
   }
 
-  if (result.error) fail(result.error);
+  if ('error' in result) fail(result.error);
 
-  const args = result.args!;
-  if (!args.projectName) {
+  const name = result.projectName;
+  if (!name) {
     process.stderr.write(USAGE);
     process.exit(1);
   }
 
-  const nameError = validateProjectName(args.projectName);
+  const nameError = validateProjectName(name);
   if (nameError) fail(nameError);
 
-  const name = args.projectName;
   const projectDir = resolve(process.cwd(), name);
 
   if (existsSync(projectDir)) {

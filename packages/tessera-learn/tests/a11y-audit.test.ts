@@ -318,7 +318,7 @@ describe('installChromium', () => {
     expect(error.mock.calls[0][0]).toContain('spawn ENOENT');
   });
 
-  it('has spawn SIGKILL the install after 10 minutes and reports the timeout', async () => {
+  it('passes a 10-minute SIGKILL timeout to spawn and reports a timed-out install', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     fakeChild('timeout');
 

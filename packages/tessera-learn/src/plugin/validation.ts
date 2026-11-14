@@ -39,17 +39,18 @@ export function reportValidationIssues({
   warnings,
   infos = [],
 }: ValidationResult): void {
-  const stderr = { stream: process.stderr };
   for (const info of infos) {
     console.log(`${styleText('cyan', '[tessera]')} ${info}`);
   }
   for (const warning of warnings) {
     console.warn(
-      `${styleText('yellow', '[tessera warning]', stderr)} ${warning}`,
+      `${styleText('yellow', '[tessera warning]', { stream: process.stderr })} ${warning}`,
     );
   }
   for (const error of errors) {
-    console.error(`${styleText('red', '[tessera error]', stderr)} ${error}`);
+    console.error(
+      `${styleText('red', '[tessera error]', { stream: process.stderr })} ${error}`,
+    );
   }
 }
 
