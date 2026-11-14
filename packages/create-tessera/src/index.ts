@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs as parseArgv } from 'node:util';
 import { validateProjectName, toTitleCase } from 'tessera-learn/project-name';
 import { copyTemplate } from 'tessera-learn/template-copy';
 
@@ -59,18 +60,22 @@ interface ParseResult {
 }
 
 export function parseArgs(argv: string[]): ParseResult {
-  const args: ParsedArgs = {};
-  for (const a of argv) {
-    if (a === '--help' || a === '-h') return { help: true };
-    if (a.startsWith('-')) {
-      return { error: `Unknown option "${a}"` };
-    } else if (!args.projectName) {
-      args.projectName = a;
-    } else {
-      return { error: `Unexpected argument "${a}"` };
-    }
+  let parsed;
+  try {
+    parsed = parseArgv({
+      args: argv,
+      options: { help: { type: 'boolean', short: 'h' } },
+      allowPositionals: true,
+    });
+  } catch (error) {
+    return { error: (error as Error).message.split('. ')[0] };
   }
-  return { args };
+  const { values, positionals } = parsed;
+  if (values.help) return { help: true };
+  if (positionals.length > 1) {
+    return { error: `Unexpected argument "${positionals[1]}"` };
+  }
+  return { args: { projectName: positionals[0] } };
 }
 
 // __UPPER__ delimiters can't collide with Svelte `{...}` or JS `${...}`;

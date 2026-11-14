@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+import { styleText } from 'node:util';
 import { dropUnreadParses } from './ast.js';
 import {
   COURSE_CONFIG_FILE,
@@ -38,14 +39,17 @@ export function reportValidationIssues({
   warnings,
   infos = [],
 }: ValidationResult): void {
+  const stderr = { stream: process.stderr };
   for (const info of infos) {
-    console.log(`\x1b[36m[tessera]\x1b[0m ${info}`);
+    console.log(`${styleText('cyan', '[tessera]')} ${info}`);
   }
   for (const warning of warnings) {
-    console.warn(`\x1b[33m[tessera warning]\x1b[0m ${warning}`);
+    console.warn(
+      `${styleText('yellow', '[tessera warning]', stderr)} ${warning}`,
+    );
   }
   for (const error of errors) {
-    console.error(`\x1b[31m[tessera error]\x1b[0m ${error}`);
+    console.error(`${styleText('red', '[tessera error]', stderr)} ${error}`);
   }
 }
 

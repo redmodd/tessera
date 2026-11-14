@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { describe, it, expect, vi } from 'vitest';
 import {
   axeTags,
@@ -9,7 +10,6 @@ import {
   mapNodeDetail,
   mapViolation,
 } from '../src/plugin/a11y/audit.js';
-import { useFakeTimers } from './helpers.js';
 
 const spawn = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -277,25 +277,19 @@ describe('launchWithInstall', () => {
   });
 });
 
-function fakeChild(behavior: 'exit0' | 'exit1' | 'error' | 'hang') {
-  const child = {
-    killed: false,
-    on(event: string, listener: (arg: any) => void) {
-      if (event === 'exit' && (behavior === 'exit0' || behavior === 'exit1')) {
-        listener(behavior === 'exit0' ? 0 : 1);
-      }
-      if (event === 'error' && behavior === 'error') {
-        listener(new Error('spawn ENOENT'));
-      }
-      return this;
-    },
-    kill() {
+function fakeChild(behavior: 'exit0' | 'exit1' | 'error' | 'timeout') {
+  const child = Object.assign(new EventEmitter(), { killed: false });
+  setImmediate(() => {
+    if (behavior === 'error') {
+      child.emit('error', new Error('spawn ENOENT'));
+    } else if (behavior === 'timeout') {
       child.killed = true;
-      return true;
-    },
-  };
+      child.emit('exit', null, 'SIGKILL');
+    } else {
+      child.emit('exit', behavior === 'exit0' ? 0 : 1, null);
+    }
+  });
   spawn.mockReturnValueOnce(child);
-  return child;
 }
 
 describe('installChromium', () => {
@@ -324,15 +318,16 @@ describe('installChromium', () => {
     expect(error.mock.calls[0][0]).toContain('spawn ENOENT');
   });
 
-  it('kills the child and returns false when the install times out', async () => {
-    useFakeTimers();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const child = fakeChild('hang');
+  it('has spawn SIGKILL the install after 10 minutes and reports the timeout', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fakeChild('timeout');
 
-    const result = installChromium('/workspace');
-    await vi.advanceTimersByTimeAsync(10 * 60_000);
-
-    expect(await result).toBe(false);
-    expect(child.killed).toBe(true);
+    expect(await installChromium('/workspace')).toBe(false);
+    const [, , options] = spawn.mock.lastCall!;
+    expect(options).toMatchObject({
+      timeout: 10 * 60_000,
+      killSignal: 'SIGKILL',
+    });
+    expect(error.mock.calls[0][0]).toContain('timed out after 10 min');
   });
 });

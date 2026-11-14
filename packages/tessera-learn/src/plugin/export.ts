@@ -7,6 +7,7 @@ import {
   unlinkSync,
 } from 'node:fs';
 import { relative, resolve } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import {
@@ -248,20 +249,13 @@ export async function createZip(
   outDir: string,
   outputPath: string,
 ): Promise<number> {
-  return new Promise((res, reject) => {
-    const output = createWriteStream(outputPath);
-    const archive = new ZipArchive({ zlib: { level: 9 } });
-
-    output.on('close', () => {
-      res(archive.pointer());
-    });
-    output.on('error', reject);
-    archive.on('error', reject);
-
-    archive.pipe(output);
-    archive.directory(outDir, false);
-    void archive.finalize();
-  });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.directory(outDir, false);
+  await Promise.all([
+    pipeline(archive, createWriteStream(outputPath)),
+    archive.finalize(),
+  ]);
+  return archive.pointer();
 }
 
 // ---------- Main Export ----------
