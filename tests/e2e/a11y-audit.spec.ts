@@ -165,11 +165,10 @@ export default {};
       // Without the CSP entry the embed is blocked and has no button to skip.
       expect(withCsp).not.toBe(source);
       writeFileSync(config, withCsp);
-      // The first page: the audit's networkidle wait doesn't settle after
-      // navigating to a page that adds a local frame (#442).
+      // Last, so the audit reaches it by in-app navigation (#442).
       writeFileSync(
         resolve(dir, 'pages/01-assessment/_meta.js'),
-        `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
+        `export default { title: 'Assessment', pages: ['check', 'exam', 'practice', 'frames'] };`,
       );
       // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
       writeFileSync(
@@ -189,7 +188,7 @@ export default {};
       await audit(dir);
 
       const report = readReport(dir);
-      const page = report.pages[0];
+      const page = report.pages[3];
       expect(page.title).toBe('Frames');
       expect(
         Object.fromEntries(

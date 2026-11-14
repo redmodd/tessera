@@ -518,7 +518,6 @@ export async function runAudit(
           i,
           { timeout: 20_000 },
         );
-        await page.waitForLoadState('networkidle');
         pages.push(
           await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
         );
