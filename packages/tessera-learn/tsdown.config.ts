@@ -5,8 +5,6 @@ export default defineConfig({
     'plugin/index': 'src/plugin/index.ts',
     'plugin/cli': 'src/plugin/cli.ts',
   },
-  format: ['esm'],
-  dts: true,
   sourcemap: true,
   fixedExtension: false,
 });
