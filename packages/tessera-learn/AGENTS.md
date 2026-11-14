@@ -539,7 +539,7 @@ Feedback text and the quiz score label render in `--tessera-success` / `--tesser
 
 ```css
 :root {
-  --tessera-text: #111827;
+  --tessera-primary: #0066cc;
   --tessera-content-max-width: 960px;
 }
 ```
@@ -550,7 +550,8 @@ The `--tessera-primary-bg`, `-hover` and `-on-bg-strong` shades and the success 
 
 ```css
 :root {
-  --tessera-on-primary: #1f2937; /* on a #facc15 primary */
+  --tessera-primary: #facc15;
+  --tessera-on-primary: #1f2937;
   --tessera-primary-on-bg: #854d0e;
 }
 ```
