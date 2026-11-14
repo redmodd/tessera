@@ -46,6 +46,9 @@ function mountWidget(
   return { target, button, name, click, unmount };
 }
 
+const labelOf = (el: Element) =>
+  document.getElementById(el.getAttribute('aria-labelledby')!)?.textContent;
+
 describe.each([
   {
     name: 'Sorting',
@@ -70,10 +73,7 @@ describe.each([
     const shell = target.querySelector('.tessera-question-shell')!;
     expect(shell.getAttribute('role')).toBe('group');
     expect(shell.hasAttribute('aria-label')).toBe(false);
-    expect(
-      document.getElementById(shell.getAttribute('aria-labelledby')!)
-        ?.textContent,
-    ).toBe('Q?');
+    expect(labelOf(shell)).toBe('Q?');
   });
 });
 
@@ -212,11 +212,10 @@ describe('Matching accessible names', () => {
         '.tessera-matching-column[role="group"]',
       ),
     ];
-    const heading = (g: HTMLElement) =>
-      document
-        .getElementById(g.getAttribute('aria-labelledby')!)
-        ?.textContent?.trim();
-    expect(groups.map(heading)).toEqual(['Match from', 'Match to']);
+    expect(groups.map((g) => labelOf(g)?.trim())).toEqual([
+      'Match from',
+      'Match to',
+    ]);
 
     const [left] = groups;
     const items = [...left.querySelectorAll<HTMLElement>('button')];

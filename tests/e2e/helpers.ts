@@ -1,5 +1,6 @@
 // Shared page-driving helpers for the preview-server specs.
 import { expect, type Locator, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { execFile, type ChildProcess } from 'node:child_process';
 import {
   variantDir,
@@ -298,6 +299,21 @@ export async function waitForStatement(
     .poll(() => findStatement(statements, verb), { timeout: 5000 })
     .toBeTruthy();
   return findStatement(statements, verb);
+}
+
+/**
+ * Runs axe on `selector`. A label on a role-less element lands in `incomplete`,
+ * not `violations`, so that rule is checked there too.
+ */
+export async function expectAxeClean(
+  page: Page,
+  selector: string,
+): Promise<void> {
+  const { violations, incomplete } = await new AxeBuilder({ page })
+    .include(selector)
+    .analyze();
+  expect(violations).toEqual([]);
+  expect(incomplete.filter((r) => r.id === 'aria-prohibited-attr')).toEqual([]);
 }
 
 /**

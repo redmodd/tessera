@@ -1,6 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { navigateToPage, waitForTesseraContent } from './helpers.js';
+import {
+  expectAxeClean,
+  navigateToPage,
+  waitForTesseraContent,
+} from './helpers.js';
 
 async function openCourse(page: Page) {
   await page.goto('/');
@@ -343,10 +347,7 @@ test.describe('Component — Sorting', () => {
     await expect(counter).toHaveText('1 of 3 to sort');
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(2);
 
-    expect(
-      (await new AxeBuilder({ page }).include('.tessera-sorting').analyze())
-        .violations,
-    ).toEqual([]);
+    await expectAxeClean(page, '.tessera-sorting');
 
     await fruit
       .getByRole('button', { name: /^Return/ })
@@ -445,10 +446,6 @@ test.describe('Component Accessibility', () => {
       .analyze();
 
     expect(results.violations).toEqual([]);
-    // axe files a label on a role-less element under incomplete, not violations.
-    expect(
-      results.incomplete.filter((r) => r.id === 'aria-prohibited-attr'),
-    ).toEqual([]);
   });
 
   test('RevealModal passes axe audit when open', async ({ page }) => {

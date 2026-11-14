@@ -6,6 +6,7 @@ import {
   answerMultipleChoice,
   completePracticeQuiz,
   expectAAText,
+  expectAxeClean,
   navigateToPage,
   primaryBtn,
   readSavedState,
@@ -386,9 +387,10 @@ test.describe('Quiz — Accessibility', () => {
       '.tessera-quiz-question-wrapper.active .tessera-matching',
     );
     const audit = () =>
-      new AxeBuilder({ page })
-        .include('.tessera-quiz-question-wrapper.active .tessera-matching-grid')
-        .analyze();
+      expectAxeClean(
+        page,
+        '.tessera-quiz-question-wrapper.active .tessera-matching',
+      );
 
     await expect(matching.locator('[aria-live="polite"]')).toHaveText(
       'All pairs matched.',
@@ -405,7 +407,7 @@ test.describe('Quiz — Accessibility', () => {
         exact: true,
       }),
     ).toBeVisible();
-    expect((await audit()).violations).toEqual([]);
+    await audit();
 
     await primaryBtn(page).click();
     await expect(
@@ -420,7 +422,7 @@ test.describe('Quiz — Accessibility', () => {
         exact: true,
       }),
     ).toBeDisabled();
-    expect((await audit()).violations).toEqual([]);
+    await audit();
   });
 
   test('success and error feedback meets AA contrast', async ({ page }) => {
