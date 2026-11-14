@@ -6,9 +6,23 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
-import { VARIANTS_ROOT, variantDir } from './global-setup.js';
+import { VARIANTS_ROOT, variantDir, type FixtureName } from './global-setup.js';
 import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
+
+function copyVariant(fixture: FixtureName, name: string): string {
+  const dir = resolve(VARIANTS_ROOT, fixture, name);
+  rmSync(dir, { recursive: true, force: true });
+  cpSync(variantDir(fixture, 'scorm12'), dir, { recursive: true });
+  return dir;
+}
+
+function readReport(dir: string) {
+  return JSON.parse(readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'));
+}
 
 async function audit(dir: string): Promise<number> {
   const sigtermListeners = process.listenerCount('SIGTERM');
@@ -29,9 +43,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
     // dir — runAudit's second arg only feeds the (here unused) $shared alias.
     const code = await audit(dir);
 
-    const reportPath = resolve(dir, 'a11y-report.json');
-    expect(existsSync(reportPath)).toBe(true);
-    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
+    const report = readReport(dir);
 
     expect(code).toBe(0);
     expect(report.totalPages).toBeGreaterThan(1);
@@ -46,9 +58,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
 
     await audit(dir);
 
-    const reportPath = resolve(dir, 'a11y-report.json');
-    expect(existsSync(reportPath)).toBe(true);
-    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
+    const report = readReport(dir);
 
     expect(report.totalPages).toBe(3);
     expect(report.pagesAudited).toBe(3);
@@ -68,9 +78,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
 
     const code = await audit(dir);
 
-    const reportPath = resolve(dir, 'a11y-report.json');
-    expect(existsSync(reportPath)).toBe(true);
-    const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
+    const report = readReport(dir);
 
     expect(report.totalPages).toBe(3);
     expect(report.pagesAudited).toBe(3);
@@ -91,9 +99,7 @@ test.describe('Tier 2 — runtime accessibility audit', () => {
   // audit uses: the audit build goes to the fixture's shared node_modules.
   test('scans with the a11y settings its build validated', async () => {
     test.setTimeout(120_000);
-    const dir = resolve(VARIANTS_ROOT, 'quiz-timing', 'audit-settings');
-    rmSync(dir, { recursive: true, force: true });
-    cpSync(variantDir('quiz-timing', 'scorm12'), dir, { recursive: true });
+    const dir = copyVariant('quiz-timing', 'audit-settings');
     writeFileSync(
       resolve(dir, 'tessera.config.js'),
       `import { readFileSync, writeFileSync } from 'node:fs';
@@ -111,20 +117,14 @@ export default {};
 
     await audit(dir);
 
-    const report = JSON.parse(
-      readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
-    );
+    const report = readReport(dir);
     expect(report.standard).toBe('wcag21aa');
   });
 
   // The same window as above, with a page added in it.
   test('scans the pages its build bundled', async () => {
     test.setTimeout(120_000);
-    const dir = resolve(VARIANTS_ROOT, 'standalone-weight', 'audit-pages');
-    rmSync(dir, { recursive: true, force: true });
-    cpSync(variantDir('standalone-weight', 'scorm12'), dir, {
-      recursive: true,
-    });
+    const dir = copyVariant('standalone-weight', 'audit-pages');
     writeFileSync(
       resolve(dir, 'tessera.config.js'),
       `import { writeFileSync } from 'node:fs';
@@ -138,10 +138,69 @@ export default {};
 
     await audit(dir);
 
-    const report = JSON.parse(
-      readFileSync(resolve(dir, 'a11y-report.json'), 'utf-8'),
-    );
+    const report = readReport(dir);
     expect(report.totalPages).toBe(3);
     expect(report.pages.at(-1).title).toBe('Added');
+  });
+
+  test('scans same-origin frames but not cross-origin ones', async () => {
+    test.setTimeout(120_000);
+    // localhost is another site than the preview server's 127.0.0.1, so these
+    // embeds are out-of-process cross-origin frames, like a YouTube Video.
+    const embed = createServer((_, res) => {
+      res.setHeader('Content-Type', 'text/html');
+      res.end('<button></button><img src="data:,">');
+    });
+    try {
+      embed.listen(0);
+      await once(embed, 'listening');
+      const embedUrl = `http://localhost:${(embed.address() as AddressInfo).port}/`;
+      const dir = copyVariant('page-weight', 'audit-frames');
+      const config = resolve(dir, 'course.config.js');
+      const source = readFileSync(config, 'utf-8');
+      const withCsp = source.replace(
+        'export: {',
+        "export: { csp: { 'frame-src': ['http://localhost:*'] },",
+      );
+      // Without the CSP entry the embed is blocked and has no button to skip.
+      expect(withCsp).not.toBe(source);
+      writeFileSync(config, withCsp);
+      // The first page: the audit's networkidle wait doesn't settle after
+      // navigating to a page that adds a local frame (#442).
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/_meta.js'),
+        `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice'] };`,
+      );
+      // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/frames.svelte'),
+        `<script module>export const pageConfig = { title: "Frames" };</script>
+<h1>Frames</h1>
+<iframe title="Local" srcdoc="<button></button>"></iframe>
+<iframe title="Sandboxed" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
+<iframe title="Embed" src="${embedUrl}"></iframe>
+<iframe title="Nested" srcdoc="<iframe title='Inner' src='${embedUrl}'></iframe>"></iframe>
+<iframe srcdoc="<p>Untitled</p>"></iframe>
+<div style="height: 30000px"></div>
+<iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
+`,
+      );
+
+      await audit(dir);
+
+      const report = readReport(dir);
+      const page = report.pages[0];
+      expect(page.title).toBe('Frames');
+      expect(
+        Object.fromEntries(
+          page.violations.map((v: { id: string; nodes: number }) => [
+            v.id,
+            v.nodes,
+          ]),
+        ),
+      ).toEqual({ 'button-name': 2, 'frame-title': 1 });
+    } finally {
+      embed.close();
+    }
   });
 });

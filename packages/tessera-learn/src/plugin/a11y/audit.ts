@@ -122,7 +122,70 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
   return [
     ...out.violations,
     ...out.incomplete.filter((r) => r.id === 'aria-prohibited-attr'),
-  ].map(mapViolation);
+  ];
+}
+
+// A node inside a cross-origin frame is a third-party embed's markup (Video's
+// YouTube or Vimeo player) that the author can't fix. The <iframe> stays checked.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
+  const courseOrigin = new URL(page.url()).origin;
+  const verdicts = new Map<string, Promise<boolean>>();
+  const inCrossOriginFrame = (
+    frames: (string | string[])[],
+  ): Promise<boolean> => {
+    const key = JSON.stringify(frames);
+    if (!verdicts.has(key)) {
+      verdicts.set(
+        key,
+        crossesOrigin(page.mainFrame(), frames, courseOrigin).catch(
+          () => false,
+        ),
+      );
+    }
+    return verdicts.get(key)!;
+  };
+  const kept = await Promise.all(
+    results.map(async (r) => {
+      const cross = await Promise.all(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        r.nodes.map((n: any) => inCrossOriginFrame(n.target.slice(0, -1))),
+      );
+      return {
+        ...r,
+        nodes: r.nodes.filter((_: unknown, i: number) => !cross[i]),
+      };
+    }),
+  );
+  return kept.filter((r) => r.nodes.length > 0);
+}
+
+// Judged by the frame's URL: an about: or data: frame holds the course's markup
+// even when sandboxed; Chrome's error page for a failed embed does not.
+async function crossesOrigin(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  frame: any,
+  selectors: (string | string[])[],
+  courseOrigin: string,
+): Promise<boolean> {
+  for (const selector of selectors) {
+    // A selector array walks into shadow roots.
+    const iframe = await frame.evaluateHandle((s: string | string[]) => {
+      const [host, ...shadow] = [s].flat();
+      let el = document.querySelector(host);
+      for (const inner of shadow) {
+        el = el?.shadowRoot?.querySelector(inner) ?? null;
+      }
+      return el;
+    }, selector);
+    frame = await iframe.asElement()?.contentFrame();
+    await iframe.dispose();
+    if (!frame) return false;
+    const url = URL.parse(frame.url());
+    if (!url || url.protocol === 'about:' || url.protocol === 'data:') continue;
+    if (url.origin !== courseOrigin) return true;
+  }
+  return false;
 }
 
 export function isMissingBrowserError(message: string): boolean {
@@ -425,7 +488,8 @@ export async function runAudit(
       const scan = async (): Promise<AxeViolation[]> => {
         const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
-        return auditFindings(await builder.analyze());
+        const found = auditFindings(await builder.analyze());
+        return (await dropCrossOriginNodes(page, found)).map(mapViolation);
       };
 
       const recordPage = async (
