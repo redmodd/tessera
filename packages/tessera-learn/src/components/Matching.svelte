@@ -377,7 +377,7 @@
 
     .tessera-matching-item.selected {
       border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
-      background: var(--tessera-primary-light);
+      background: var(--tessera-primary-bg);
       transform: scale(1.02);
     }
 

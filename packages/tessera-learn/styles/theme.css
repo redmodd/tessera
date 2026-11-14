@@ -63,12 +63,12 @@
 
   :root {
     /* Colors */
-    --tessera-primary-light: color-mix(
+    --tessera-primary-bg: color-mix(
       in srgb,
       var(--tessera-primary) 15%,
       transparent
     );
-    --tessera-primary-dark: color-mix(
+    --tessera-primary-hover: color-mix(
       in srgb,
       var(--tessera-primary) 70%,
       black

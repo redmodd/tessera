@@ -106,7 +106,7 @@
   }
 
   .nav-btn--primary:hover:not(:disabled) {
-    background: var(--tessera-primary-dark);
+    background: var(--tessera-primary-hover);
   }
 
   .nav-btn:disabled {

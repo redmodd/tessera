@@ -356,7 +356,7 @@
 
     .tessera-sorting-card.selected {
       border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
-      background: var(--tessera-primary-light);
+      background: var(--tessera-primary-bg);
       --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
       transform: translateY(-2px) scale(1.02);
       cursor: pointer;
@@ -427,7 +427,7 @@
 
     .tessera-sorting-target.drag-over {
       border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
-      background: var(--tessera-primary-light);
+      background: var(--tessera-primary-bg);
       border-style: solid;
     }
 
@@ -438,7 +438,7 @@
     }
 
     .tessera-sorting-target.clickable:hover {
-      background: var(--tessera-primary-light);
+      background: var(--tessera-primary-bg);
       border-style: solid;
     }
 

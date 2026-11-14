@@ -230,7 +230,7 @@
 
   /* ---- Selection ---- */
   ::selection {
-    background-color: var(--tessera-primary-light);
+    background-color: var(--tessera-primary-bg);
     color: var(--tessera-text);
   }
 }

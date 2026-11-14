@@ -170,7 +170,7 @@
 
     .tessera-mc-option.selected {
       border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
-      background: var(--tessera-primary-light);
+      background: var(--tessera-primary-bg);
     }
 
     .tessera-mc-option.correct {

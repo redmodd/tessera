@@ -163,7 +163,7 @@
   }
 
   .tessera-nav-page[aria-current='page'] {
-    background-color: var(--tessera-primary-light);
+    background-color: var(--tessera-primary-bg);
     color: var(--tessera-primary-on-bg-strong);
     font-weight: 600;
     border-left-color: var(--tessera-primary-on-bg, var(--tessera-primary));
@@ -425,7 +425,7 @@
   }
 
   .tessera-btn-primary:hover:not(:disabled) {
-    background-color: var(--tessera-primary-dark);
+    background-color: var(--tessera-primary-hover);
   }
 
   .tessera-btn-primary:disabled {
