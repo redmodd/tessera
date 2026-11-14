@@ -22,10 +22,11 @@ vi.mock('@axe-core/playwright', () => ({ default: class {} }));
 
 describe('runAudit', () => {
   it('asks for an upgrade when @axe-core/playwright predates 4.3', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await runAudit('.', '.')).toBe(1);
-    expect(error.mock.calls[0]?.[0]).toContain('4.3 or later');
-    error.mockRestore();
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('4.3 or later'),
+    );
   });
 });
 

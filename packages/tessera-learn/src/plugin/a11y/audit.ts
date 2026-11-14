@@ -295,9 +295,7 @@ interface LoadedDeps {
   AxeBuilder: any;
 }
 
-async function loadDeps(): Promise<
-  { ok: true; deps: LoadedDeps } | { ok: false; missing: string }
-> {
+async function loadDeps(): Promise<LoadedDeps | undefined> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let chromium: any;
   for (const spec of PLAYWRIGHT_SPECS) {
@@ -311,7 +309,7 @@ async function loadDeps(): Promise<
       // try the next specifier
     }
   }
-  if (!chromium) return { ok: false, missing: 'playwright' };
+  if (!chromium) return undefined;
 
   try {
     const mod = (await tryImport('@axe-core/playwright')) as {
@@ -319,11 +317,11 @@ async function loadDeps(): Promise<
     };
     // setLegacyMode arrived in 4.3; an older copy only warns as a peer.
     if (typeof mod.default?.prototype?.setLegacyMode !== 'function') {
-      return { ok: false, missing: '@axe-core/playwright' };
+      return undefined;
     }
-    return { ok: true, deps: { chromium, AxeBuilder: mod.default } };
+    return { chromium, AxeBuilder: mod.default };
   } catch {
-    return { ok: false, missing: '@axe-core/playwright' };
+    return undefined;
   }
 }
 
@@ -340,7 +338,7 @@ export async function runAudit(
   const threshold: ImpactLevel = options.threshold ?? 'serious';
 
   const deps = await loadDeps();
-  if (!deps.ok) {
+  if (!deps) {
     console.error(
       `${stderrTag()} Tier 2 needs Playwright and @axe-core/playwright 4.3 or later.\n` +
         `  Install or upgrade them to run the runtime audit:\n` +
@@ -349,7 +347,7 @@ export async function runAudit(
     );
     return 1;
   }
-  const { chromium, AxeBuilder } = deps.deps;
+  const { chromium, AxeBuilder } = deps;
 
   const vite = await import('vite');
   const { resolveTesseraConfig } = await import('../inline-config.js');
@@ -426,12 +424,9 @@ export async function runAudit(
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
 
       const scan = async (): Promise<AxeViolation[]> => {
-        // Legacy mode keeps axe to same-origin frames: a cross-origin embed
-        // (Video's YouTube/Vimeo player) isn't course markup. The <iframe>
-        // element itself is still checked (frame-title).
-        const builder = new AxeBuilder({ page })
-          .setLegacyMode(true)
-          .withTags(tags);
+        // Legacy mode skips cross-origin frames (Video's YouTube/Vimeo
+        // player); the <iframe> itself is still checked (frame-title).
+        const builder = new AxeBuilder({ page }).setLegacyMode().withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
         return auditFindings(await builder.analyze());
       };
