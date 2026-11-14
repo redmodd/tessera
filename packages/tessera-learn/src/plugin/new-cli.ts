@@ -6,7 +6,7 @@ import { validateProjectName, toTitleCase } from './project-name.js';
 import { copyTemplate } from './template-copy.js';
 import { resolvePackageRoot } from './package-root.js';
 
-// `tessera new <name>` — stamp a new course into courses/<name> inside the
+// `tessera new <name>`: stamp a new course into courses/<name> inside the
 // current workspace. No install step: the workspace already owns the deps.
 export function runNew(name: string, cwd: string): number {
   const nameError = validateProjectName(name, 'Course name');
@@ -18,7 +18,7 @@ export function runNew(name: string, cwd: string): number {
   const workspaceRoot = findWorkspaceRoot(resolve(cwd));
   if (!workspaceRoot) {
     console.error(
-      '[tessera new] Not inside a Tessera workspace — run this from a workspace (a directory with a `courses/` folder).',
+      '[tessera new] Not inside a Tessera workspace. Run this from a workspace (a directory with a `courses/` folder).',
     );
     return 1;
   }

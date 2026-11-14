@@ -272,7 +272,7 @@ function isFailing(v: AxeViolation, thresholdRank: number): boolean {
 }
 
 // Optional deps loaded by variable specifier so tsc doesn't require them to be
-// installed — Tier 2 is opt-in and the absence is handled with a clear message.
+// installed; Tier 2 is opt-in and the absence is handled with a clear message.
 async function tryImport(specifier: string): Promise<unknown> {
   return import(specifier);
 }
@@ -513,7 +513,7 @@ function printSummary(report: AuditReport, reportPath: string): void {
     console.log(`${mark} ${p.title}`);
     for (const v of p.violations) {
       console.log(
-        `      [${v.impact ?? 'n/a'}] ${v.id} — ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,
+        `      [${v.impact ?? 'n/a'}] ${v.id}: ${v.help} (${v.nodes} node${v.nodes === 1 ? '' : 's'})`,
       );
       for (const el of v.elements.slice(0, MAX_ELEMENTS_SHOWN)) {
         console.log(

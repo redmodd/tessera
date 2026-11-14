@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { parseArgs, type ParseArgsOptionsConfig } from 'node:util';
+import type { ParseArgsOptionsConfig } from 'node:util';
+import { parseCliArgs } from './cli-args.js';
 import { runValidate } from './validate-cli.js';
 import { IMPACT_LEVELS, runAudit, type ImpactLevel } from './a11y/audit.js';
 import { runNew } from './new-cli.js';
@@ -169,23 +170,17 @@ function parseCommandArgs(
   | { error: string }
   | { help: true }
   | { help: false; positionals: string[]; flagValue?: string } {
-  if (args.includes('--help') || args.includes('-h')) {
-    return { help: true };
-  }
-
   const options: ParseArgsOptionsConfig = {};
   if (flag) options[flag.name] = { type: 'string' };
 
-  let parsed;
-  try {
-    parsed = parseArgs({ args, options, allowPositionals: true });
-  } catch (error) {
-    const { code, message } = error as Error & { code?: string };
-    if (flag && code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
+  const parsed = parseCliArgs(args, options);
+  if ('error' in parsed) {
+    if (flag && parsed.code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
       return { error: `--${flag.name} requires a value` };
     }
-    return { error: message.split('. ')[0] };
+    return { error: parsed.error };
   }
+  if (parsed.help) return { help: true };
   const { values, positionals } = parsed;
 
   const required = synopsis.filter((arg) => arg.startsWith('<')).length;

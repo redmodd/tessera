@@ -52,6 +52,10 @@
       "import": "./dist/plugin/index.js",
       "default": "./dist/plugin/index.js"
     },
+    "./cli-args": {
+      "types": "./src/plugin/cli-args.ts",
+      "default": "./src/plugin/cli-args.ts"
+    },
     "./project-name": {
       "types": "./src/plugin/project-name.ts",
       "default": "./src/plugin/project-name.ts"

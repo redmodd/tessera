@@ -14,6 +14,7 @@ describe('parseArgs', () => {
 
   it('parses the workspace name', () => {
     expect(parseArgs(['my-course'])).toEqual({ projectName: 'my-course' });
+    expect(parseArgs(['--', '-h'])).toEqual({ projectName: '-h' });
   });
 
   it('rejects unknown flags', () => {

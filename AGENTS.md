@@ -68,7 +68,7 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 
 - `dev`/`export` run Vite programmatically through the shared `buildInlineConfig()`. There is no scaffolded `vite.config.js`, and `vite` is a runtime dependency.
 - Playwright and `@axe-core/playwright` are **optional peers**: the `tessera a11y` audit (Tier 2) is opt-in, so the static gate stays dependency-free. Keep them in `devDependencies` too, so Dependabot bumps the copies the workspace runs and the lockfile holds one `playwright-core` (the e2e image tag).
-- Exports: `.` (Svelte source), `./plugin`, `./runtime/*`, `./virtual` (types), and `./project-name` / `./template-copy` (source helpers `create-tessera` bundles). Built with tsdown.
+- Exports: `.` (Svelte source), `./plugin`, `./runtime/*`, `./virtual` (types), and `./cli-args` / `./project-name` / `./template-copy` (source helpers `create-tessera` bundles). Built with tsdown.
 
 **`create-tessera`**: one-shot scaffolder (`src/index.ts`), no `upgrade` verb. Built with tsdown to the `create-tessera` bin. The build first runs `scripts/sync-templates.mjs`, which copies `tessera-learn/templates/course/` into a gitignored `templates/course/`: edit the course template in `tessera-learn`.
 

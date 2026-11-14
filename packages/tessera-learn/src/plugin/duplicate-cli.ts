@@ -34,7 +34,7 @@ function reidentifyCourse(courseRoot: string): void {
     return;
   }
   console.warn(
-    `[tessera duplicate] Could not set a unique id in ${configPath} — the copy shares the source's identity. Add a unique "id" manually.`,
+    `[tessera duplicate] Could not set a unique id in ${configPath}, so the copy shares the source's identity. Add a unique "id" manually.`,
   );
 }
 
@@ -48,7 +48,7 @@ function skip(srcPath: string): boolean {
   return SKIP.has(name) || name.startsWith('.tessera');
 }
 
-// `tessera duplicate <source> <new>` — copy an existing course verbatim within
+// `tessera duplicate <source> <new>`: copy an existing course verbatim within
 // the current workspace. Unlike `new`, there is no template stamping: the JS
 // config (including its title) is copied untouched.
 export function runDuplicate(

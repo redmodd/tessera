@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArgs as parseArgv } from 'node:util';
+import { parseCliArgs } from 'tessera-learn/cli-args';
 import { validateProjectName, toTitleCase } from 'tessera-learn/project-name';
 import { copyTemplate } from 'tessera-learn/template-copy';
 
@@ -53,14 +53,11 @@ type ParseResult =
   { help: true } | { error: string } | { projectName?: string };
 
 export function parseArgs(argv: string[]): ParseResult {
-  if (argv.includes('--help') || argv.includes('-h')) return { help: true };
+  const parsed = parseCliArgs(argv);
+  if ('error' in parsed) return { error: parsed.error };
+  if (parsed.help) return { help: true };
 
-  let positionals;
-  try {
-    ({ positionals } = parseArgv({ args: argv, allowPositionals: true }));
-  } catch (error) {
-    return { error: (error as Error).message.split('. ')[0] };
-  }
+  const { positionals } = parsed;
   if (positionals.length > 1) {
     return { error: `Unexpected argument: ${positionals[1]}` };
   }
