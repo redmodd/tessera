@@ -2,4 +2,4 @@
 'tessera-learn': minor
 ---
 
-**Breaking:** `branding.primaryColor` and `branding.fontFamily` are gone, and the build warns that it ignores them. To upgrade, set `--tessera-primary` and `--tessera-font-family` on `:root` in `styles/`. The `tessera/primary-contrast` rule goes with them: run `tessera a11y` to check contrast.
+**Breaking:** Theme colors and fonts now live in one place, your course CSS. Set `--tessera-primary` and `--tessera-font-family` on `:root` in `styles/` in place of `branding.primaryColor` and `branding.fontFamily`, which are removed. `tessera a11y` checks contrast as rendered, replacing the `tessera/primary-contrast` rule.
