@@ -19,7 +19,7 @@ if [ "$NODE_MAJOR" -lt 24 ]; then
 fi
 
 echo "==> pnpm install"
-pnpm install --no-frozen-lockfile
+pnpm install --frozen-lockfile
 
 echo "==> Building packages (tessera-learn plugin must be built before fixtures resolve it)"
 pnpm build
