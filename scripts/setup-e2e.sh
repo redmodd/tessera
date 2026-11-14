@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bootstrap a fresh checkout to the point where `pnpm test:e2e` works.
 #
-# Idempotent — safe to re-run. Skips browser install if Playwright cache is hot.
+# Idempotent: safe to re-run. Skips browser install if Playwright cache is hot.
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ if [ "$NODE_MAJOR" -lt 24 ]; then
 fi
 
 echo "==> pnpm install"
-pnpm install --no-frozen-lockfile
+pnpm install --frozen-lockfile
 
 echo "==> Building packages (tessera-learn plugin must be built before fixtures resolve it)"
 pnpm build

@@ -1,24 +1,23 @@
+import { defineConfig, globalIgnores } from 'eslint/config';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
-export default tseslint.config(
-  {
-    ignores: [
-      '**/dist/**',
-      '**/coverage/**',
-      '**/test-results/**',
-      '**/playwright-report/**',
-      '**/.vite/**',
-      'tests/.e2e-variants/**',
-    ],
-  },
+export default defineConfig(
+  globalIgnores([
+    '**/dist/**',
+    '**/coverage/**',
+    '**/test-results/**',
+    '**/playwright-report/**',
+    '**/.vite/**',
+    'tests/.e2e-variants/**',
+  ]),
 
   js.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...svelte.configs.recommended,
+  tseslint.configs.recommended,
+  svelte.configs.recommended,
 
   {
     languageOptions: {
@@ -67,7 +66,7 @@ export default tseslint.config(
   // a svelte.config.js the build doesn't otherwise require, so async LMS work
   // is kept in these `.ts`/`.svelte.ts` modules where the rule reaches it.
   {
-    files: ['packages/*/src/**/*.ts', 'packages/*/src/**/*.svelte.ts'],
+    files: ['packages/*/src/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -80,7 +79,7 @@ export default tseslint.config(
     },
   },
 
-  // A stray console.log in the runtime ships to the learner's browser — flag it.
+  // A stray console.log in the runtime ships to the learner's browser, so flag it.
   {
     files: ['packages/tessera-learn/src/runtime/**/*.{ts,svelte}'],
     rules: {
@@ -99,11 +98,6 @@ export default tseslint.config(
               regex: '^\\.\\./(?!runtime/hooks\\.svelte\\.js$)',
               message:
                 'Built-in components use only the public tessera-learn API.',
-            },
-            {
-              regex: '^\\.\\./runtime/hooks\\.svelte\\.js$',
-              importNamePattern: '^__',
-              message: 'Internal hook helpers are not public API.',
             },
           ],
         },

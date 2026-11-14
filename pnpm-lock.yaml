@@ -53,18 +53,12 @@ importers:
       scorm-again:
         specifier: 3.5.0
         version: 3.5.0
-      svelte-eslint-parser:
-        specifier: ^1.10.1
-        version: 1.10.1(svelte@5.57.3(@typescript-eslint/types@8.72.1))
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
       typescript-eslint:
         specifier: ^8.72.1
         version: 8.72.1(eslint@10.14.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
-      vitest:
-        specifier: ^5.1.0
-        version: 5.1.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(jsdom@30.1.3)(vite@8.3.6(@types/node@26.6.6)(yaml@2.9.1))
 
   packages/create-tessera:
     devDependencies:
