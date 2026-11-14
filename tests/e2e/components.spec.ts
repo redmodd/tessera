@@ -347,8 +347,6 @@ test.describe('Component — Sorting', () => {
     await expect(counter).toHaveText('1 of 3 to sort');
     await expect(fruit.locator('.tessera-sorting-placed-item')).toHaveCount(2);
 
-    await expectAxeClean(page, '.tessera-sorting');
-
     await fruit
       .getByRole('button', { name: /^Return/ })
       .first()
@@ -392,22 +390,25 @@ test.describe('Component — Sorting', () => {
     expect(onLabel).toEqual([true, true, true, true]);
   });
 
-  test('checked results pass axe audit', async ({ page }) => {
+  test('passes axe audit before and after checking', async ({ page }) => {
     const sorting = page.locator('.tessera-sorting');
     const fruit = sorting.getByRole('button', { name: /^Fruit/ });
+    const audit = () =>
+      expectAxeClean(new AxeBuilder({ page }).include('.tessera-sorting'));
 
-    for (let i = 0; i < 3; i++) {
+    const placeOnFruit = async () => {
       await sorting.locator('.tessera-sorting-card').click();
       await fruit.click();
-    }
+    };
+
+    await placeOnFruit();
+    await placeOnFruit();
+    await audit();
+    await placeOnFruit();
     await sorting.getByRole('button', { name: 'Submit' }).click();
     await expect(sorting.locator('.tessera-question-review')).toBeVisible();
     await expect(sorting.getByText('(incorrect)')).toHaveCount(1);
-
-    expect(
-      (await new AxeBuilder({ page }).include('.tessera-sorting').analyze())
-        .violations,
-    ).toEqual([]);
+    await audit();
   });
 });
 
@@ -418,34 +419,23 @@ test.describe('Component Accessibility', () => {
     await navigateToPage(page, 'Callouts & Images');
     await page.waitForSelector('.tessera-callout');
 
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-content')
-      .analyze();
-
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(new AxeBuilder({ page }).include('.tessera-content'));
   });
 
   test('Accordion & Carousel page passes axe audit', async ({ page }) => {
     await navigateToPage(page, 'Accordion & Carousel');
     await page.waitForSelector('.tessera-accordion');
 
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-content')
-      .analyze();
-
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(new AxeBuilder({ page }).include('.tessera-content'));
   });
 
   test('Modal, Video & Audio page passes axe audit', async ({ page }) => {
     await navigateToPage(page, 'Modal, Video & Audio');
     await page.waitForSelector('.tessera-audio');
 
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-content')
-      .exclude('iframe')
-      .analyze();
-
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(
+      new AxeBuilder({ page }).include('.tessera-content').exclude('iframe'),
+    );
   });
 
   test('RevealModal passes axe audit when open', async ({ page }) => {
@@ -460,10 +450,8 @@ test.describe('Component Accessibility', () => {
     // it to settle so axe doesn't read mid-animation colors as low-contrast.
     await expect(content).toHaveCSS('opacity', '1');
 
-    const results = await new AxeBuilder({ page })
-      .include('.tessera-modal-content')
-      .analyze();
-
-    expect(results.violations).toEqual([]);
+    await expectAxeClean(
+      new AxeBuilder({ page }).include('.tessera-modal-content'),
+    );
   });
 });
