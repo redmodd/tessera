@@ -108,12 +108,7 @@ describe('mapViolation', () => {
 
 describe('auditFindings', () => {
   it('adds a prohibited label from incomplete, and nothing else from it', () => {
-    const rule = (id: string) => ({
-      id,
-      help: 'h',
-      helpUrl: 'u',
-      nodes: [{ target: ['p'] }],
-    });
+    const rule = (id: string) => ({ id, help: 'h', helpUrl: 'u', nodes: [] });
     const ids = auditFindings({
       violations: [rule('color-contrast')],
       incomplete: [rule('aria-prohibited-attr'), rule('color-contrast')],

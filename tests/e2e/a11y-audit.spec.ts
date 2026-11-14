@@ -149,7 +149,7 @@ export default {};
     // embeds are out-of-process cross-origin frames, like a YouTube Video.
     const embed = createServer((_, res) => {
       res.setHeader('Content-Type', 'text/html');
-      res.end('<button></button>');
+      res.end('<button></button><img src="data:,">');
     });
     embed.listen(0);
     await once(embed, 'listening');
@@ -176,7 +176,9 @@ export default {};
       `<script module>export const pageConfig = { title: "Frames" };</script>
 <h1>Frames</h1>
 <iframe title="Local" srcdoc="<button></button>"></iframe>
+<iframe title="Sandboxed" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
 <iframe title="Embed" src="${embedUrl}"></iframe>
+<iframe title="Nested" srcdoc="<iframe title='Inner' src='${embedUrl}'></iframe>"></iframe>
 <iframe srcdoc="<p>Untitled</p>"></iframe>
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
@@ -199,6 +201,6 @@ export default {};
           v.nodes,
         ]),
       ),
-    ).toEqual({ 'button-name': 1, 'frame-title': 1 });
+    ).toEqual({ 'button-name': 2, 'frame-title': 1 });
   });
 });

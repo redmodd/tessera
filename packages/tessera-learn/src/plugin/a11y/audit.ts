@@ -122,40 +122,62 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
   return [
     ...out.violations,
     ...out.incomplete.filter((r) => r.id === 'aria-prohibited-attr'),
-  ]
-    .filter((r) => r.nodes.length > 0)
-    .map(mapViolation);
+  ];
 }
 
 // A node inside a cross-origin frame is a third-party embed's markup (Video's
 // YouTube or Vimeo player) that the author can't fix. The <iframe> stays checked.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function dropCrossOriginNodes(page: any, results: any[]): Promise<void> {
-  const framed = results
-    .flatMap((r) => r.nodes)
-    .filter((n) => n.target.length > 1);
-  if (framed.length === 0) return;
-  const crossOrigin: boolean[] = await page.evaluate(
-    (paths: (string | string[])[][]) =>
-      paths.map((path) => {
-        let doc = document;
-        for (const selector of path) {
-          // A selector array walks into shadow roots.
-          const [host, ...shadow] = [selector].flat();
-          let el = doc.querySelector(host);
-          for (const s of shadow) el = el?.shadowRoot?.querySelector(s) ?? null;
-          if (!el || !('contentDocument' in el)) return false;
-          const inner = (el as HTMLIFrameElement).contentDocument;
-          if (!inner) return true;
-          doc = inner;
-        }
-        return false;
-      }),
-    framed.map((n) => n.target.slice(0, -1)),
+async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
+  const courseOrigin = new URL(page.url()).origin;
+  const verdicts = new Map<string, Promise<boolean>>();
+  const inCrossOriginFrame = (frames: unknown[]): Promise<boolean> => {
+    const key = JSON.stringify(frames);
+    if (!verdicts.has(key)) {
+      verdicts.set(
+        key,
+        crossesOrigin(page.mainFrame(), frames, courseOrigin).catch(
+          () => false,
+        ),
+      );
+    }
+    return verdicts.get(key)!;
+  };
+  const kept = await Promise.all(
+    results.map(async (r) => {
+      const cross = await Promise.all(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        r.nodes.map((n: any) => inCrossOriginFrame(n.target.slice(0, -1))),
+      );
+      return {
+        ...r,
+        nodes: r.nodes.filter((_: unknown, i: number) => !cross[i]),
+      };
+    }),
   );
-  const dropped = new Set(framed.filter((_, i) => crossOrigin[i]));
-  for (const r of results)
-    r.nodes = r.nodes.filter((n: unknown) => !dropped.has(n));
+  return kept.filter((r) => r.nodes.length > 0);
+}
+
+// Judged by the frame's URL, not by whether its document is reachable: a
+// sandboxed or srcdoc frame has an opaque origin but holds the course's markup.
+async function crossesOrigin(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  frame: any,
+  selectors: unknown[],
+  courseOrigin: string,
+): Promise<boolean> {
+  for (const selector of selectors) {
+    const iframe = await frame.evaluateHandle(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (s: unknown) => (window as any).axe.utils.shadowSelect(s),
+      selector,
+    );
+    frame = await iframe.asElement()?.contentFrame();
+    if (!frame) return false;
+    const origin = URL.parse(frame.url())?.origin ?? 'null';
+    if (origin !== 'null' && origin !== courseOrigin) return true;
+  }
+  return false;
 }
 
 export function isMissingBrowserError(message: string): boolean {
@@ -458,12 +480,8 @@ export async function runAudit(
       const scan = async (): Promise<AxeViolation[]> => {
         const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
-        const out = await builder.analyze();
-        await dropCrossOriginNodes(page, [
-          ...out.violations,
-          ...out.incomplete,
-        ]);
-        return auditFindings(out);
+        const found = auditFindings(await builder.analyze());
+        return (await dropCrossOriginNodes(page, found)).map(mapViolation);
       };
 
       const recordPage = async (
