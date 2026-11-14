@@ -8,6 +8,7 @@ import Sorting from '../src/components/Sorting.svelte';
 import CustomChoice from './fixtures/custom-choice.svelte';
 import CustomChoiceQuiz from './fixtures/custom-choice-quiz.svelte';
 import CustomChoiceUnwrapped from './fixtures/custom-choice-unwrapped.svelte';
+import QuestionQuiz from './fixtures/question-quiz.svelte';
 import type { QuizConfig } from '../src/runtime/types.js';
 import type { QuizPageState } from '../src/runtime/contexts.js';
 import { mountQuestion } from './helpers/mount.js';
@@ -57,18 +58,22 @@ describe.each([
     props: { pairs: [{ left: 'A', right: 'Alpha' }] },
   },
 ])('$name question group', ({ widget, props }) => {
-  it('is a group named by the visible question', () => {
-    const { target } = mountWidget(widget, {
-      ...props,
-      question: 'Sort these',
-    });
+  it.each([
+    ['standalone', () => mountWidget(widget, { ...props, question: 'Q?' })],
+    [
+      'quiz',
+      () => mountWidget(QuestionQuiz, { widget, ...props, question: 'Q?' }, {}),
+    ],
+  ])('is a group named by the visible question (%s)', (_, mount) => {
+    const { target } = mount();
+    flushSync();
     const shell = target.querySelector('.tessera-question-shell')!;
     expect(shell.getAttribute('role')).toBe('group');
     expect(shell.hasAttribute('aria-label')).toBe(false);
     expect(
       document.getElementById(shell.getAttribute('aria-labelledby')!)
         ?.textContent,
-    ).toBe('Sort these');
+    ).toBe('Q?');
   });
 });
 
