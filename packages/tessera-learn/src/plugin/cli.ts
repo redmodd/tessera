@@ -204,7 +204,10 @@ export async function main(
 ): Promise<number> {
   const [sub, ...rest] = argv;
 
-  if (wantsHelp(argv)) {
+  // Help wins over a bad option, but not over a mistyped command name.
+  const typo =
+    sub !== undefined && !sub.startsWith('-') && !Object.hasOwn(COMMANDS, sub);
+  if (wantsHelp(argv) && !typo) {
     console.log(USAGE);
     return 0;
   }
