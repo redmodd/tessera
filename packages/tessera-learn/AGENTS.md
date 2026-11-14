@@ -506,10 +506,10 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
 | `--tessera-primary`                            | `#2563eb`                             |
-| `--tessera-primary-on-bg`                      | `--tessera-primary`                   |
+| `--tessera-primary-on-bg`                      | unset, see below                      |
 | `--tessera-primary-on-bg-strong`               | the `-on-bg` at 70% over the text     |
 | `--tessera-on-primary`                         | `#ffffff`                             |
-| `--tessera-primary-light`                      | the primary at 15% over the bg        |
+| `--tessera-primary-light`                      | the primary at 15% over transparent   |
 | `--tessera-primary-dark`                       | the primary at 70% over black         |
 | `--tessera-text`                               | `#1f2937`                             |
 | `--tessera-text-light`                         | `#6b7280`                             |
@@ -546,7 +546,7 @@ Feedback text and the quiz score label render in `--tessera-success` / `--tesser
 
 **Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-light`, `-dark` and `-on-bg-strong` shades and the success and error tints mix from the `:root` values of the color tokens, so set color tokens on `:root` for them to follow. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
 
-**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary, and darken to `--tessera-primary-dark` on hover. Links, outlined buttons, hints and selection indicators (selected borders, the radio dot, the progress bar) use `--tessera-primary-on-bg` on the page background. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast. Darkening can push the hover fill under 4.5:1 with dark `--tessera-on-primary` text (orange does), so set `--tessera-primary-dark` to a fill that holds it. `tessera/primary-contrast` checks only `branding.primaryColor` against white and still warns: add it to `a11y.ignore` and run `tessera a11y`. That checks text as rendered, not hover states, so check the button hover fill yourself.
+**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary, and darken to `--tessera-primary-dark` on hover. Links, outlined buttons, hints and selection indicators (selected borders, the radio dot, the progress bar) use `--tessera-primary-on-bg` on `--tessera-bg` and `--tessera-bg-secondary`. It's unset so it follows a `--tessera-primary` set on any element: in your own CSS, write `var(--tessera-primary-on-bg, var(--tessera-primary))`. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast, `-on-bg` against both backgrounds. Darkening can push the hover fill under 4.5:1 with dark `--tessera-on-primary` text (orange does), so set `--tessera-primary-dark` to a fill that holds it. `tessera/primary-contrast` checks only `branding.primaryColor` against white and still warns: add it to `a11y.ignore` and run `tessera a11y`. That checks text as rendered, not hover states, so check the button hover fill yourself.
 
 ```css
 :root {

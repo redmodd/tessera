@@ -203,37 +203,35 @@ test.describe('Navigation — Free Mode', () => {
     await expect(nextBtn).toBeDisabled();
   });
 
-  for (const [name, property, value, shadedFrom, bg] of [
+  for (const [name, property, value, shadedFrom] of [
     [
       'follow the primary color on <html>',
       '--tessera-primary',
       '#b91c1c',
       '#b91c1c',
-      'white',
     ],
     [
       'keep the default for an unparseable primary color',
       '--tessera-primary',
       '#12345',
       '#2563eb',
-      'white',
     ],
-    ['mix over --tessera-bg', '--tessera-bg', '#111827', '#2563eb', '#111827'],
+    ['mix toward --tessera-text', '--tessera-text', '#000000', '#2563eb'],
   ]) {
     test(`the current page shades ${name}`, async ({ page }) => {
       const expected = await page.evaluate(
-        ([property, value, shadedFrom, bg]) => {
+        ([property, value, shadedFrom]) => {
           document.documentElement.style.setProperty(property, value);
           const probe = document.body.appendChild(
             document.createElement('div'),
           );
-          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, ${bg})`;
-          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, #1f2937)`;
+          probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, transparent)`;
+          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, var(--tessera-text))`;
           const { backgroundColor, color } = getComputedStyle(probe);
           probe.remove();
           return { backgroundColor, color };
         },
-        [property, value, shadedFrom, bg],
+        [property, value, shadedFrom],
       );
       const current = page.locator('.tessera-nav-page[aria-current="page"]');
       await expect(current).toHaveCSS(
