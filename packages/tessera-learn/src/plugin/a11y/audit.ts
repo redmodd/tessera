@@ -131,7 +131,9 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
 async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
   const courseOrigin = new URL(page.url()).origin;
   const verdicts = new Map<string, Promise<boolean>>();
-  const inCrossOriginFrame = (frames: unknown[]): Promise<boolean> => {
+  const inCrossOriginFrame = (
+    frames: (string | string[])[],
+  ): Promise<boolean> => {
     const key = JSON.stringify(frames);
     if (!verdicts.has(key)) {
       verdicts.set(
@@ -158,25 +160,30 @@ async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
   return kept.filter((r) => r.nodes.length > 0);
 }
 
-// Judged by the frame's URL, not by whether its document is reachable: a
-// sandboxed or srcdoc frame has an opaque origin but holds the course's markup.
+// Judged by the frame's URL: an about: or data: frame holds the course's markup
+// even when sandboxed; Chrome's error page for a failed embed does not.
 async function crossesOrigin(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   frame: any,
-  selectors: unknown[],
+  selectors: (string | string[])[],
   courseOrigin: string,
 ): Promise<boolean> {
   for (const selector of selectors) {
-    const iframe = await frame.evaluateHandle(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (s: unknown) => (window as any).axe.utils.shadowSelect(s),
-      selector,
-    );
+    // A selector array walks into shadow roots.
+    const iframe = await frame.evaluateHandle((s: string | string[]) => {
+      const [host, ...shadow] = [s].flat();
+      let el = document.querySelector(host);
+      for (const inner of shadow) {
+        el = el?.shadowRoot?.querySelector(inner) ?? null;
+      }
+      return el;
+    }, selector);
     frame = await iframe.asElement()?.contentFrame();
     await iframe.dispose();
     if (!frame) return false;
-    const origin = URL.parse(frame.url())?.origin ?? 'null';
-    if (origin !== 'null' && origin !== courseOrigin) return true;
+    const url = URL.parse(frame.url());
+    if (!url || url.protocol === 'about:' || url.protocol === 'data:') continue;
+    if (url.origin !== courseOrigin) return true;
   }
   return false;
 }
