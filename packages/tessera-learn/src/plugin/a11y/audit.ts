@@ -482,7 +482,7 @@ export async function runAudit(
       // ?__tessera_audit unlocks navigation so quiz-gated pages can be scanned.
       const auditUrl = new URL(baseUrl);
       auditUrl.searchParams.set('__tessera_audit', '1');
-      await page.goto(auditUrl.href, { waitUntil: 'networkidle' });
+      await page.goto(auditUrl.href);
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
 
       const scan = async (): Promise<AxeViolation[]> => {
@@ -491,6 +491,22 @@ export async function runAudit(
         const found = auditFindings(await builder.analyze());
         return (await dropCrossOriginNodes(page, found)).map(mapViolation);
       };
+
+      // A frame the page just added may still be loading, and axe would scan
+      // its half-parsed document. A lazy frame off screen never starts loading.
+      const framesLoaded = () =>
+        Promise.all(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          page.frames().map(async (frame: any) => {
+            if (!frame.url()) {
+              const el = await frame.frameElement().catch(() => null);
+              if ((await el?.getAttribute('loading')) === 'lazy') return;
+            }
+            await frame
+              .waitForLoadState('load', { timeout: 10_000 })
+              .catch(() => {});
+          }),
+        );
 
       const recordPage = async (
         index: number,
@@ -518,6 +534,7 @@ export async function runAudit(
           i,
           { timeout: 20_000 },
         );
+        await framesLoaded();
         pages.push(
           await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
         );

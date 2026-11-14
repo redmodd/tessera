@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -147,7 +148,12 @@ export default {};
     test.setTimeout(120_000);
     // localhost is another site than the preview server's 127.0.0.1, so these
     // embeds are out-of-process cross-origin frames, like a YouTube Video.
-    const embed = createServer((_, res) => {
+    const embed = createServer(async (req, res) => {
+      if (req.url === '/slow.js') {
+        await new Promise((r) => setTimeout(r, 1000));
+        res.setHeader('Content-Type', 'text/javascript');
+        return res.end('');
+      }
       res.setHeader('Content-Type', 'text/html');
       res.end('<button></button><img src="data:,">');
     });
@@ -171,10 +177,14 @@ export default {};
         resolve(dir, 'pages/01-assessment/_meta.js'),
         `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice', 'frames-last'] };`,
       );
-      // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
+      // "Asset" parses its button only after a slow script loads; "Poll" keeps
+      // the network busy. "Unloaded" is a lazy Video below the fold: still
+      // about:blank, so same-origin.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <h1>Frames</h1>
 <iframe title="Local" srcdoc="<button></button>"></iframe>
+<iframe title="Asset" src="./sim.html"></iframe>
+<iframe title="Poll" srcdoc="<script>setInterval(() => fetch('/poll'), 200)</script>"></iframe>
 <iframe title="Sandboxed" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
 <iframe title="Embed" src="${embedUrl}"></iframe>
 <iframe title="Nested" srcdoc="<iframe title='Inner' src='${embedUrl}'></iframe>"></iframe>
@@ -182,6 +192,11 @@ export default {};
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
 `;
+      mkdirSync(resolve(dir, 'public'), { recursive: true });
+      writeFileSync(
+        resolve(dir, 'public/sim.html'),
+        `<!doctype html><title>Sim</title><script src="${embedUrl}slow.js"></script><button></button>`,
+      );
       for (const name of ['frames', 'frames-last']) {
         writeFileSync(
           resolve(dir, `pages/01-assessment/${name}.svelte`),
@@ -201,7 +216,7 @@ export default {};
               v.nodes,
             ]),
           ),
-        ).toEqual({ 'button-name': 2, 'frame-title': 1 });
+        ).toEqual({ 'button-name': 3, 'frame-title': 1 });
       }
     } finally {
       embed.close();
