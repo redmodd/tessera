@@ -165,15 +165,14 @@ export default {};
       // Without the CSP entry the embed is blocked and has no button to skip.
       expect(withCsp).not.toBe(source);
       writeFileSync(config, withCsp);
-      // Last, so the audit reaches it by in-app navigation (#442).
+      // First and last, so the audit reaches the frames both by the initial
+      // load and by in-app navigation (#442).
       writeFileSync(
         resolve(dir, 'pages/01-assessment/_meta.js'),
-        `export default { title: 'Assessment', pages: ['check', 'exam', 'practice', 'frames'] };`,
+        `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice', 'frames-last'] };`,
       );
       // "Unloaded" is a lazy Video below the fold: still about:blank, so same-origin.
-      writeFileSync(
-        resolve(dir, 'pages/01-assessment/frames.svelte'),
-        `<script module>export const pageConfig = { title: "Frames" };</script>
+      const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <h1>Frames</h1>
 <iframe title="Local" srcdoc="<button></button>"></iframe>
 <iframe title="Sandboxed" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
@@ -182,22 +181,28 @@ export default {};
 <iframe srcdoc="<p>Untitled</p>"></iframe>
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
-`,
-      );
+`;
+      for (const name of ['frames', 'frames-last']) {
+        writeFileSync(
+          resolve(dir, `pages/01-assessment/${name}.svelte`),
+          frames,
+        );
+      }
 
       await audit(dir);
 
       const report = readReport(dir);
-      const page = report.pages[3];
-      expect(page.title).toBe('Frames');
-      expect(
-        Object.fromEntries(
-          page.violations.map((v: { id: string; nodes: number }) => [
-            v.id,
-            v.nodes,
-          ]),
-        ),
-      ).toEqual({ 'button-name': 2, 'frame-title': 1 });
+      for (const page of [report.pages[0], report.pages.at(-1)]) {
+        expect(page.title).toBe('Frames');
+        expect(
+          Object.fromEntries(
+            page.violations.map((v: { id: string; nodes: number }) => [
+              v.id,
+              v.nodes,
+            ]),
+          ),
+        ).toEqual({ 'button-name': 2, 'frame-title': 1 });
+      }
     } finally {
       embed.close();
     }
