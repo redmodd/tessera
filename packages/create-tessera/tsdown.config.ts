@@ -29,7 +29,6 @@ if (typeof packageManager !== 'string' || packageManager.length === 0) {
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  dts: false,
   sourcemap: true,
   fixedExtension: false,
   banner: '#!/usr/bin/env node',

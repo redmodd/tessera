@@ -4,6 +4,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "allowJs": true,
+    "declaration": true,
+    "declarationMap": true,
     "types": ["vite/client"]
   },
   "include": ["src"]
