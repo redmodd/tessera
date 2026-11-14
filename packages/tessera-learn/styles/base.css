@@ -91,7 +91,7 @@
   }
 
   a {
-    color: var(--tessera-primary);
+    color: var(--tessera-primary-text);
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 2px;
@@ -99,7 +99,11 @@
   }
 
   a:hover {
-    color: var(--tessera-primary-dark);
+    color: color-mix(
+      in srgb,
+      var(--tessera-primary-text) 70%,
+      var(--tessera-text)
+    );
   }
 
   a:focus-visible {

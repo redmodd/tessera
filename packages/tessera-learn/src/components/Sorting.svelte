@@ -381,7 +381,7 @@
 
     .tessera-sorting-hint {
       font-size: 0.8125rem;
-      color: var(--tessera-primary);
+      color: var(--tessera-primary-text);
       font-weight: 500;
       margin: 0;
     }

@@ -7,6 +7,12 @@
     initial-value: #2563eb;
   }
 
+  @property --tessera-on-primary {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #ffffff;
+  }
+
   @property --tessera-text {
     syntax: '<color>';
     inherits: true;
@@ -60,13 +66,14 @@
     --tessera-primary-light: color-mix(
       in srgb,
       var(--tessera-primary) 15%,
-      white
+      var(--tessera-bg)
     );
     --tessera-primary-dark: color-mix(
       in srgb,
       var(--tessera-primary) 70%,
       black
     );
+    --tessera-primary-text: var(--tessera-primary);
     --tessera-success-bg: color-mix(
       in srgb,
       var(--tessera-success) 8%,

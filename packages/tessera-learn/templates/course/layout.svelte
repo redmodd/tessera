@@ -102,7 +102,7 @@
   .nav-btn--primary {
     border-color: transparent;
     background: var(--tessera-primary);
-    color: #fff;
+    color: var(--tessera-on-primary);
   }
 
   .nav-btn--primary:hover:not(:disabled) {

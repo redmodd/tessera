@@ -218,7 +218,7 @@ test.describe('Navigation — Free Mode', () => {
             document.createElement('div'),
           );
           probe.style.backgroundColor = `color-mix(in srgb, ${shadedFrom} 15%, white)`;
-          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, black)`;
+          probe.style.color = `color-mix(in srgb, ${shadedFrom} 70%, #1f2937)`;
           const { backgroundColor, color } = getComputedStyle(probe);
           probe.remove();
           return { backgroundColor, color };
@@ -233,6 +233,20 @@ test.describe('Navigation — Free Mode', () => {
       await expect(current).toHaveCSS('color', expected.color);
     });
   }
+
+  test('the page nav buttons follow --tessera-primary-text and --tessera-on-primary', async ({
+    page,
+  }) => {
+    await page.addStyleTag({
+      content:
+        ':root { --tessera-primary-text: #854d0e; --tessera-on-primary: #1f2937; }',
+    });
+    const next = page.locator('.tessera-page-nav-btn', { hasText: 'Next' });
+    await expect(next).toHaveCSS('color', 'rgb(133, 77, 14)');
+    await expect(next).toHaveCSS('border-color', 'rgb(133, 77, 14)');
+    await next.hover();
+    await expect(next).toHaveCSS('color', 'rgb(31, 41, 55)');
+  });
 
   test('current page is highlighted in sidebar', async ({ page }) => {
     // The first page should have aria-current
