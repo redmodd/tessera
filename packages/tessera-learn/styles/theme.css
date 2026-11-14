@@ -7,6 +7,12 @@
     initial-value: #2563eb;
   }
 
+  @property --tessera-on-primary {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #ffffff;
+  }
+
   @property --tessera-text {
     syntax: '<color>';
     inherits: true;
@@ -57,15 +63,22 @@
 
   :root {
     /* Colors */
-    --tessera-primary-light: color-mix(
+    --tessera-primary-bg: color-mix(
       in srgb,
       var(--tessera-primary) 15%,
-      white
+      transparent
     );
-    --tessera-primary-dark: color-mix(
+    --tessera-primary-hover: color-mix(
       in srgb,
       var(--tessera-primary) 70%,
       black
+    );
+    /* --tessera-primary-on-bg stays unset and falls back to --tessera-primary
+       where it's used, so it follows a primary set on any element. */
+    --tessera-primary-on-bg-strong: color-mix(
+      in srgb,
+      var(--tessera-primary-on-bg, var(--tessera-primary)) 70%,
+      var(--tessera-text)
     );
     --tessera-success-bg: color-mix(
       in srgb,

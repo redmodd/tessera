@@ -506,8 +506,11 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 | Property                                       | Default                               |
 | ---------------------------------------------- | ------------------------------------- |
 | `--tessera-primary`                            | `#2563eb`                             |
-| `--tessera-primary-light`                      | the primary at 15% over white         |
-| `--tessera-primary-dark`                       | the primary at 70% over black         |
+| `--tessera-primary-on-bg`                      | unset, see below                      |
+| `--tessera-primary-on-bg-strong`               | the `-on-bg` at 70% over the text     |
+| `--tessera-on-primary`                         | `#ffffff`                             |
+| `--tessera-primary-bg`                         | the primary at 15% over transparent   |
+| `--tessera-primary-hover`                      | the primary at 70% over black         |
 | `--tessera-text`                               | `#1f2937`                             |
 | `--tessera-text-light`                         | `#6b7280`                             |
 | `--tessera-bg`                                 | `#ffffff`                             |
@@ -532,7 +535,7 @@ Add `.css` files to `styles/`. Framework CSS sits in the `tessera` cascade layer
 
 Every `:focus-visible` element gets `outline: var(--tessera-focus-outline)`, `outline-offset: 2px` and `box-shadow: var(--tessera-focus-halo)`, except a heading with `tabindex="-1"`, which shows no ring. A `tabindex="-1"` wrapper the page change focuses (see [Custom Layouts](docs/recipes.md#custom-layouts)) does show it. Any rule of yours that sets `outline` or `box-shadow` on a focusable element beats this ring, including an element selector like `button { box-shadow: … }` in `styles/`. Restate the ring in a matching `:focus-visible` rule, and on `.wrapper:has(:focus-visible)` when a wrapper shows a child's focus.
 
-Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-success-bg` / `--tessera-error-bg`, an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
+Feedback text and the quiz score label render in `--tessera-success` / `--tessera-error` on `--tessera-success-bg` / `--tessera-error-bg`, an 8% tint of the same color, laid over `--tessera-bg` or `--tessera-bg-secondary`. An override must keep 4.5:1 contrast against that tint over both backgrounds.
 
 ```css
 :root {
@@ -541,7 +544,32 @@ Feedback text renders in `--tessera-success` / `--tessera-error` on `--tessera-s
 }
 ```
 
-**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `-light` and `-dark` shades mix from the `:root` value of `--tessera-primary`, so override it on `:root` for them to follow. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
+**Set the primary color and font in `course.config.js`, not CSS.** `branding.primaryColor` and `branding.fontFamily` are applied as inline styles on `<html>`, so they beat a `:root` rule for `--tessera-primary` and `--tessera-font-family`. The `--tessera-primary-bg`, `-hover` and `-on-bg-strong` shades and the success and error tints mix from the `:root` values of the color tokens, so set color tokens on `:root` for them to follow. The properties with a hex default above take a color only: any other value in CSS, a gradient included, falls back to that default. Scaffolded courses set `branding.primaryColor`: change it there, or delete it to control the color from CSS.
+
+**Light primary colors.** Filled buttons put `--tessera-on-primary` text on the primary, and darken to `--tessera-primary-hover` on hover. Links, outlined buttons, hints and selection indicators (selected borders, the radio dot, the progress bar) use `--tessera-primary-on-bg` on `--tessera-bg` and `--tessera-bg-secondary`. It's unset so it follows a `--tessera-primary` set on any element: in your own CSS, write `var(--tessera-primary-on-bg, var(--tessera-primary))`. Both defaults need a dark primary, so for a light one (yellow, orange, pale teal) set both to colors with 4.5:1 contrast, `-on-bg` against both backgrounds. Darkening can push the hover fill under 4.5:1 with dark `--tessera-on-primary` text (orange does), so set `--tessera-primary-hover` to a fill that holds it. `tessera/primary-contrast` checks only `branding.primaryColor` against white and still warns: add it to `a11y.ignore` and run `tessera a11y`. That checks text as rendered, not hover states, so check the button hover fill yourself.
+
+```css
+:root {
+  --tessera-on-primary: #1f2937; /* on a #facc15 primary */
+  --tessera-primary-on-bg: #854d0e;
+}
+```
+
+**Dark themes.** Set `color-scheme: dark` with the color tokens, or scrollbars and your own `<input>`, `<select>` and `<textarea>` stay light and show `--tessera-text` on a white field. Lighten `--tessera-primary-on-bg`, `--tessera-success` and `--tessera-error` to keep 4.5:1 on the dark background.
+
+```css
+:root {
+  color-scheme: dark;
+  --tessera-bg: #111827;
+  --tessera-bg-secondary: #1f2937;
+  --tessera-text: #f3f4f6;
+  --tessera-text-light: #9ca3af;
+  --tessera-border: #374151;
+  --tessera-primary-on-bg: #93c5fd;
+  --tessera-success: #4ade80;
+  --tessera-error: #f87171;
+}
+```
 
 ---
 

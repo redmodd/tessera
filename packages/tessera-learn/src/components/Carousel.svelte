@@ -218,8 +218,8 @@
     }
 
     .tessera-carousel-dot.active {
-      background-color: var(--tessera-primary);
-      border-color: var(--tessera-primary);
+      background-color: var(--tessera-primary-on-bg, var(--tessera-primary));
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
     }
   }
 </style>

@@ -372,12 +372,12 @@
     }
 
     .tessera-matching-item:hover:not(:disabled, .matched) {
-      border-color: var(--tessera-primary);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
     }
 
     .tessera-matching-item.selected {
-      border-color: var(--tessera-primary);
-      background: var(--tessera-primary-light);
+      border-color: var(--tessera-primary-on-bg, var(--tessera-primary));
+      background: var(--tessera-primary-bg);
       transform: scale(1.02);
     }
 

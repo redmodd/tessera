@@ -163,10 +163,10 @@
   }
 
   .tessera-nav-page[aria-current='page'] {
-    background-color: var(--tessera-primary-light);
-    color: var(--tessera-primary-dark);
+    background-color: var(--tessera-primary-bg);
+    color: var(--tessera-primary-on-bg-strong);
     font-weight: 600;
-    border-left-color: var(--tessera-primary);
+    border-left-color: var(--tessera-primary-on-bg, var(--tessera-primary));
   }
 
   /* The inset halo starts inside the border, so the border gives way to padding. */
@@ -248,9 +248,9 @@
     padding: var(--tessera-spacing-sm) var(--tessera-spacing-md);
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--tessera-primary);
+    color: var(--tessera-primary-on-bg, var(--tessera-primary));
     background: none;
-    border: 1px solid var(--tessera-primary);
+    border: 1px solid var(--tessera-primary-on-bg, var(--tessera-primary));
     border-radius: 6px;
     cursor: pointer;
     transition:
@@ -260,7 +260,7 @@
 
   .tessera-page-nav-btn:hover:not(:disabled) {
     background-color: var(--tessera-primary);
-    color: #ffffff;
+    color: var(--tessera-on-primary);
   }
 
   .tessera-page-nav-btn:disabled {
@@ -287,7 +287,7 @@
 
   .tessera-progress-fill {
     height: 100%;
-    background-color: var(--tessera-primary);
+    background-color: var(--tessera-primary-on-bg, var(--tessera-primary));
     border-radius: 2px;
     transition: width var(--tessera-transition-normal);
   }
@@ -413,7 +413,7 @@
   /* ---- Buttons ---- */
   .tessera-btn-primary {
     background-color: var(--tessera-primary);
-    color: #ffffff;
+    color: var(--tessera-on-primary);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -425,7 +425,7 @@
   }
 
   .tessera-btn-primary:hover:not(:disabled) {
-    background-color: var(--tessera-primary-dark);
+    background-color: var(--tessera-primary-hover);
   }
 
   .tessera-btn-primary:disabled {

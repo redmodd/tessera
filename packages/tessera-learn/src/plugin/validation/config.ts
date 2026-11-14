@@ -329,15 +329,15 @@ function validateBranding(
         `"branding.primaryColor" ${formatValue(primaryColor)} does not look like a valid CSS color. If the browser can't parse it, the course ignores it`,
       );
     } else {
-      // Rule 1.7: primaryColor is used both as links on the default white page
-      // background and as a button fill behind white text. That is symmetric, so one
-      // ratio covers both. Non-#hex valid colors return null and defer to Tier 2.
+      // Rule 1.7 checks the default theme: primary text on a white page and white
+      // text on a primary fill, one symmetric ratio. It can't see token overrides in
+      // styles/, so it still fires; Tier 2 checks the rendered colors.
       const ratio = contrastRatio(primaryColor, '#ffffff');
       if (ratio !== null && ratio < 4.5) {
         d.warn(
           tag(
             A11Y_IDS.primaryContrast,
-            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white. It's used both for links on the page background and as a button fill behind white text, and WCAG AA needs 4.5:1 for each`,
+            `branding.primaryColor (${primaryColor}) is ${ratio.toFixed(2)}:1 against white, and WCAG AA needs 4.5:1 for links on the page and white text on buttons. To keep a light primary, set the color tokens in styles/ (see "Light primary colors" in the authoring guide), then add "${A11Y_IDS.primaryContrast}" to a11y.ignore and run tessera a11y`,
           ),
         );
       }

@@ -189,7 +189,7 @@
       padding: 0;
       font-size: 0.875rem;
       font-weight: 600;
-      color: var(--tessera-primary);
+      color: var(--tessera-primary-on-bg, var(--tessera-primary));
       background: none;
       border: none;
       cursor: pointer;
@@ -198,7 +198,7 @@
     }
 
     .tessera-standalone-retry:hover {
-      color: var(--tessera-primary-dark);
+      color: var(--tessera-primary-on-bg-strong);
     }
   }
 </style>

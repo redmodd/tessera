@@ -91,7 +91,7 @@
   }
 
   a {
-    color: var(--tessera-primary);
+    color: var(--tessera-primary-on-bg, var(--tessera-primary));
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 2px;
@@ -99,7 +99,7 @@
   }
 
   a:hover {
-    color: var(--tessera-primary-dark);
+    color: var(--tessera-primary-on-bg-strong);
   }
 
   a:focus-visible {
@@ -230,7 +230,7 @@
 
   /* ---- Selection ---- */
   ::selection {
-    background-color: var(--tessera-primary-light);
+    background-color: var(--tessera-primary-bg);
     color: var(--tessera-text);
   }
 }

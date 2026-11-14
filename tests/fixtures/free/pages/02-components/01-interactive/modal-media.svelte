@@ -13,7 +13,7 @@
 <RevealModal title="More Details">
   {#snippet trigger()}
     <button
-      style="padding: 0.5rem 1rem; background: var(--tessera-primary); color: white; border: none; border-radius: 6px; cursor: pointer;"
+      style="padding: 0.5rem 1rem; background: var(--tessera-primary); color: var(--tessera-on-primary); border: none; border-radius: 6px; cursor: pointer;"
       >Click to reveal</button
     >
   {/snippet}
