@@ -13,7 +13,6 @@
   import DefaultLayout from '../components/DefaultLayout.svelte';
   import { NavigationState } from './navigation.svelte.js';
   import { ProgressState } from './progress.svelte.js';
-  import { applyBranding } from './branding.js';
   import { CourseSession } from './course-session.svelte.js';
   import { createAdapter } from 'virtual:tessera-adapter';
   import { buildXAPIClient } from 'virtual:tessera-xapi-setup';
@@ -258,8 +257,6 @@
 
   // ---- Lifecycle ----
   onMount(async () => {
-    applyBranding(document.documentElement, config.branding);
-
     const initError = await session.start();
     if (initError) {
       console.error('Tessera: adapter init failed', initError);

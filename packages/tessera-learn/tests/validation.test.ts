@@ -563,28 +563,7 @@ describe('config validation', () => {
     expect(logoWarning(validateProject(testRoot).warnings)).toHaveLength(0);
   });
 
-  it('warns on an unparseable branding.primaryColor', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  branding: { primaryColor: "not a color" },
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining(
-        '"branding.primaryColor" "not a color" does not look like a valid CSS color',
-      ),
-    );
-  });
-
-  it('accepts a valid branding.primaryColor', () => {
+  it('warns on branding fields other than logo', () => {
     createValidProject(testRoot);
     writeConfig(
       testRoot,
@@ -598,24 +577,16 @@ describe('config validation', () => {
 };`,
     );
     const { warnings } = validateProject(testRoot);
-    expect(warnings.filter((w) => w.includes('branding'))).toHaveLength(0);
-  });
-
-  it('accepts a modern CSS color function for branding.primaryColor', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  branding: { primaryColor: "oklch(0.7 0.15 200)" },
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'unknown field "branding.primaryColor" will be ignored',
+      ),
     );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings.filter((w) => w.includes('branding'))).toHaveLength(0);
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        'unknown field "branding.fontFamily" will be ignored',
+      ),
+    );
   });
 
   it('warns when branding is an array', () => {
@@ -634,27 +605,6 @@ describe('config validation', () => {
     const { warnings } = validateProject(testRoot);
     expect(warnings).toContainEqual(
       expect.stringContaining('"branding" must be an object, got array'),
-    );
-  });
-
-  it('warns when branding.fontFamily is not a string', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "Test",
-  branding: { fontFamily: 42 },
-  navigation: { mode: "free" },
-  completion: { mode: "percentage" },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(warnings).toContainEqual(
-      expect.stringContaining(
-        '"branding.fontFamily" must be a string, got number',
-      ),
     );
   });
 
@@ -3606,44 +3556,6 @@ describe('a11y rule 1.6 — heading order', () => {
     writePage(testRoot, `<h2>Intro</h2>\n${tag}`);
     const { warnings } = validateProject(testRoot);
     expect(has(warnings, 'tessera/heading-order')).toBe(true);
-  });
-});
-
-describe('a11y rule 1.7 — primaryColor contrast', () => {
-  it('warns on a low-contrast primaryColor against white', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "T",
-  language: "en",
-  branding: { primaryColor: "#93c5fd" },
-  navigation: { mode: "free" },
-  completion: { mode: "percentage", percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(has(warnings, 'tessera/primary-contrast')).toBe(true);
-  });
-
-  it('does not warn on a passing primaryColor', () => {
-    createValidProject(testRoot);
-    writeConfig(
-      testRoot,
-      `export default {
-  title: "T",
-  language: "en",
-  branding: { primaryColor: "#2563eb" },
-  navigation: { mode: "free" },
-  completion: { mode: "percentage", percentageThreshold: 100 },
-  scoring: { passingScore: 70 },
-  export: { standard: "web" },
-};`,
-    );
-    const { warnings } = validateProject(testRoot);
-    expect(has(warnings, 'tessera/primary-contrast')).toBe(false);
   });
 });
 

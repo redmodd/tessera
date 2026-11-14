@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  relativeLuminance,
-  contrastRatio,
-} from '../src/plugin/a11y/contrast.js';
+import { relativeLuminance, contrastRatio } from './contrast.js';
 import { MATCH_PAIR_COLORS } from '../src/components/util.js';
 
 describe('relativeLuminance', () => {

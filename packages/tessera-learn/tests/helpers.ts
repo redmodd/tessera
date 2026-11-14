@@ -304,7 +304,7 @@ export function createConfig(
     description: '',
     author: '',
     version: '1.0.0',
-    branding: { logo: '', primaryColor: '#2563eb', fontFamily: 'Inter' },
+    branding: { logo: '' },
     navigation: { mode: 'free' as const },
     completion: { mode: 'percentage' as const, percentageThreshold: 100 },
     scoring: { passingScore: 70 },

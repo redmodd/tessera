@@ -1,8 +1,6 @@
 /**
- * Pure-JS WCAG contrast helpers for the build-time linter (rule 1.7). Only
- * opaque #hex (3/4/6/8) is parsed. Other CSS color forms and translucent hex
- * return null and fall through to the Tier-2 axe audit, which uses the
- * browser's own parser.
+ * WCAG contrast helpers for tests. Only opaque #hex (3/4/6/8) is parsed; other
+ * CSS color forms and translucent hex return null.
  */
 
 function parseHex(

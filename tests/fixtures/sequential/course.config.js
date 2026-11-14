@@ -6,8 +6,6 @@ export default {
   language: 'en',
   branding: {
     logo: '',
-    primaryColor: '#2563eb',
-    fontFamily: 'Inter, sans-serif',
   },
   navigation: { mode: 'sequential' },
   completion: { mode: 'percentage', percentageThreshold: 100 },

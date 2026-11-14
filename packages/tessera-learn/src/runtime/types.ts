@@ -155,8 +155,6 @@ export interface CourseConfig {
   a11y?: A11yConfig;
   branding?: {
     logo?: string;
-    primaryColor?: string;
-    fontFamily?: string;
   };
   /** 'custom' hides the built-in layout so a course-owned shell can take over.
    * A project-root layout.svelte outranks it. */
