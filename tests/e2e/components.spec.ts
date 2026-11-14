@@ -445,6 +445,10 @@ test.describe('Component Accessibility', () => {
       .analyze();
 
     expect(results.violations).toEqual([]);
+    // axe files a label on a role-less element under incomplete, not violations.
+    expect(
+      results.incomplete.filter((r) => r.id === 'aria-prohibited-attr'),
+    ).toEqual([]);
   });
 
   test('RevealModal passes axe audit when open', async ({ page }) => {

@@ -36,6 +36,7 @@
   let cardSelected = $state(false); // current card selected via tap/click
   let cardEl = $state(null);
   const componentId = $props.id();
+  const questionId = `sorting-${componentId}-question`;
   const hintId = `sorting-${componentId}-hint`;
 
   function initQueue() {
@@ -154,8 +155,13 @@
   }
 </script>
 
-<QuestionShell {q} class="tessera-sorting" aria-label={question}>
-  <p class="tessera-sorting-question">{question}</p>
+<QuestionShell
+  {q}
+  class="tessera-sorting"
+  role="group"
+  aria-labelledby={questionId}
+>
+  <p id={questionId} class="tessera-sorting-question">{question}</p>
 
   <!-- Card deck: shows the current card to be placed -->
   {#if !q.locked}

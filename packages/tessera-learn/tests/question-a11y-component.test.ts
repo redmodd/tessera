@@ -45,6 +45,33 @@ function mountWidget(
   return { target, button, name, click, unmount };
 }
 
+describe.each([
+  {
+    name: 'Sorting',
+    widget: Sorting,
+    props: { items: ['Apple'], targets: ['Fruit'], correct: [0] },
+  },
+  {
+    name: 'Matching',
+    widget: Matching,
+    props: { pairs: [{ left: 'A', right: 'Alpha' }] },
+  },
+])('$name question group', ({ widget, props }) => {
+  it('is a group named by the visible question', () => {
+    const { target } = mountWidget(widget, {
+      ...props,
+      question: 'Sort these',
+    });
+    const shell = target.querySelector('.tessera-question-shell')!;
+    expect(shell.getAttribute('role')).toBe('group');
+    expect(shell.hasAttribute('aria-label')).toBe(false);
+    expect(
+      document.getElementById(shell.getAttribute('aria-labelledby')!)
+        ?.textContent,
+    ).toBe('Sort these');
+  });
+});
+
 describe('Sorting accessible names', () => {
   it('names the card and targets from their visible text', () => {
     const { target, button, name, click } = mountWidget(Sorting, {
@@ -176,8 +203,10 @@ describe('Matching accessible names', () => {
       pairs: [...pairs, { left: 'C', right: 'Gamma' }],
     });
     const groups = [
-      ...target.querySelectorAll<HTMLElement>('[role="group"]'),
-    ].filter((g) => g.querySelector('.tessera-matching-item'));
+      ...target.querySelectorAll<HTMLElement>(
+        '.tessera-matching-column[role="group"]',
+      ),
+    ];
     const heading = (g: HTMLElement) =>
       document
         .getElementById(g.getAttribute('aria-labelledby')!)
