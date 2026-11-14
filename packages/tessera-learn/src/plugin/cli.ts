@@ -170,7 +170,10 @@ function parseCommandArgs(
   const options: ParseArgsOptionsConfig = {};
   if (flag) options[flag.name] = { type: 'string' };
 
-  const parsed = parseCliArgs(args, options);
+  const parsed = parseCliArgs(args, {
+    options,
+    maxPositionals: synopsis.length,
+  });
   if ('error' in parsed) {
     if (flag && parsed.code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') {
       return { error: `--${flag.name} requires a value` };
@@ -182,9 +185,6 @@ function parseCommandArgs(
   const required = synopsis.filter((arg) => arg.startsWith('<')).length;
   if (positionals.length < required) {
     return { error: `Missing argument: ${synopsis[positionals.length]}` };
-  }
-  if (positionals.length > synopsis.length) {
-    return { error: `Unexpected argument: ${positionals[synopsis.length]}` };
   }
 
   if (!flag) return { positionals };

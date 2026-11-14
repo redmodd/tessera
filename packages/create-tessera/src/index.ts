@@ -54,14 +54,9 @@ type ParseResult =
 
 export function parseArgs(argv: string[]): ParseResult {
   if (wantsHelp(argv)) return { help: true };
-  const parsed = parseCliArgs(argv);
+  const parsed = parseCliArgs(argv, { maxPositionals: 1 });
   if ('error' in parsed) return { error: parsed.error };
-
-  const { positionals } = parsed;
-  if (positionals.length > 1) {
-    return { error: `Unexpected argument: ${positionals[1]}` };
-  }
-  return { projectName: positionals[0] };
+  return { projectName: parsed.positionals[0] };
 }
 
 // __UPPER__ delimiters can't collide with Svelte `{...}` or JS `${...}`;

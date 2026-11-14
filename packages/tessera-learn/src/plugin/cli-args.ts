@@ -17,15 +17,22 @@ export function wantsHelp(args: string[]): boolean {
 
 export function parseCliArgs(
   args: string[],
-  options: ParseArgsOptionsConfig = {},
+  {
+    options = {},
+    maxPositionals = Infinity,
+  }: { options?: ParseArgsOptionsConfig; maxPositionals?: number } = {},
 ): CliArgs {
+  let parsed;
   try {
-    return parseArgs({ args, options, allowPositionals: true });
+    parsed = parseArgs({ args, options, allowPositionals: true });
   } catch (error) {
     const { code, message } = error as Error & { code?: string };
-    // Node follows the error with a hint sentence; keep only the error.
-    return { error: message.split('. ')[0], code };
+    // Node follows an unknown option with a hint on passing it after `--`.
+    return { error: message.replace(/\. To specify .*$/s, ''), code };
   }
+  const extra = parsed.positionals[maxPositionals];
+  if (extra !== undefined) return { error: `Unexpected argument: ${extra}` };
+  return parsed;
 }
 
 export function styleErr(
