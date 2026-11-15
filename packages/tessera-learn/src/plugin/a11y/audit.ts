@@ -259,6 +259,7 @@ function resolvePlaywrightBin():
 }
 
 const INSTALL_TIMEOUT_MS = 10 * 60_000;
+const SETTLE_TIMEOUT_MS = 10_000;
 
 // Run the workspace's own `playwright` bin with the current Node binary so the
 // install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
@@ -509,8 +510,7 @@ export async function runAudit(
       // navigation (#442), so track requests to catch content a page renders
       // after a fetch. Only the main frame must also go 500ms without a
       // request starting or finishing: a polling frame's requests are rarely
-      // in flight, so it can't hold the audit. A frame's own document is
-      // waited on by frameLoaded.
+      // in flight, so it can't hold the audit.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pending = new Set<any>();
       let lastRequestAt = 0;
@@ -529,13 +529,19 @@ export async function runAudit(
           lastRequestAt = Date.now();
           lastRequestUrl = request.url();
         } else if (
-          request.isNavigationRequest() ||
-          underCrossOrigin(frame, courseOrigin)
+          // A navigating frame still has its old URL, so judge the new one.
+          request.isNavigationRequest()
+            ? isCrossOrigin(request.url(), courseOrigin) ||
+              underCrossOrigin(frame.parentFrame(), courseOrigin)
+            : underCrossOrigin(frame, courseOrigin)
         ) {
           return;
         }
         pending.add(request);
       });
+      // A frame that navigates gets its new document waited on too.
+      const seen = new Set<unknown>();
+      page.on('framenavigated', (frame: unknown) => seen.delete(frame));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const settled = (request: any) => {
         if (pending.delete(request) && request.frame() === page.mainFrame()) {
@@ -574,10 +580,12 @@ export async function runAudit(
         if (!el) return;
         // A lazy frame is still about:blank, so judge it by what it will load.
         const src: string | undefined = await el
-          .evaluate((iframe: HTMLIFrameElement) =>
-            iframe.hasAttribute('srcdoc')
+          .evaluate((frameEl: HTMLIFrameElement | HTMLObjectElement) =>
+            frameEl.hasAttribute('srcdoc')
               ? 'about:srcdoc'
-              : iframe.src || 'about:blank',
+              : (frameEl instanceof HTMLObjectElement
+                  ? frameEl.data
+                  : frameEl.src) || 'about:blank',
           )
           .catch(() => undefined);
         const local = src !== undefined && !isCrossOrigin(src, courseOrigin);
@@ -598,34 +606,43 @@ export async function runAudit(
           .catch((err: Error) => {
             if (err.name !== 'TimeoutError') return;
             console.warn(
-              `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within 10s; scanned it as it was.`,
+              `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within ${SETTLE_TIMEOUT_MS / 1000}s; scanned it as it was.`,
             );
           });
       };
 
-      // Each pass reaches frames one level deeper: a loaded frame can hold
-      // lazy frames of its own and start requests.
-      const settle = async (title: string) => {
-        const deadline = Date.now() + 10_000;
-        const seen = new Set<unknown>();
-        let busy: boolean;
-        for (let depth = 0; ; depth++) {
-          while ((busy = networkBusy()) && Date.now() < deadline) {
-            await delay(100);
-          }
-          if (depth === 5) break;
-          const fresh = page.frames().filter((f: unknown) => !seen.has(f));
-          if (fresh.length === 0) break;
-          for (const frame of fresh) seen.add(frame);
-          await Promise.all(
-            fresh.map((frame: unknown) => frameLoaded(frame, title, deadline)),
-          );
+      const networkQuiet = async (deadline: number) => {
+        while (networkBusy()) {
+          if (Date.now() >= deadline) return false;
+          await delay(100);
         }
-        if (busy) {
-          const [request] = pending;
-          console.warn(
-            `${stderrTag('yellow')} ${title}: the network was still busy after 10s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
-          );
+        return true;
+      };
+
+      // Each pass reaches frames one level deeper: a loaded frame can hold
+      // lazy frames of its own and start requests. Frames load while the
+      // network wait runs, so a slow fetch doesn't use up their time.
+      const settle = async (title: string) => {
+        const deadline = Date.now() + SETTLE_TIMEOUT_MS;
+        seen.clear();
+        for (let depth = 0; ; depth++) {
+          const fresh =
+            depth < 5 ? page.frames().filter((f: unknown) => !seen.has(f)) : [];
+          for (const frame of fresh) seen.add(frame);
+          const [quiet] = await Promise.all([
+            networkQuiet(deadline),
+            ...fresh.map((frame: unknown) =>
+              frameLoaded(frame, title, deadline),
+            ),
+          ]);
+          if (fresh.length > 0) continue;
+          if (!quiet) {
+            const [request] = pending;
+            console.warn(
+              `${stderrTag('yellow')} ${title}: the network was still busy after ${SETTLE_TIMEOUT_MS / 1000}s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
+            );
+          }
+          return;
         }
       };
 

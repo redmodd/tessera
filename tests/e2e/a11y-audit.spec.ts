@@ -149,6 +149,7 @@ export default {};
     // localhost is another site than the preview server's 127.0.0.1, so these
     // embeds are out-of-process cross-origin frames, like a YouTube Video.
     const embed = createServer(async (req, res) => {
+      if (req.url === '/hang') return;
       if (req.url === '/slow.js') {
         await new Promise((r) => setTimeout(r, 1000));
         res.setHeader('Content-Type', 'text/javascript');
@@ -172,16 +173,48 @@ export default {};
       const source = readFileSync(config, 'utf-8');
       const withCsp = source.replace(
         'export: {',
-        "export: { csp: { 'frame-src': ['http://localhost:*'], 'connect-src': ['http://localhost:*'] },",
+        "export: { csp: { 'frame-src': ['http://localhost:*'], 'object-src': ['http://localhost:*'], 'connect-src': ['http://localhost:*'] },",
       );
       // Without the CSP entry the embed is blocked and has no button to skip.
       expect(withCsp).not.toBe(source);
       writeFileSync(config, withCsp);
+      // The preview server sends late.html slowly, so a frame navigating to
+      // it is mid-navigation for a while.
+      writeFileSync(
+        resolve(dir, 'vite.config.js'),
+        `import { tesseraPlugin } from 'tessera-learn/plugin';
+export default {
+  plugins: [
+    tesseraPlugin({ standardOverride: process.env.TESSERA_STANDARD }),
+    {
+      name: 'slow-late-html',
+      configurePreviewServer(server) {
+        server.middlewares.use((req, res, next) =>
+          req.url.endsWith('/late.html') ? setTimeout(next, 1000) : next(),
+        );
+      },
+    },
+  ],
+};
+`,
+      );
       // First and last, so the audit reaches the frames both by the initial
       // load and by in-app navigation (#442).
       writeFileSync(
         resolve(dir, 'pages/01-assessment/_meta.js'),
-        `export default { title: 'Assessment', pages: ['frames', 'check', 'chained', 'exam', 'practice', 'frames-last'] };`,
+        `export default { title: 'Assessment', pages: ['frames', 'check', 'chained', 'late', 'exam', 'practice', 'frames-last'] };`,
+      );
+      // A frame that gets its src only after the page went quiet.
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/late.svelte'),
+        `<script module>export const pageConfig = { title: "Late" };</script>
+<script>
+  let src = $state();
+  setTimeout(() => (src = './late.html'), 300);
+</script>
+<h1>Late</h1>
+<iframe title="Late" {src}></iframe>
+`,
       );
       // A request that starts 200ms after the one before it ends, with no
       // frame load to wait out in between.
@@ -203,10 +236,11 @@ export default {};
       // loads; "Poll" keeps the network busy. "Unloaded" is a lazy Video below
       // the fold: still about:blank, so same-origin. "Below" is a lazy
       // same-origin frame the audit loads, holding a lazy frame of its own.
+      // "Hang" is a cross-origin <object> that never responds.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <script>
   let late = $state(false);
-  fetch('${embedUrl}data?5000').then(() => (late = true));
+  fetch('${embedUrl}data?2000').then(() => (late = true));
 </script>
 <h1>Frames</h1>
 {#if late}<button></button>{/if}
@@ -218,6 +252,7 @@ export default {};
 <iframe title="Embed" src="${embedUrl}"></iframe>
 <iframe title="Nested" srcdoc="<iframe title='Inner' src='${embedUrl}'></iframe>"></iframe>
 <iframe srcdoc="<p>Untitled</p>"></iframe>
+<object title="Hang" data="${embedUrl}hang"></object>
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
 <iframe title="Below" loading="lazy" src="./nest.html"></iframe>
@@ -229,7 +264,11 @@ export default {};
       );
       writeFileSync(
         resolve(dir, 'public/fetch.html'),
-        `<!doctype html><title>Fetch</title><script>fetch('${embedUrl}data?7000').then(() => document.body.append(document.createElement('button')))</script>`,
+        `<!doctype html><title>Fetch</title><script>fetch('${embedUrl}data?3000').then(() => document.body.append(document.createElement('button')))</script>`,
+      );
+      writeFileSync(
+        resolve(dir, 'public/late.html'),
+        `<!doctype html><title>Late</title><button></button>`,
       );
       writeFileSync(
         resolve(dir, 'public/nest.html'),
@@ -242,13 +281,24 @@ export default {};
         );
       }
 
-      await audit(dir);
+      const warnings: string[] = [];
+      const warn = console.warn;
+      console.warn = (...args) => warnings.push(args.join(' '));
+      try {
+        await audit(dir);
+      } finally {
+        console.warn = warn;
+      }
 
+      expect(warnings.filter((w) => w.includes('as it was'))).toEqual([]);
       const report = readReport(dir);
       expect(report.pages[2].title).toBe('Chained');
-      expect(report.pages[2].violations).toMatchObject([
-        { id: 'button-name', nodes: 1 },
-      ]);
+      expect(report.pages[3].title).toBe('Late');
+      for (const page of report.pages.slice(2, 4)) {
+        expect(page.violations).toMatchObject([
+          { id: 'button-name', nodes: 1 },
+        ]);
+      }
       for (const page of [report.pages[0], report.pages.at(-1)]) {
         expect(page.title).toBe('Frames');
         expect(
@@ -261,6 +311,7 @@ export default {};
         ).toEqual({ 'button-name': 6, 'frame-title': 1 });
       }
     } finally {
+      embed.closeAllConnections();
       embed.close();
     }
   });
