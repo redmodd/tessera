@@ -27,7 +27,7 @@ concurrency:
 jobs:
   screen-reader:
     name: ${{ matrix.label }} (${{ matrix.browser }})
-    if: github.head_ref != 'changeset-release/main'
+    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

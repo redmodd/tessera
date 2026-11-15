@@ -10,15 +10,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
 
+# Every job but CI skips on the release PR: it only bumps versions over a main
+# commit, and CI checks that commit's push run instead. The head label, unlike
+# the branch name, can't come from a fork.
 jobs:
-  # The release PR only bumps versions and changelogs over code main's push
-  # run already tested.
   static:
     name: Lint, types & format
-    if: github.head_ref != 'changeset-release/main'
+    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -39,7 +40,7 @@ jobs:
 
   test:
     name: Build & test (Node ${{ matrix.node }})
-    if: github.head_ref != 'changeset-release/main'
+    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -72,7 +73,7 @@ jobs:
 
   playwright-version:
     name: Playwright version
-    if: github.head_ref != 'changeset-release/main'
+    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.lockfile.outputs.version }}
@@ -90,7 +91,7 @@ jobs:
 
   e2e:
     name: Playwright e2e (${{ matrix.browser }})
-    if: github.head_ref != 'changeset-release/main'
+    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     needs: playwright-version
     runs-on: ubuntu-latest
     # The image ships the browsers and their system packages; installing them
@@ -130,7 +131,7 @@ jobs:
 
   templates-e2e:
     name: Scaffold & build templates
-    if: github.head_ref != 'changeset-release/main'
+    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -151,7 +152,7 @@ jobs:
     name: Changeset present
     if: >-
       github.event_name == 'pull_request' &&
-      github.head_ref != 'changeset-release/main' &&
+      github.event.pull_request.head.label != 'redmodd:changeset-release/main' &&
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -177,6 +178,21 @@ jobs:
     if: always()
     needs: [static, test, playwright-version, e2e, templates-e2e, changeset]
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
+
+      - name: Main's CI passed on the release PR's base
+        if: github.event.pull_request.head.label == 'redmodd:changeset-release/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA" --jq '.parents[0].sha')
+          run=$(gh run list -w ci.yml -e push -c "$base" -L 1 --json databaseId -q '.[0].databaseId')
+          [[ -n "$run" ]] || { echo "::error::no CI push run for $base: the release PR must sit directly on a main commit"; exit 1; }
+          gh run watch "$run" -i 30 --compact --exit-status

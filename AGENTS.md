@@ -83,6 +83,6 @@ The directory tree is discoverable with `ls`; these are the facts that aren't.
 - **changeset**: the `pnpm changeset status` gate, skipped for Dependabot and the release PR.
 - **CI**: the only required check. Fails if any job above failed or was cancelled; skipped jobs pass.
 
-On the release PR (`changeset-release/main`) every job except **CI** skips, as does the screen reader check: it only bumps versions over code `main` already tested. A new push to a PR cancels its running CI.
+On the release PR (`changeset-release/main`) every job except **CI** skips, as does the screen reader check: it only bumps versions over a `main` commit. **CI** there waits for that commit's push run and fails unless it passed. A new push to a PR cancels its running CI; every push to `main` gets its own run.
 
 `dependabot-changeset.yml` commits a `patch` changeset listing the version bumps to each Dependabot npm PR that bumps a dependency of a published package. `release.yml` runs changesets on `main`. `screen-reader.yml` runs the screen reader check, NVDA on `windows-latest` and VoiceOver on `macos-15`, by hand or on PRs that touch its `paths`; it is not a required check. CI uploads `coverage-<node>` on every run, `playwright-test-results-<browser>` when e2e fails and `<reader>-phrases-<browser>` on every screen reader run; see [TESTING.md](./TESTING.md#debugging-a-failing-ci-run).
