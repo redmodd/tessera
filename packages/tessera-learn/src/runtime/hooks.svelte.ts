@@ -135,6 +135,7 @@ export interface UseQuestionHandle extends Question {
 
 interface QuizContext {
   registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle;
+  unregisterQuestion(handle: Question): void;
 }
 
 const [getQuizContext, setQuizContext] = optionalContext<QuizContext>();
@@ -205,7 +206,7 @@ export function useQuestion<I extends Interaction = Interaction>(
         );
       }
     }
-    return quizCtx.registerQuestion({
+    const handle = quizCtx.registerQuestion({
       id: opts.id,
       weight: opts.weight,
       checkAnswer: () => {
@@ -218,6 +219,8 @@ export function useQuestion<I extends Interaction = Interaction>(
       text: () => opts.text,
       restore: opts.restore,
     });
+    onDestroy(() => quizCtx.unregisterQuestion(handle));
+    return handle;
   }
 
   const pageIndex = isInPage() ? getPageContext()?.index : undefined;
@@ -474,16 +477,13 @@ export interface UseQuizHandle {
 }
 
 function warnUnsubmittedQuiz(stats: {
-  questionsCount: number;
-  answersCount: number;
+  answered: boolean;
   submitCalled: boolean;
 }): void {
-  if (stats.submitCalled) return;
-  if (stats.answersCount <= 0) return;
+  if (stats.submitCalled || !stats.answered) return;
   console.warn(
-    '[tessera] useQuiz: submit() was never called before unmount, but the learner answered ' +
-      `${stats.answersCount} of ${stats.questionsCount} questions. ` +
-      'Did your custom quiz shell forget to call handle.submit()?',
+    '[tessera] useQuiz: submit() was never called before unmount, but the learner ' +
+      'answered questions. Did your custom quiz shell forget to call handle.submit()?',
   );
 }
 
@@ -533,6 +533,7 @@ export function useQuiz(
 
   setQuizContext({
     registerQuestion: (api) => engine.registerQuestion(api),
+    unregisterQuestion: (handle) => engine.unregisterQuestion(handle),
   });
 
   onMount(() => {

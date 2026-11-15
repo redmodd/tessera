@@ -2,13 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // ---- createContext mock ----
 // The hooks run outside a component here, so each context reads and writes a
-// per-test map instead. `get` throws on a missing context, as Svelte's does.
+// per-test map instead, and onDestroy has no component to attach to. `get`
+// throws on a missing context, as Svelte's does.
 const ctxStore = new Map<object, unknown>();
 
 vi.mock('svelte', async () => {
   const actual = await vi.importActual<typeof import('svelte')>('svelte');
   return {
     ...actual,
+    onDestroy: () => {},
     createContext: () => {
       const key = {};
       return [

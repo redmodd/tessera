@@ -48,8 +48,10 @@ export interface QuizEngineDeps {
 }
 
 type InternalQuestion = UseQuizQuestionApi & {
+  /** The id the widget asked for; `id` is the unique one it is recorded under. */
+  requestedId: string;
   weight: number;
-  render: unknown;
+  handle: UseQuestionHandle;
 };
 
 /**
@@ -62,11 +64,17 @@ export class QuizEngine implements UseQuizHandle {
   #deps: QuizEngineDeps;
   #maxAttempts: number;
 
-  #internalQuestions = $state<InternalQuestion[]>([]);
+  // A widget's onDestroy sees any state written in the same flush at its old
+  // value, so what unregisterQuestion() reads is kept in plain fields too.
+  #members: InternalQuestion[] = [];
   #questionHandles = $state.raw<UseQuestionHandle[]>([]);
-  #answers = new SvelteMap<number, unknown>();
-  #reportedAnswers = new Map<number, string>();
-  #submitted = $state(false);
+  #submittedState = $state(false);
+  #submittedNow = false;
+  #answers = new SvelteMap<InternalQuestion, unknown>();
+  #renders = new SvelteMap<InternalQuestion, unknown>();
+  #reportedAnswers = new Map<InternalQuestion, string>();
+  // Unmounted after submit: kept, with their results, until retry().
+  #detached = new Set<InternalQuestion>();
   #reviewing = $state(false);
   #score = $state(0);
   #bestScore = $state(0);
@@ -75,13 +83,14 @@ export class QuizEngine implements UseQuizHandle {
   #attemptCount = $state(0);
   #fromSave = $state(false);
   #answerMissing = $state(false);
-  #submitCalled = false; // plain field, not $state — only the wrapper's onDestroy reads it
-  #feedbackShown = new SvelteSet<number>();
-  #lockedCorrect = new SvelteSet<number>();
-  // Each handle carries its index under this symbol, so a proxied copy resolves too.
-  #indexKey = Symbol('tessera.questionIndex');
-  #seenIds = new Set<string>();
-  #rewrittenIds = new Set<string>();
+  // Plain fields, not $state: only the wrapper's onDestroy reads them, after
+  // the questions have unmounted and taken their answers with them.
+  #submitCalled = false;
+  #answered = false;
+  #feedbackShown = new SvelteSet<InternalQuestion>();
+  #lockedCorrect = new SvelteSet<InternalQuestion>();
+  // Each handle carries its question under this symbol, so a proxied copy resolves too.
+  #questionKey = Symbol('tessera.question');
 
   constructor(deps: QuizEngineDeps) {
     this.#deps = deps;
@@ -98,6 +107,20 @@ export class QuizEngine implements UseQuizHandle {
     }
   }
 
+  get #internalQuestions(): InternalQuestion[] {
+    void this.#questionHandles; // tracks membership for reactive readers
+    return this.#members;
+  }
+
+  get #submitted(): boolean {
+    return this.#submittedState;
+  }
+
+  set #submitted(value: boolean) {
+    this.#submittedState = value;
+    this.#submittedNow = value;
+  }
+
   // Derived values are plain getters over $state, not $derived. Getters
   // recompute on read with or without a tracking effect, so
   // engine-construction tests need no $effect.root.
@@ -105,16 +128,14 @@ export class QuizEngine implements UseQuizHandle {
     return this.#internalQuestions.length;
   }
 
-  #answerComplete(i: number): boolean {
-    return (
-      this.#answers.has(i) && (this.#internalQuestions[i].complete?.() ?? true)
-    );
+  #answerComplete(q: InternalQuestion): boolean {
+    return this.#answers.has(q) && (q.complete?.() ?? true);
   }
 
   get #allAnswered(): boolean {
     return (
       this.#totalQuestions > 0 &&
-      this.#internalQuestions.every((_, i) => this.#answerComplete(i))
+      this.#internalQuestions.every((q) => this.#answerComplete(q))
     );
   }
 
@@ -173,96 +194,102 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   /** Dev-warning inputs the wrapper reads in onDestroy. */
-  get stats(): {
-    questionsCount: number;
-    answersCount: number;
-    submitCalled: boolean;
-  } {
-    return {
-      questionsCount: this.#internalQuestions.length,
-      answersCount: this.#answers.size,
-      submitCalled: this.#submitCalled,
-    };
+  get stats(): { answered: boolean; submitCalled: boolean } {
+    return { answered: this.#answered, submitCalled: this.#submitCalled };
   }
 
   registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle {
-    let id = api.id;
-    if (this.#seenIds.has(id)) {
-      let n = 2;
-      while (this.#seenIds.has(`${api.id}-${n}`)) n++;
-      id = `${api.id}-${n}`;
-      console.warn(
-        this.#rewrittenIds.has(api.id)
-          ? `[tessera] useQuiz: question id "${api.id}" is already taken by an earlier question whose ` +
-              `duplicate id was rewritten to it, so it is registered as "${id}" instead. ` +
-              'Give the earlier duplicates unique ids, because the rewritten one is the key ' +
-              "this question's LMS interaction is recorded under."
-          : `[tessera] useQuiz: duplicate question id "${api.id}" is registered as "${id}" instead. ` +
-              'Give each question in a quiz a unique id, because the rewritten one is the key ' +
-              'its LMS interaction is recorded under.',
-      );
-      this.#rewrittenIds.add(id);
-    }
-    this.#seenIds.add(id);
-    const internal: InternalQuestion = {
+    const internal = {
       ...api,
-      id,
+      requestedId: api.id,
       weight: normalizeWeight(api.weight),
-      render: undefined,
-    };
-    this.#internalQuestions.push(internal);
-    const index = this.#internalQuestions.length - 1;
+    } as InternalQuestion;
+    internal.handle = this.#makeQuestionHandle(internal);
+    this.#members.push(internal);
+    this.#publish();
     const answer = this.#fromSave
-      ? restoreResponse(internal, this.#deps.restore?.responses?.get(id))
+      ? restoreResponse(
+          internal,
+          this.#deps.restore?.responses?.get(internal.id),
+        )
       : undefined;
     if (answer !== undefined) {
-      this.#answers.set(index, answer);
+      this.#answers.set(internal, answer);
     } else if (this.#fromSave) {
       // `restored` is now true, and a review of it would judge nothing.
       this.#answerMissing = true;
       this.#reviewing = false;
     }
-    const handle = this.#makeQuestionHandle(index);
-    this.#questionHandles = [...this.#questionHandles, handle];
-    return handle;
+    // A keyed block mounts its new questions before the old ones leave, so
+    // a duplicate counts only once the swap has settled.
+    queueMicrotask(() => this.#warnDuplicate(internal));
+    return internal.handle;
   }
 
-  setAnswer(index: number, answer: unknown): void {
-    this.#answers.set(index, answer);
+  /**
+   * A question whose widget unmounted. While answering it leaves the quiz with
+   * its answer; after submit it keeps its result until `retry()`.
+   */
+  unregisterQuestion(handle: Question): void {
+    const q = this.#questionOf(handle);
+    if (!q || !this.#members.includes(q)) return;
+    if (this.#submittedNow) this.#detached.add(q);
+    else this.#remove(q);
   }
 
-  getAnswer(index: number): unknown {
-    return this.#answers.get(index);
+  #remove(q: InternalQuestion): void {
+    this.#members = this.#members.filter((x) => x !== q);
+    this.#publish();
+    this.#answers.delete(q);
+    this.#renders.delete(q);
+    this.#reportedAnswers.delete(q);
+    this.#feedbackShown.delete(q);
+    this.#lockedCorrect.delete(q);
   }
 
-  setRender(index: number, render: unknown): void {
-    if (this.#internalQuestions[index])
-      this.#internalQuestions[index].render = render;
+  /** Gives each question a unique id, the first to ask for one keeping it. */
+  #publish(): void {
+    const taken = new Set<string>();
+    for (const q of this.#members) {
+      let id = q.requestedId;
+      for (let n = 2; taken.has(id); n++) id = `${q.requestedId}-${n}`;
+      taken.add(id);
+      q.id = id;
+    }
+    this.#questionHandles = this.#members.map((q) => q.handle);
   }
 
-  getRender(index: number): unknown {
-    return this.#internalQuestions[index]?.render;
+  #warnDuplicate(q: InternalQuestion): void {
+    if (q.id === q.requestedId || !this.#members.includes(q)) return;
+    const holder = this.#members.find((m) => m.id === q.requestedId);
+    console.warn(
+      holder && holder.requestedId !== q.requestedId
+        ? `[tessera] useQuiz: question id "${q.requestedId}" is already taken by an earlier question whose ` +
+            `duplicate id was rewritten to it, so it is registered as "${q.id}" instead. ` +
+            'Give the earlier duplicates unique ids, because the rewritten one is the key ' +
+            "this question's LMS interaction is recorded under."
+        : `[tessera] useQuiz: duplicate question id "${q.requestedId}" is registered as "${q.id}" instead. ` +
+            'Give each question in a quiz a unique id, because the rewritten one is the key ' +
+            'its LMS interaction is recorded under.',
+    );
   }
 
-  feedbackVisible(index: number): boolean {
+  #questionOf(handle: Question): InternalQuestion | undefined {
+    return (handle as unknown as Record<symbol, InternalQuestion | undefined>)[
+      this.#questionKey
+    ];
+  }
+
+  #feedbackVisible(q: InternalQuestion): boolean {
     const mode = this.feedbackMode;
     if (mode === 'never') return false;
     if (this.#reviewing) return true;
-    return mode === 'immediate' && this.#feedbackShown.has(index);
+    return mode === 'immediate' && this.#feedbackShown.has(q);
   }
 
-  revealFeedbackByIndex(index: number): void {
-    if (this.feedbackMode === 'never') return;
-    this.#feedbackShown.add(index);
-  }
-
-  isLockedCorrect(index: number): boolean {
-    return this.#lockedCorrect.has(index);
-  }
-
-  revealFeedback(q: Question): void {
-    const index = (q as unknown as Record<symbol, unknown>)[this.#indexKey];
-    if (typeof index === 'number') this.revealFeedbackByIndex(index);
+  revealFeedback(handle: Question): void {
+    const q = this.#questionOf(handle);
+    if (q && this.feedbackMode !== 'never') this.#feedbackShown.add(q);
   }
 
   submit(): void {
@@ -276,7 +303,7 @@ export class QuizEngine implements UseQuizHandle {
       return;
     }
 
-    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
+    for (const q of this.#internalQuestions) this.#commit(q);
 
     const computed = this.#computeScore();
     const scored = computed !== null;
@@ -339,25 +366,27 @@ export class QuizEngine implements UseQuizHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    const kept = new Set<number>();
+    for (const q of this.#detached) this.#remove(q);
+    this.#detached.clear();
+    const kept = new Set<InternalQuestion>();
     this.#lockedCorrect.clear();
     if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
-      this.#internalQuestions.forEach((q, i) => {
+      for (const q of this.#internalQuestions) {
         // A question restored without its answer can read as correct, and
         // locked it could never be answered.
-        if (!this.#answers.has(i)) return;
+        if (!this.#answers.has(q)) continue;
         const correct = q.checkAnswer();
-        if (correct) this.#lockedCorrect.add(i);
+        if (correct) this.#lockedCorrect.add(q);
         // An answer with no `correct` can't be wrong: it stays, still editable.
-        if (correct !== false) kept.add(i);
-      });
+        if (correct !== false) kept.add(q);
+      }
     }
-    for (const i of [...this.#answers.keys()]) {
-      if (!kept.has(i)) this.#answers.delete(i);
+    for (const q of [...this.#answers.keys()]) {
+      if (!kept.has(q)) this.#answers.delete(q);
     }
     this.#reportedAnswers.clear();
-    for (let i = 0; i < this.#internalQuestions.length; i++) {
-      if (!kept.has(i)) this.#internalQuestions[i].reset?.();
+    for (const q of this.#internalQuestions) {
+      if (!kept.has(q)) q.reset?.();
     }
     this.#feedbackShown.clear();
     this.#submitted = false;
@@ -366,15 +395,14 @@ export class QuizEngine implements UseQuizHandle {
     this.#score = 0;
   }
 
-  #commit(index: number): void {
-    const q = this.#internalQuestions[index];
-    if (!q || typeof q.interaction !== 'function') return;
+  #commit(q: InternalQuestion): void {
+    if (typeof q.interaction !== 'function') return;
     const interaction = q.interaction();
     if (!interaction) return;
     const fingerprint = JSON.stringify(interaction);
-    if (this.#reportedAnswers.get(index) === fingerprint) return;
+    if (this.#reportedAnswers.get(q) === fingerprint) return;
     this.#deps.report(q.id, interaction, q.checkAnswer(), q.text?.());
-    this.#reportedAnswers.set(index, fingerprint);
+    this.#reportedAnswers.set(q, fingerprint);
   }
 
   /** Null when no question has a `correct` to score. */
@@ -391,57 +419,58 @@ export class QuizEngine implements UseQuizHandle {
     );
   }
 
-  #makeQuestionHandle(i: number): UseQuestionHandle {
+  #makeQuestionHandle(q: InternalQuestion): UseQuestionHandle {
     const engine = this;
     return {
-      [engine.#indexKey]: i,
+      [engine.#questionKey]: q,
       get id() {
-        return engine.#internalQuestions[i].id;
+        return q.id;
       },
       get submitted() {
         return engine.#submitted;
       },
       get correct() {
         if (engine.restored) return null;
-        if (!engine.#submitted && !engine.feedbackVisible(i)) return null;
-        return engine.#internalQuestions[i].checkAnswer();
+        if (!engine.#submitted && !engine.#feedbackVisible(q)) return null;
+        return q.checkAnswer();
       },
       get answer() {
-        return engine.getAnswer(i);
+        return engine.#answers.get(q);
       },
       get answerComplete() {
-        return engine.#answerComplete(i);
+        return engine.#answerComplete(q);
       },
       get feedbackVisible() {
-        return engine.feedbackVisible(i);
+        return engine.#feedbackVisible(q);
       },
       get locked() {
         return (
           engine.#submitted ||
-          engine.feedbackVisible(i) ||
-          engine.isLockedCorrect(i)
+          engine.#feedbackVisible(q) ||
+          engine.#lockedCorrect.has(q)
         );
       },
       get isLockedCorrect() {
-        return engine.isLockedCorrect(i);
+        return engine.#lockedCorrect.has(q);
       },
       get render() {
-        return engine.getRender(i);
+        return engine.#renders.get(q);
       },
       setAnswer(a: unknown) {
-        engine.setAnswer(i, a);
+        engine.#answered = true;
+        engine.#answers.set(q, a);
       },
       commit() {
         // A submitted answer is already reported, in this visit or an earlier one.
-        if (!engine.#submitted) engine.#commit(i);
+        if (!engine.#submitted) engine.#commit(q);
       },
       setRender(r: unknown) {
-        engine.setRender(i, r);
+        engine.#renders.set(q, r);
       },
       submit() {},
       retry() {},
       reset() {
-        engine.#internalQuestions[i].reset?.();
+        q.reset?.();
       },
       canRetry: false,
       retryCount: 0,

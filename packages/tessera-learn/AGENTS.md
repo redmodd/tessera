@@ -395,6 +395,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 - **Keep a question's `id` when you edit its prompt.** The id keys the learner's saved answer and the question's LMS record.
 - **Page markup outside the question components renders as an intro.** The built-in `<Quiz>` shows it above the current question and hides it on the results and review screens. Under `<Quiz>` prose cannot be interleaved between questions; a custom shell can (see [Recipe 2c](docs/recipes.md#recipe-2c-inline-layout-prose-between-questions)).
 - **Custom widgets register through `useQuestion`; only `useQuiz().submit()` scores the quiz.** Anything else and the LMS sees nothing.
+- **To draw questions from a pool on each attempt**, use a custom shell ([Recipe 2d](docs/recipes.md#recipe-2d-draw-questions-from-a-pool)).
 
 ### `pageConfig.quiz` fields
 

@@ -48,7 +48,7 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
       });
     }
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
-      q.setAnswer(i, '__answered__');
+      q.questions[i].setAnswer('__answered__');
     }
     q.submit();
     expect(m.ref.events).toHaveLength(1);
@@ -242,13 +242,13 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
       });
     }
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
-      q.setAnswer(i, '__answered__');
+      q.questions[i].setAnswer('__answered__');
     q.submit();
     expect(adapter.calls).toHaveLength(ALL_INTERACTION_FIXTURES.length);
 
     q.retry();
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
-      q.setAnswer(i, '__answered__');
+      q.questions[i].setAnswer('__answered__');
     q.submit();
 
     expect(m.ref.events).toHaveLength(2);
@@ -276,7 +276,7 @@ describe('Quiz orchestration → LMS bridge compliance', () => {
       });
     }
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++)
-      q.setAnswer(i, '__answered__');
+      q.questions[i].setAnswer('__answered__');
     q.submit();
     for (let i = 0; i < ALL_INTERACTION_FIXTURES.length; i++) {
       const f = ALL_INTERACTION_FIXTURES[i];

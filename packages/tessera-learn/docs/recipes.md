@@ -258,6 +258,62 @@ Render `children` visibly, never call `q.render()`, and let widgets render their
 
 Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
 
+## Recipe 2d: Draw questions from a pool
+
+The page draws its questions when it mounts. The shell remounts the page body on Retry, so each attempt draws a new set.
+
+```svelte
+<!-- quiz.svelte: Recipe 2's shell, with Retry bumping a key around children -->
+<script>
+  let draw = $state(0);
+
+  function retry() {
+    quiz.retry();
+    draw++;
+  }
+</script>
+
+{#if quiz.canRetry}<button onclick={retry}>Retry</button>{/if}
+
+<div style="display:none">
+  {#key draw}{@render children?.()}{/key}
+</div>
+```
+
+```svelte
+<!-- pages/03-check/01-quiz.svelte -->
+<script module>
+  export const pageConfig = {
+    title: 'Knowledge Check',
+    quiz: { graded: true, maxAttempts: 3 },
+  };
+</script>
+
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+  import { pool } from './pool.js'; // [{ key, prompt, options, correct }]
+
+  const drawn = [...pool];
+  for (let i = drawn.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [drawn[i], drawn[j]] = [drawn[j], drawn[i]];
+  }
+</script>
+
+{#each drawn.slice(0, 5) as item (item.key)}
+  <MultipleChoice
+    id={item.key}
+    question={item.prompt}
+    options={item.options}
+    correct={item.correct}
+  />
+{/each}
+```
+
+- **Give each question the id of its pool item**, not its slot (`q_1`). The LMS groups answers by id, so a slot id would mix answers to different questions.
+- **A redraw replaces every question**, so `retryMode: 'incorrect-only'` has nothing to keep.
+- **Saved answers are keyed by id.** A return visit draws again, so the result comes back with `restored` true (score, no review) unless it draws the same ids.
+
 ## Recipe 3: Graded standalone question
 
 A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`. With no `correct` and no `score()`, it is left out of the page score, as in a quiz. Course success rolls up across every declared graded page, quiz and standalone pages alike.

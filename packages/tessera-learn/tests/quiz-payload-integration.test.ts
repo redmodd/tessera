@@ -41,6 +41,7 @@ function makeQuizCtx() {
         setRender() {},
       };
     },
+    unregisterQuestion() {},
   };
   return { quiz, registrations };
 }

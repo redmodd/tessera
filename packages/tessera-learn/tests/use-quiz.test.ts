@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Interaction } from '../src/runtime/interaction.js';
 import type { QuizConfig } from '../src/runtime/types.js';
 import { QuizEngine } from '../src/runtime/quiz-engine.svelte.js';
+import type { UseQuestionHandle } from '../src/runtime/hooks.svelte.js';
 import { flush } from './helpers.js';
 import { mountHarness } from './helpers/mount.js';
 
@@ -103,7 +104,7 @@ describe('QuizEngine', () => {
       ...tfQuestion('a', true, true),
       reset,
     });
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
 
     expect(q.mode).toBe('quiz');
     expect(q.canRetry).toBe(false);
@@ -146,9 +147,9 @@ describe('QuizEngine', () => {
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.registerQuestion(tfQuestion('b', true, true));
     expect(engine.canSubmit).toBe(false);
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     expect(engine.canSubmit).toBe(false);
-    engine.setAnswer(1, true);
+    engine.questions[1].setAnswer(true);
     expect(engine.canSubmit).toBe(true);
   });
 
@@ -160,8 +161,8 @@ describe('QuizEngine', () => {
       complete: () => filled === 2,
     });
     engine.registerQuestion(tfQuestion('b', true, true));
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, true);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(true);
     expect(engine.canSubmit).toBe(false);
     filled = 2;
     expect(engine.canSubmit).toBe(true);
@@ -171,8 +172,8 @@ describe('QuizEngine', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true)); // correct
     engine.registerQuestion(tfQuestion('b', false, true)); // wrong
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
 
     engine.submit();
 
@@ -203,8 +204,8 @@ describe('QuizEngine', () => {
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.registerQuestion(tfQuestion('b', false, true));
 
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
     expect(reports).toHaveLength(0);
 
     engine.questions[0].commit();
@@ -226,7 +227,7 @@ describe('QuizEngine', () => {
       ...tfQuestion('a', true, true),
       text: () => 'Is the sky blue?',
     });
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(reports[0].text).toBe('Is the sky blue?');
   });
@@ -235,8 +236,8 @@ describe('QuizEngine', () => {
     const { engine, reports } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.registerQuestion(tfQuestion('b', false, true));
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
     engine.submit();
     expect(reports.map((r) => r.id)).toEqual(['a', 'b']);
   });
@@ -244,7 +245,7 @@ describe('QuizEngine', () => {
   it('does not re-report a question whose answer was already committed before submit', () => {
     const { engine, reports } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.questions[0].commit();
     engine.submit();
     expect(reports.map((r) => r.id)).toEqual(['a']);
@@ -254,16 +255,16 @@ describe('QuizEngine', () => {
     const { engine, reports } = makeEngine();
     engine.registerQuestion({
       id: 'a',
-      checkAnswer: () => engine.getAnswer(0) === true,
+      checkAnswer: () => engine.questions[0].answer === true,
       interaction: () => ({
         type: 'true-false',
-        response: engine.getAnswer(0) === true,
+        response: engine.questions[0].answer === true,
         correct: true,
       }),
     });
-    engine.setAnswer(0, false);
+    engine.questions[0].setAnswer(false);
     engine.questions[0].commit();
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.questions[0].commit();
     expect(reports.map((r) => [r.id, r.correct])).toEqual([
       ['a', false],
@@ -274,7 +275,7 @@ describe('QuizEngine', () => {
   it('is a no-op when commit() is called twice with the same answer', () => {
     const { engine, reports } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.questions[0].commit();
     engine.questions[0].commit();
     expect(reports.map((r) => r.id)).toEqual(['a']);
@@ -283,7 +284,7 @@ describe('QuizEngine', () => {
   it('submit() is the only sanctioned dispatcher — calling twice does not double-fire', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     engine.submit();
     expect(completes(events)).toHaveLength(1);
@@ -293,7 +294,7 @@ describe('QuizEngine', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.registerQuestion(tfQuestion('b', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(completes(events)).toHaveLength(0);
     expect(engine.state).toBe('answering');
@@ -303,8 +304,8 @@ describe('QuizEngine', () => {
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
     engine.registerQuestion(tfQuestion('b', false, true));
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
     engine.submit();
 
     expect(engine.questions[0].correct).toBe(true);
@@ -316,7 +317,7 @@ describe('QuizEngine', () => {
   it('startReview / exitReview toggle the reviewing sub-state', () => {
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(engine.state).toBe('submitted');
     engine.startReview();
@@ -328,7 +329,7 @@ describe('QuizEngine', () => {
   it('startReview is a no-op before submit', () => {
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.startReview();
     expect(engine.state).toBe('answering');
   });
@@ -336,27 +337,27 @@ describe('QuizEngine', () => {
   it('retry() resets state and bumps attemptCount', () => {
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(engine.attemptCount).toBe(1);
     expect(engine.canRetry).toBe(true);
     engine.retry();
     expect(engine.state).toBe('answering');
     expect(engine.score).toBe(0);
-    expect(engine.getAnswer(0)).toBeUndefined();
+    expect(engine.questions[0].answer).toBeUndefined();
   });
 
   it('canRetry respects maxAttempts', () => {
     const { engine } = makeEngine({ graded: true, maxAttempts: 2 });
     engine.registerQuestion(tfQuestion('a', false, true));
-    engine.setAnswer(0, false);
+    engine.questions[0].setAnswer(false);
 
     engine.submit();
     expect(engine.attemptCount).toBe(1);
     expect(engine.canRetry).toBe(true);
 
     engine.retry();
-    engine.setAnswer(0, false);
+    engine.questions[0].setAnswer(false);
     engine.submit();
     expect(engine.attemptCount).toBe(2);
     expect(engine.canRetry).toBe(false);
@@ -385,14 +386,14 @@ describe('QuizEngine', () => {
     };
     const { engine } = makeEngine({ graded: true, maxAttempts: 3 });
     engine.registerQuestion(swingQuestion);
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(engine.score).toBe(100);
     expect(engine.bestScore).toBe(100);
 
     correct = false;
     engine.retry();
-    engine.setAnswer(0, false);
+    engine.questions[0].setAnswer(false);
     engine.submit();
     expect(engine.score).toBe(0);
     expect(engine.bestScore).toBe(100);
@@ -407,7 +408,7 @@ describe('QuizEngine', () => {
     expect(engine.bestScore).toBe(80);
 
     engine.retry();
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(engine.score).toBe(0);
     expect(engine.bestScore).toBe(80);
@@ -447,7 +448,7 @@ describe('QuizEngine', () => {
       engine.retry();
       expect(engine.restored).toBe(false);
       expect(engine.state).toBe('answering');
-      engine.setAnswer(0, true);
+      engine.questions[0].setAnswer(true);
       engine.submit();
       expect(engine.attemptCount).toBe(2);
       expect(completeScore(events)).toBe(100);
@@ -480,8 +481,8 @@ describe('QuizEngine', () => {
         const restore = () => {};
         engine.registerQuestion({ ...tfQuestion('a', true, true), restore });
         engine.registerQuestion({ ...tfQuestion('b', false, true), restore });
-        engine.setAnswer(0, true);
-        engine.setAnswer(1, false);
+        engine.questions[0].setAnswer(true);
+        engine.questions[1].setAnswer(false);
         engine.submit();
 
         expect(responses).toEqual([{ a: true, b: false }]);
@@ -499,8 +500,8 @@ describe('QuizEngine', () => {
             restore: () => {},
           });
           engine.registerQuestion(tfQuestion('b', true, true));
-          engine.setAnswer(0, true);
-          engine.setAnswer(1, true);
+          engine.questions[0].setAnswer(true);
+          engine.questions[1].setAnswer(true);
           engine.submit();
 
           expect(responses).toEqual([saved]);
@@ -553,11 +554,7 @@ describe('QuizEngine', () => {
         );
         engine.registerQuestion(widget('a', true));
 
-        expect(engine.stats).toEqual({
-          questionsCount: 1,
-          answersCount: 1,
-          submitCalled: true,
-        });
+        expect(engine.stats.submitCalled).toBe(true);
       });
 
       it('reports nothing when a restored question commits', () => {
@@ -638,7 +635,7 @@ describe('QuizEngine', () => {
         expect(engine.canSubmit).toBe(false);
 
         b.restore!(true);
-        engine.setAnswer(1, true);
+        engine.questions[1].setAnswer(true);
         engine.submit();
         expect(engine.score).toBe(100);
         expect(responses).toEqual([{ a: true, b: true }]);
@@ -711,15 +708,15 @@ describe('QuizEngine', () => {
         correct: true,
       }),
     });
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
     engine.submit();
 
     engine.retry();
-    expect(engine.isLockedCorrect(0)).toBe(true);
-    expect(engine.isLockedCorrect(1)).toBe(false);
-    expect(engine.getAnswer(0)).toBe(true);
-    expect(engine.getAnswer(1)).toBeUndefined();
+    expect(engine.questions[0].isLockedCorrect).toBe(true);
+    expect(engine.questions[1].isLockedCorrect).toBe(false);
+    expect(engine.questions[0].answer).toBe(true);
+    expect(engine.questions[1].answer).toBeUndefined();
   });
 
   it('full retry (default) clears every answer and resets every question', () => {
@@ -728,25 +725,25 @@ describe('QuizEngine', () => {
     const resetB = vi.fn();
     engine.registerQuestion({ ...tfQuestion('a', true, true), reset: resetA });
     engine.registerQuestion({ ...tfQuestion('b', true, true), reset: resetB });
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, true);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(true);
     engine.submit();
 
     engine.retry();
     expect(resetA).toHaveBeenCalledTimes(1);
     expect(resetB).toHaveBeenCalledTimes(1);
-    expect(engine.getAnswer(0)).toBeUndefined();
-    expect(engine.getAnswer(1)).toBeUndefined();
+    expect(engine.questions[0].answer).toBeUndefined();
+    expect(engine.questions[1].answer).toBeUndefined();
   });
 
   it('revealFeedback flips feedbackVisible for a question', () => {
     const { engine } = makeEngine({ graded: true, feedbackMode: 'immediate' });
     const a = engine.registerQuestion(tfQuestion('a', true, true));
     expect(a.feedbackVisible).toBe(false);
-    expect(engine.feedbackVisible(0)).toBe(false);
+    expect(engine.questions[0].feedbackVisible).toBe(false);
     engine.revealFeedback(a);
     expect(a.feedbackVisible).toBe(true);
-    expect(engine.feedbackVisible(0)).toBe(true);
+    expect(engine.questions[0].feedbackVisible).toBe(true);
   });
 
   it('revealFeedback resolves a proxied copy of a handle', () => {
@@ -754,7 +751,7 @@ describe('QuizEngine', () => {
     const a = engine.registerQuestion(tfQuestion('a', true, true));
     const proxied = new Proxy(a, {});
     engine.revealFeedback(proxied);
-    expect(engine.feedbackVisible(0)).toBe(true);
+    expect(engine.questions[0].feedbackVisible).toBe(true);
   });
 
   it('revealFeedback ignores a handle from another engine with the same id', () => {
@@ -763,7 +760,7 @@ describe('QuizEngine', () => {
     engine.registerQuestion(tfQuestion('a', true, true));
     const foreign = other.engine.registerQuestion(tfQuestion('a', true, true));
     engine.revealFeedback(foreign);
-    expect(engine.feedbackVisible(0)).toBe(false);
+    expect(engine.questions[0].feedbackVisible).toBe(false);
   });
 
   it('correct is a boolean once feedback is visible, before submit', () => {
@@ -778,12 +775,12 @@ describe('QuizEngine', () => {
     expect(b.correct).toBe(false);
   });
 
-  it('setRender stores the snippet returned via getRender', () => {
+  it('a handle renders the snippet passed to setRender', () => {
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
     const snippet = () => 'rendered';
-    engine.setRender(0, snippet);
-    expect(engine.getRender(0)).toBe(snippet);
+    (engine.questions[0] as UseQuestionHandle).setRender(snippet);
+    expect(engine.questions[0].render).toBe(snippet);
   });
 
   it('reportInteraction skips questions that do not expose interaction()', () => {
@@ -794,8 +791,8 @@ describe('QuizEngine', () => {
       checkAnswer: () => true,
       interaction: undefined as unknown as () => Interaction,
     });
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, true);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(true);
     engine.submit();
 
     expect(reports.map((r) => [r.id, r.interaction, r.correct])).toEqual([
@@ -826,8 +823,8 @@ describe('QuizEngine', () => {
         correct: true,
       }),
     });
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
     engine.submit();
     expect(completeScore(events)).toBe(75);
   });
@@ -836,8 +833,8 @@ describe('QuizEngine', () => {
     const { engine, events, reports } = makeEngine();
     const a = engine.registerQuestion(tfQuestion('a', true, true));
     const b = engine.registerQuestion({ ...surveyQuestion('b'), weight: 3 });
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, 'x');
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer('x');
     engine.submit();
 
     expect(completeScore(events)).toBe(100);
@@ -854,7 +851,7 @@ describe('QuizEngine', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine, events } = makeEngine({ graded: true });
     engine.registerQuestion(surveyQuestion('a'));
-    engine.setAnswer(0, 'x');
+    engine.questions[0].setAnswer('x');
     engine.submit();
     expect(completes(events)[0].detail).toEqual({ score: 100, scored: false });
     expect(engine.scored).toBe(false);
@@ -870,13 +867,13 @@ describe('QuizEngine', () => {
       ...surveyQuestion('a'),
       checkAnswer: () => result,
     });
-    engine.setAnswer(0, 'x');
+    engine.questions[0].setAnswer('x');
     engine.submit();
     expect(engine.bestScore).toBe(0);
 
     result = null;
     engine.retry();
-    engine.setAnswer(0, 'x');
+    engine.questions[0].setAnswer('x');
     engine.submit();
     expect(engine.score).toBe(100);
     expect(engine.bestScore).toBe(0);
@@ -889,7 +886,7 @@ describe('QuizEngine', () => {
     );
     engine.registerQuestion(tfQuestion('a', true, false));
     engine.retry();
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(engine.bestScore).toBe(0);
   });
@@ -906,7 +903,7 @@ describe('QuizEngine', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine({ graded: false });
     engine.registerQuestion(surveyQuestion('a'));
-    engine.setAnswer(0, 'x');
+    engine.questions[0].setAnswer('x');
     engine.submit();
     expect(warn).not.toHaveBeenCalled();
   });
@@ -926,16 +923,16 @@ describe('QuizEngine', () => {
       ...tfQuestion('b', false, true),
       reset: wrongReset,
     });
-    engine.setAnswer(0, 'x');
-    engine.setAnswer(1, false);
+    engine.questions[0].setAnswer('x');
+    engine.questions[1].setAnswer(false);
     engine.submit();
 
     engine.retry();
-    expect(engine.getAnswer(0)).toBe('x');
+    expect(engine.questions[0].answer).toBe('x');
     expect(kept.locked).toBe(false);
     expect(kept.isLockedCorrect).toBe(false);
     expect(keptReset).not.toHaveBeenCalled();
-    expect(engine.getAnswer(1)).toBeUndefined();
+    expect(engine.questions[1].answer).toBeUndefined();
     expect(wrongReset).toHaveBeenCalledTimes(1);
   });
 
@@ -944,9 +941,9 @@ describe('QuizEngine', () => {
     engine.registerQuestion(tfQuestion('a', true, true)); // correct
     engine.registerQuestion(tfQuestion('b', false, true)); // wrong
     engine.registerQuestion(tfQuestion('c', true, true)); // correct
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, false);
-    engine.setAnswer(2, true);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(false);
+    engine.questions[2].setAnswer(true);
     engine.submit();
     expect(completeScore(events)).toBe(66.67);
   });
@@ -954,7 +951,7 @@ describe('QuizEngine', () => {
   it('tessera-quiz-complete is the only event the engine dispatches', () => {
     const { engine, events } = makeEngine();
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     engine.retry();
     expect(events.map((e) => e.name)).toEqual(['tessera-quiz-complete']);
@@ -963,22 +960,22 @@ describe('QuizEngine', () => {
   it("feedbackMode 'review' (default) hides feedback until review", () => {
     const { engine } = makeEngine({ graded: true });
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
-    engine.revealFeedbackByIndex(0);
-    expect(engine.feedbackVisible(0)).toBe(false);
+    engine.questions[0].setAnswer(true);
+    engine.revealFeedback(engine.questions[0]);
+    expect(engine.questions[0].feedbackVisible).toBe(false);
     engine.submit();
     engine.startReview();
-    expect(engine.feedbackVisible(0)).toBe(true);
+    expect(engine.questions[0].feedbackVisible).toBe(true);
   });
 
   it("feedbackMode 'never' keeps feedback hidden even while reviewing", () => {
     const { engine } = makeEngine({ graded: true, feedbackMode: 'never' });
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
-    engine.revealFeedbackByIndex(0);
+    engine.questions[0].setAnswer(true);
+    engine.revealFeedback(engine.questions[0]);
     engine.submit();
     engine.startReview();
-    expect(engine.feedbackVisible(0)).toBe(false);
+    expect(engine.questions[0].feedbackVisible).toBe(false);
   });
 
   it('commits on reveal with no element bound', () => {
@@ -987,7 +984,7 @@ describe('QuizEngine', () => {
       { noElement: true },
     );
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.questions[0].commit();
     expect(reports.map((r) => r.id)).toEqual(['a']);
   });
@@ -998,12 +995,12 @@ describe('QuizEngine', () => {
       feedbackMode: 'immediate',
     });
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.questions[0].commit();
     expect(reports.map((r) => r.id)).toEqual(['a']);
   });
 
-  it('rewrites a duplicate question id instead of registering it twice', () => {
+  it('rewrites a duplicate question id instead of registering it twice', async () => {
     // The shell keys its {#each} on the id, and Svelte throws on a duplicate key
     // in production as well as dev, so a collision has to be made unique.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -1016,12 +1013,13 @@ describe('QuizEngine', () => {
       'dup-2',
       'dup-3',
     ]);
+    await Promise.resolve();
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/duplicate question id/i),
     );
   });
 
-  it('warns that a rewritten id took an id a later question owns', () => {
+  it('warns that a rewritten id took an id a later question owns', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine();
     engine.registerQuestion(tfQuestion('dup', true, true));
@@ -1032,6 +1030,7 @@ describe('QuizEngine', () => {
       'dup-2',
       'dup-2-2',
     ]);
+    await Promise.resolve();
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/is already taken by an earlier/),
     );
@@ -1042,10 +1041,79 @@ describe('QuizEngine', () => {
     const { engine, reports } = makeEngine();
     engine.registerQuestion(tfQuestion('dup', true, true));
     engine.registerQuestion(tfQuestion('dup', true, true));
-    engine.setAnswer(0, true);
-    engine.setAnswer(1, true);
+    engine.questions[0].setAnswer(true);
+    engine.questions[1].setAnswer(true);
     engine.submit();
     expect(reports.map((r) => r.id)).toEqual(['dup', 'dup-2']);
+  });
+
+  describe('a question that unmounts', () => {
+    it('hands its id to a replacement mounted before it left, without a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { engine } = makeEngine();
+      const old = engine.registerQuestion(tfQuestion('a', true, true));
+      const next = engine.registerQuestion(tfQuestion('a', true, true));
+      expect(next.id).toBe('a-2');
+
+      engine.unregisterQuestion(old);
+      await Promise.resolve();
+      expect(next.id).toBe('a');
+      expect(engine.questions).toEqual([next]);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('leaves the quiz with its answer while answering, freeing its id', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { engine, completed, reports } = makeEngine();
+      const a = engine.registerQuestion(tfQuestion('a', true, true));
+      engine.registerQuestion(tfQuestion('b', false, true));
+      a.setAnswer(true);
+
+      engine.unregisterQuestion(a);
+      expect(engine.questions.map((q) => q.id)).toEqual(['b']);
+      const again = engine.registerQuestion(tfQuestion('a', true, true));
+      expect(again.id).toBe('a');
+      expect(again.answer).toBeUndefined();
+      expect(engine.canSubmit).toBe(false);
+      expect(warn).not.toHaveBeenCalled();
+
+      engine.questions[0].setAnswer(false);
+      again.setAnswer(true);
+      engine.submit();
+      expect(completed).toEqual([50]);
+      expect(reports.map((r) => r.id)).toEqual(['b', 'a']);
+    });
+
+    it('keeps its result after submit until retry() replaces the set', () => {
+      const { engine, completed, reports } = makeEngine({
+        graded: true,
+        retryMode: 'incorrect-only',
+      });
+      const old = [
+        engine.registerQuestion(tfQuestion('a', true, true)),
+        engine.registerQuestion(tfQuestion('b', false, true)),
+      ];
+      old[0].setAnswer(true);
+      old[1].setAnswer(false);
+      engine.submit();
+
+      for (const q of old) engine.unregisterQuestion(q);
+      expect(engine.questions.map((q) => q.correct)).toEqual([true, false]);
+      expect(engine.score).toBe(50);
+
+      engine.retry();
+      expect(engine.questions).toEqual([]);
+      const next = [
+        engine.registerQuestion(tfQuestion('c', true, true)),
+        engine.registerQuestion(tfQuestion('a', true, true)),
+      ];
+      expect(next.map((q) => q.id)).toEqual(['c', 'a']);
+      expect(next.map((q) => q.locked)).toEqual([false, false]);
+      for (const q of next) q.setAnswer(true);
+      engine.submit();
+      expect(completed).toEqual([50, 100]);
+      expect(reports.map((r) => r.id)).toEqual(['a', 'b', 'c', 'a']);
+    });
   });
 
   it('stays quiet about incomplete answers when no question registered', () => {
@@ -1063,7 +1131,7 @@ describe('QuizEngine', () => {
       { noElement: true },
     );
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(completed).toEqual([100]);
     expect(reports.map((r) => r.id)).toEqual(['a']);
@@ -1072,11 +1140,11 @@ describe('QuizEngine', () => {
   it('calls onComplete once per attempt', () => {
     const { engine, completed } = makeEngine({ graded: true, maxAttempts: 2 });
     engine.registerQuestion(tfQuestion('a', true, true));
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     engine.submit();
     engine.retry();
-    engine.setAnswer(0, true);
+    engine.questions[0].setAnswer(true);
     engine.submit();
     expect(completed).toEqual([100, 100]);
   });
@@ -1107,7 +1175,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     const m = mountHarness({ graded: true, maxAttempts: 1 });
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
-    q.setAnswer(0, true);
+    q.questions[0].setAnswer(true);
     q.submit();
     expect(q.canRetry).toBe(false);
   });
@@ -1138,7 +1206,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     );
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
-    q.setAnswer(0, true);
+    q.questions[0].setAnswer(true);
     q.submit();
     expect(scored).toEqual([[3, 100]]);
     expect(m.ref.events).toHaveLength(0);
@@ -1148,7 +1216,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     const m = mountHarness({ graded: true });
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
-    q.setAnswer(0, true);
+    q.questions[0].setAnswer(true);
     q.submit();
     expect(m.ref.events).toEqual([{ score: 100, scored: true }]);
   });
@@ -1168,7 +1236,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     const m = mountHarness({ graded: true });
     const q = m.ref.handle!;
     q.registerQuestion(tfQuestion('a', true, true));
-    q.setAnswer(0, true);
+    q.questions[0].setAnswer(true);
     await flush();
     m.unmount();
     expect(warn).toHaveBeenCalledWith(
@@ -1181,7 +1249,7 @@ describe('useQuiz (Svelte wrapper)', () => {
     [
       'the quiz was submitted',
       (q: QuizEngine) => {
-        q.setAnswer(0, true);
+        q.questions[0].setAnswer(true);
         q.submit();
       },
     ],
