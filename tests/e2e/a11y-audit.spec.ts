@@ -154,8 +154,9 @@ export default {};
         res.setHeader('Content-Type', 'text/javascript');
         return res.end('');
       }
-      if (req.url === '/data') {
-        await new Promise((r) => setTimeout(r, 5000));
+      if (req.url?.startsWith('/data?')) {
+        const ms = Number(req.url.slice('/data?'.length));
+        await new Promise((r) => setTimeout(r, ms));
         res.setHeader('Access-Control-Allow-Origin', '*');
         return res.end('{}');
       }
@@ -182,19 +183,21 @@ export default {};
         resolve(dir, 'pages/01-assessment/_meta.js'),
         `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice', 'frames-last'] };`,
       );
-      // The page renders a button only after a slow fetch. "Asset" parses its
-      // button only after a slow script loads; "Poll" keeps the network busy.
-      // "Unloaded" is a lazy Video below the fold: still about:blank, so
-      // same-origin. "Below" is a lazy same-origin frame the audit loads.
+      // The page renders a button only after a slow fetch, and "Fetch" after
+      // a slower one. "Asset" parses its button only after a slow script
+      // loads; "Poll" keeps the network busy. "Unloaded" is a lazy Video below
+      // the fold: still about:blank, so same-origin. "Below" is a lazy
+      // same-origin frame the audit loads, holding a lazy frame of its own.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <script>
   let late = $state(false);
-  fetch('${embedUrl}data').then(() => (late = true));
+  fetch('${embedUrl}data?5000').then(() => (late = true));
 </script>
 <h1>Frames</h1>
 {#if late}<button></button>{/if}
 <iframe title="Local" srcdoc="<button></button>"></iframe>
 <iframe title="Asset" src="./sim.html"></iframe>
+<iframe title="Fetch" src="./fetch.html"></iframe>
 <iframe title="Poll" srcdoc="<script>setInterval(() => fetch('/poll'), 200)</script>"></iframe>
 <iframe title="Sandboxed" sandbox="allow-scripts" srcdoc="<button></button>"></iframe>
 <iframe title="Embed" src="${embedUrl}"></iframe>
@@ -202,12 +205,20 @@ export default {};
 <iframe srcdoc="<p>Untitled</p>"></iframe>
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
-<iframe title="Below" loading="lazy" src="./sim.html"></iframe>
+<iframe title="Below" loading="lazy" src="./nest.html"></iframe>
 `;
       mkdirSync(resolve(dir, 'public'), { recursive: true });
       writeFileSync(
         resolve(dir, 'public/sim.html'),
         `<!doctype html><title>Sim</title><script src="${embedUrl}slow.js"></script><button></button>`,
+      );
+      writeFileSync(
+        resolve(dir, 'public/fetch.html'),
+        `<!doctype html><title>Fetch</title><script>fetch('${embedUrl}data?7000').then(() => document.body.append(document.createElement('button')))</script>`,
+      );
+      writeFileSync(
+        resolve(dir, 'public/nest.html'),
+        `<!doctype html><title>Nest</title><div style="height: 30000px"></div><iframe title="Deep" loading="lazy" src="./sim.html"></iframe>`,
       );
       for (const name of ['frames', 'frames-last']) {
         writeFileSync(
@@ -228,7 +239,7 @@ export default {};
               v.nodes,
             ]),
           ),
-        ).toEqual({ 'button-name': 5, 'frame-title': 1 });
+        ).toEqual({ 'button-name': 6, 'frame-title': 1 });
       }
     } finally {
       embed.close();

@@ -128,9 +128,14 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
 
 // A node inside a cross-origin frame is a third-party embed's markup (Video's
 // YouTube or Vimeo player) that the author can't fix. The <iframe> stays checked.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
-  const courseOrigin = new URL(page.url()).origin;
+async function dropCrossOriginNodes(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  results: any[],
+  courseOrigin: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
   const verdicts = new Map<string, Promise<boolean>>();
   const inCrossOriginFrame = (
     frames: (string | string[])[],
@@ -185,14 +190,22 @@ async function crossesOrigin(
   return false;
 }
 
-// Judged by the frame's URL: an about: or data: frame holds the course's markup
-// even when sandboxed; Chrome's error page for a failed embed does not.
+// An about: or data: frame holds the course's markup even when sandboxed;
+// Chrome's error page for a failed embed (chrome-error:) does not.
 function isCrossOrigin(href: string, courseOrigin: string): boolean {
   const url = URL.parse(href);
   if (!url || url.protocol === 'about:' || url.protocol === 'data:') {
     return false;
   }
   return url.origin !== courseOrigin;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function underCrossOrigin(frame: any, courseOrigin: string): boolean {
+  for (; frame; frame = frame.parentFrame()) {
+    if (isCrossOrigin(frame.url(), courseOrigin)) return true;
+  }
+  return false;
 }
 
 export function isMissingBrowserError(message: string): boolean {
@@ -490,81 +503,118 @@ export async function runAudit(
       const auditUrl = new URL(baseUrl);
       auditUrl.searchParams.set('__tessera_audit', '1');
 
+      const courseOrigin = auditUrl.origin;
+
       // Playwright's networkidle can't be awaited again after in-app
-      // navigation (#442), so track the main frame's requests to catch content
-      // a page renders after a fetch.
-      let pendingRequests = 0;
-      let lastRequestAt = 0;
+      // navigation (#442), so track requests to catch content a page renders
+      // after a fetch. Only main-frame requests must also go quiet for 500ms:
+      // a polling frame's requests are rarely in flight, so it can't hold the
+      // audit. A frame's own document is waited on by frameLoaded.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const countRequest = (delta: number) => (request: any) => {
+      const pending = new Set<any>();
+      let lastRequestAt = 0;
+      let lastRequestUrl = '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      page.on('request', (request: any) => {
+        // An EventSource never finishes; networkidle ignores it too.
+        if (request.resourceType() === 'eventsource') return;
+        let frame;
         try {
-          if (request.frame() !== page.mainFrame()) return;
+          frame = request.frame();
         } catch {
           return; // A service worker request has no frame.
         }
-        pendingRequests += delta;
-        lastRequestAt = Date.now();
-      };
-      page.on('request', countRequest(1));
-      page.on('requestfinished', countRequest(-1));
-      page.on('requestfailed', countRequest(-1));
-      const mainFrameIdle = async () => {
-        const deadline = Date.now() + 10_000;
-        while (
-          Date.now() < deadline &&
-          (pendingRequests > 0 || Date.now() - lastRequestAt < 500)
+        if (frame === page.mainFrame()) {
+          lastRequestAt = Date.now();
+          lastRequestUrl = request.url();
+        } else if (
+          request.isNavigationRequest() ||
+          underCrossOrigin(frame, courseOrigin)
         ) {
-          await delay(100);
+          return;
         }
-      };
+        pending.add(request);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const settled = (request: any) => pending.delete(request);
+      page.on('requestfinished', settled);
+      page.on('requestfailed', settled);
+      const networkBusy = () =>
+        pending.size > 0 || Date.now() - lastRequestAt < 500;
 
       await page.goto(auditUrl.href);
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
-      const courseOrigin = new URL(page.url()).origin;
 
       const scan = async (): Promise<AxeViolation[]> => {
         const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
         const found = auditFindings(await builder.analyze());
-        return (await dropCrossOriginNodes(page, found)).map(mapViolation);
+        return (await dropCrossOriginNodes(page, found, courseOrigin)).map(
+          mapViolation,
+        );
       };
 
       // A frame the page just added may still be loading, and axe would scan
       // its half-parsed document. A lazy frame loads only near the viewport,
       // so it is made eager. Cross-origin frames go unscanned, so no wait.
-      const framesLoaded = (title: string) =>
-        Promise.all(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          page.frames().map(async (frame: any) => {
-            if (frame === page.mainFrame()) return;
-            const el = await frame.frameElement().catch(() => null);
-            if (!el) return;
-            const src: string | undefined = await el
-              .evaluate((iframe: HTMLIFrameElement) =>
-                iframe.hasAttribute('srcdoc') ? '' : iframe.src,
-              )
-              .catch(() => undefined);
-            const local =
-              src !== undefined && !isCrossOrigin(src, courseOrigin);
-            if (local) {
-              await el
-                .evaluate((iframe: HTMLIFrameElement) => {
-                  if (iframe.loading === 'lazy') iframe.loading = 'eager';
-                })
-                .catch(() => {});
-            }
-            await el.dispose();
-            if (!local) return;
-            await frame
-              .waitForLoadState('load', { timeout: 10_000 })
-              .catch((err: Error) => {
-                if (err.name !== 'TimeoutError') return;
-                console.warn(
-                  `${stderrTag('yellow')} ${title}: a frame (${src || 'srcdoc'}) didn't load within 10s; scanned it as it was.`,
-                );
-              });
-          }),
-        );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const frameLoaded = async (frame: any, title: string) => {
+        if (frame === page.mainFrame()) return;
+        if (underCrossOrigin(frame.parentFrame(), courseOrigin)) return;
+        const el = await frame.frameElement().catch(() => null);
+        if (!el) return;
+        // A lazy frame is still about:blank, so judge it by what it will load.
+        const src: string | undefined = await el
+          .evaluate((iframe: HTMLIFrameElement) =>
+            iframe.hasAttribute('srcdoc')
+              ? 'about:srcdoc'
+              : iframe.src || 'about:blank',
+          )
+          .catch(() => undefined);
+        const local = src !== undefined && !isCrossOrigin(src, courseOrigin);
+        if (local) {
+          await el
+            .evaluate((iframe: HTMLIFrameElement) => {
+              if (iframe.loading === 'lazy') iframe.loading = 'eager';
+            })
+            .catch(() => {});
+        }
+        await el.dispose();
+        if (!local) return;
+        await frame
+          .waitForLoadState('load', { timeout: 10_000 })
+          .catch((err: Error) => {
+            if (err.name !== 'TimeoutError') return;
+            console.warn(
+              `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within 10s; scanned it as it was.`,
+            );
+          });
+      };
+
+      // Each pass reaches frames one level deeper: a loaded frame can hold
+      // lazy frames of its own and start requests.
+      const settle = async (title: string) => {
+        const deadline = Date.now() + 10_000;
+        const seen = new Set<unknown>();
+        let busy = false;
+        for (let depth = 0; depth < 5; depth++) {
+          while ((busy = networkBusy()) && Date.now() < deadline) {
+            await delay(100);
+          }
+          const fresh = page.frames().filter((f: unknown) => !seen.has(f));
+          if (fresh.length === 0) break;
+          for (const frame of fresh) seen.add(frame);
+          await Promise.all(
+            fresh.map((frame: unknown) => frameLoaded(frame, title)),
+          );
+        }
+        if (busy) {
+          const [request] = pending;
+          console.warn(
+            `${stderrTag('yellow')} ${title}: the network was still busy after 10s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
+          );
+        }
+      };
 
       const recordPage = async (
         index: number,
@@ -594,9 +644,9 @@ export async function runAudit(
           i,
           { timeout: 20_000 },
         );
-        await mainFrameIdle();
-        await framesLoaded(title);
+        await settle(title);
         pages.push(await recordPage(i, title));
+        pending.clear();
       }
     } finally {
       await browser.close();
