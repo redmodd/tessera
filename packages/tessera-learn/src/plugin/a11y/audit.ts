@@ -505,18 +505,15 @@ export async function runAudit(
 
       const courseOrigin = auditUrl.origin;
 
-      // Playwright's networkidle can't be awaited again after in-app
-      // navigation (#442), so track requests to catch content a page renders
-      // after a fetch. Only the main frame must also go 500ms without a
-      // request starting or finishing: a polling frame's requests are rarely
-      // in flight, so it can't hold the audit.
+      // networkidle can't be awaited again after in-app navigation (#442).
+      // Only main-frame requests start the 500ms quiet window, so a polling
+      // frame can't hold the audit.
       const pending = new Set<Request>();
       let lastRequestAt = 0;
       let lastRequestUrl = '';
       page.on('request', (request: Request) => {
-        // An EventSource never finishes; networkidle ignores it too. Chromium
-        // holds a preload="auto" media request open while it buffers, and
-        // media never changes the markup axe scans.
+        // An EventSource never finishes, and Chromium holds a preload="auto"
+        // media request open while it buffers.
         if (['eventsource', 'media'].includes(request.resourceType())) return;
         const frame = request.frame();
         if (frame === page.mainFrame()) {
@@ -553,40 +550,40 @@ export async function runAudit(
         );
       };
 
-      // A frame the page just added may still be loading, and axe would scan
-      // its half-parsed document. A lazy frame loads only near the viewport,
-      // so it is made eager. Cross-origin frames go unscanned, so no wait.
+      // A lazy frame loads only near the viewport, so it is made eager.
       const frameLoaded = async (
         frame: Frame,
         title: string,
         deadline: number,
       ) => {
-        if (frame === page.mainFrame()) return;
-        if (underCrossOrigin(frame, courseOrigin)) return;
         const el = await frame.frameElement().catch(() => null);
         if (!el) return;
         // A lazy frame is still about:blank, so judge it by what it will load.
-        const src: string | undefined = await el
-          .evaluate((frameEl: HTMLIFrameElement | HTMLObjectElement) =>
-            frameEl.hasAttribute('srcdoc')
+        const target = await el
+          .evaluate((frameEl: HTMLIFrameElement | HTMLObjectElement) => ({
+            src: frameEl.hasAttribute('srcdoc')
               ? 'about:srcdoc'
               : (frameEl instanceof HTMLObjectElement
                   ? frameEl.data
                   : frameEl.src) || 'about:blank',
-          )
+            lazy:
+              frameEl instanceof HTMLIFrameElement &&
+              frameEl.loading === 'lazy',
+          }))
           .catch(() => undefined);
+        const src = target?.src;
         const local = src !== undefined && !isCrossOrigin(src, courseOrigin);
-        if (local) {
+        if (local && target?.lazy) {
           await el
             .evaluate((iframe: HTMLIFrameElement) => {
-              if (iframe.loading === 'lazy') iframe.loading = 'eager';
+              iframe.loading = 'eager';
             })
             .catch(() => {});
         }
         await el.dispose();
         if (!local) return;
-        // The load wait follows the frame to its next document, so it ends
-        // when the frame moves to another origin, even mid-wait.
+        // The load wait follows the frame across navigations, so end it when
+        // the frame moves to another origin.
         if (underCrossOrigin(frame, courseOrigin)) return;
         const left = new Promise<void>((done) => leftOrigin.set(frame, done));
         // A 0 timeout would wait forever, so a frame past the deadline gets 1ms.
@@ -620,12 +617,18 @@ export async function runAudit(
         if (underCrossOrigin(frame, courseOrigin)) leftOrigin.get(frame)?.();
       });
 
-      const unseen = () => page.frames().filter((f: Frame) => !seen.has(f));
+      // Cross-origin frames go unscanned, so they get no wait.
+      const unseen = () =>
+        page
+          .frames()
+          .filter(
+            (f: Frame) =>
+              !seen.has(f) &&
+              f !== page.mainFrame() &&
+              !underCrossOrigin(f, courseOrigin),
+          );
 
-      // Each frame pass reaches frames one level deeper: a loaded frame can
-      // hold lazy frames of its own. The passes run beside the network wait,
-      // so a slow fetch doesn't use up the frames' time, and repeat after it,
-      // since a fetch can add frames.
+      // Each frame pass reaches one level deeper, and a fetch can add frames.
       const settle = async (title: string) => {
         const deadline = Date.now() + SETTLE_TIMEOUT_MS;
         seen.clear();
@@ -640,8 +643,7 @@ export async function runAudit(
         };
         let quiet: boolean;
         do {
-          await Promise.all([networkQuiet(deadline), framesLoaded()]);
-          // A frame can outlast the wait and start requests of its own.
+          await framesLoaded();
           quiet = await networkQuiet(deadline);
         } while (quiet && Date.now() < deadline && unseen().length > 0);
         const [frame] = unseen();
