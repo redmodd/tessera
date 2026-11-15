@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { styleText } from 'node:util';
 import { styleErr } from '../cli-args.js';
+import type { Frame, Page, Request } from 'playwright';
 import type { Plugin, PreviewServer } from 'vite';
 import type { ContextPluginApi } from '../build-context.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
@@ -129,8 +130,7 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
 // A node inside a cross-origin frame is a third-party embed's markup (Video's
 // YouTube or Vimeo player) that the author can't fix. The <iframe> stays checked.
 async function dropCrossOriginNodes(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any,
+  page: Page,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   results: any[],
   courseOrigin: string,
@@ -200,8 +200,7 @@ function isCrossOrigin(href: string, courseOrigin: string): boolean {
   return url.origin !== courseOrigin;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function underCrossOrigin(frame: any, courseOrigin: string): boolean {
+function underCrossOrigin(frame: Frame | null, courseOrigin: string): boolean {
   for (; frame; frame = frame.parentFrame()) {
     if (isCrossOrigin(frame.url(), courseOrigin)) return true;
   }
@@ -260,6 +259,8 @@ function resolvePlaywrightBin():
 
 const INSTALL_TIMEOUT_MS = 10 * 60_000;
 const SETTLE_TIMEOUT_MS = 10_000;
+// Also ends the frame passes on a page that keeps adding frames.
+const MAX_FRAME_DEPTH = 5;
 
 // Run the workspace's own `playwright` bin with the current Node binary so the
 // install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
@@ -511,20 +512,13 @@ export async function runAudit(
       // after a fetch. Only the main frame must also go 500ms without a
       // request starting or finishing: a polling frame's requests are rarely
       // in flight, so it can't hold the audit.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pending = new Set<any>();
+      const pending = new Set<Request>();
       let lastRequestAt = 0;
       let lastRequestUrl = '';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      page.on('request', (request: any) => {
+      page.on('request', (request: Request) => {
         // An EventSource never finishes; networkidle ignores it too.
         if (request.resourceType() === 'eventsource') return;
-        let frame;
-        try {
-          frame = request.frame();
-        } catch {
-          return; // A service worker request has no frame.
-        }
+        const frame = request.frame();
         if (frame === page.mainFrame()) {
           lastRequestAt = Date.now();
           lastRequestUrl = request.url();
@@ -539,19 +533,13 @@ export async function runAudit(
         }
         pending.add(request);
       });
-      // A frame that navigates gets its new document waited on too.
-      const seen = new Set<unknown>();
-      page.on('framenavigated', (frame: unknown) => seen.delete(frame));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const settled = (request: any) => {
+      const settled = (request: Request) => {
         if (pending.delete(request) && request.frame() === page.mainFrame()) {
           lastRequestAt = Date.now();
         }
       };
       page.on('requestfinished', settled);
       page.on('requestfailed', settled);
-      const networkBusy = () =>
-        pending.size > 0 || Date.now() - lastRequestAt < 500;
 
       await page.goto(auditUrl.href);
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
@@ -569,8 +557,7 @@ export async function runAudit(
       // its half-parsed document. A lazy frame loads only near the viewport,
       // so it is made eager. Cross-origin frames go unscanned, so no wait.
       const frameLoaded = async (
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        frame: any,
+        frame: Frame,
         title: string,
         deadline: number,
       ) => {
@@ -612,12 +599,16 @@ export async function runAudit(
       };
 
       const networkQuiet = async (deadline: number) => {
-        while (networkBusy()) {
+        while (pending.size > 0 || Date.now() - lastRequestAt < 500) {
           if (Date.now() >= deadline) return false;
           await delay(100);
         }
         return true;
       };
+
+      // A frame that navigates gets its new document waited on too.
+      const seen = new Set<Frame>();
+      page.on('framenavigated', (frame: Frame) => seen.delete(frame));
 
       // Each pass reaches frames one level deeper: a loaded frame can hold
       // lazy frames of its own and start requests. Frames load while the
@@ -625,24 +616,20 @@ export async function runAudit(
       const settle = async (title: string) => {
         const deadline = Date.now() + SETTLE_TIMEOUT_MS;
         seen.clear();
-        for (let depth = 0; ; depth++) {
-          const fresh =
-            depth < 5 ? page.frames().filter((f: unknown) => !seen.has(f)) : [];
+        for (let depth = 0; depth < MAX_FRAME_DEPTH; depth++) {
+          const fresh = page.frames().filter((f: Frame) => !seen.has(f));
+          if (fresh.length === 0) break;
           for (const frame of fresh) seen.add(frame);
-          const [quiet] = await Promise.all([
+          await Promise.all([
             networkQuiet(deadline),
-            ...fresh.map((frame: unknown) =>
-              frameLoaded(frame, title, deadline),
-            ),
+            ...fresh.map((frame: Frame) => frameLoaded(frame, title, deadline)),
           ]);
-          if (fresh.length > 0) continue;
-          if (!quiet) {
-            const [request] = pending;
-            console.warn(
-              `${stderrTag('yellow')} ${title}: the network was still busy after ${SETTLE_TIMEOUT_MS / 1000}s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
-            );
-          }
-          return;
+        }
+        if (!(await networkQuiet(deadline))) {
+          const [request] = pending;
+          console.warn(
+            `${stderrTag('yellow')} ${title}: the network was still busy after ${SETTLE_TIMEOUT_MS / 1000}s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
+          );
         }
       };
 
@@ -675,11 +662,10 @@ export async function runAudit(
           { timeout: 20_000 },
         );
         await settle(title);
-        // The next page waits for a request the scan overlapped, not for one
+        // The next page waits for a request the scan overlaps, not for one
         // this page already gave up on.
-        const stale = [...pending];
+        pending.clear();
         pages.push(await recordPage(i, title));
-        for (const request of stale) pending.delete(request);
       }
     } finally {
       await browser.close();

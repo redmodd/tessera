@@ -11,6 +11,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { VARIANTS_ROOT, variantDir, type FixtureName } from './global-setup.js';
 import { runAudit } from '../../packages/tessera-learn/dist/plugin/index.js';
 
@@ -151,13 +152,12 @@ export default {};
     const embed = createServer(async (req, res) => {
       if (req.url === '/hang') return;
       if (req.url === '/slow.js') {
-        await new Promise((r) => setTimeout(r, 1000));
+        await delay(1000);
         res.setHeader('Content-Type', 'text/javascript');
         return res.end('');
       }
       if (req.url?.startsWith('/data?')) {
-        const ms = Number(req.url.slice('/data?'.length));
-        await new Promise((r) => setTimeout(r, ms));
+        await delay(Number(req.url.slice('/data?'.length)));
         res.setHeader('Access-Control-Allow-Origin', '*');
         return res.end('{}');
       }
@@ -178,8 +178,9 @@ export default {};
       // Without the CSP entry the embed is blocked and has no button to skip.
       expect(withCsp).not.toBe(source);
       writeFileSync(config, withCsp);
-      // The preview server sends late.html slowly, so a frame navigating to
-      // it is mid-navigation for a while.
+      // The audit's preview server loads the course's vite.config.js, which
+      // sends late.html slowly, so a frame navigating to it is mid-navigation
+      // for a while.
       writeFileSync(
         resolve(dir, 'vite.config.js'),
         `import { tesseraPlugin } from 'tessera-learn/plugin';
