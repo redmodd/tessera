@@ -202,7 +202,19 @@ export default {
       // load and by in-app navigation (#442).
       writeFileSync(
         resolve(dir, 'pages/01-assessment/_meta.js'),
-        `export default { title: 'Assessment', pages: ['frames', 'check', 'chained', 'late', 'exam', 'practice', 'frames-last'] };`,
+        `export default { title: 'Assessment', pages: ['frames', 'overlap', 'check', 'chained', 'late', 'exam', 'practice', 'frames-last'] };`,
+      );
+      // Renders a button when a request the Frames page starts mid-scan ends.
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/overlap.svelte'),
+        `<script module>export const pageConfig = { title: "Overlap" };</script>
+<script>
+  let done = $state(!!window.overlapDone);
+  addEventListener('overlap', () => (done = true));
+</script>
+<h1>Overlap</h1>
+{#if done}<button></button>{/if}
+`,
       );
       // A frame that gets its src only after the page went quiet.
       writeFileSync(
@@ -236,11 +248,28 @@ export default {
       // loads; "Poll" keeps the network busy. "Unloaded" is a lazy Video below
       // the fold: still about:blank, so same-origin. "Below" is a lazy
       // same-origin frame the audit loads, holding a lazy frame of its own.
-      // "Hang" is a cross-origin <object> that never responds.
+      // "Hang" is a cross-origin <object> that never responds. The page starts
+      // a request when the audit first injects axe, so during its scan.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <script>
   let late = $state(false);
   fetch('${embedUrl}data?2000').then(() => (late = true));
+  if (!('axe' in window)) {
+    let axe;
+    Object.defineProperty(window, 'axe', {
+      configurable: true,
+      get: () => axe,
+      set(value) {
+        if (!axe) {
+          fetch('${embedUrl}data?5000').then(() => {
+            window.overlapDone = true;
+            dispatchEvent(new Event('overlap'));
+          });
+        }
+        axe = value;
+      },
+    });
+  }
 </script>
 <h1>Frames</h1>
 {#if late}<button></button>{/if}
@@ -292,9 +321,13 @@ export default {
 
       expect(warnings.filter((w) => w.includes('as it was'))).toEqual([]);
       const report = readReport(dir);
-      expect(report.pages[2].title).toBe('Chained');
-      expect(report.pages[3].title).toBe('Late');
-      for (const page of report.pages.slice(2, 4)) {
+      const late = [1, 3, 4].map((i) => report.pages[i]);
+      expect(late.map((page) => page.title)).toEqual([
+        'Overlap',
+        'Chained',
+        'Late',
+      ]);
+      for (const page of late) {
         expect(page.violations).toMatchObject([
           { id: 'button-name', nodes: 1 },
         ]);

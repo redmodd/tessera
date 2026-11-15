@@ -675,8 +675,11 @@ export async function runAudit(
           { timeout: 20_000 },
         );
         await settle(title);
+        // The next page waits for a request the scan overlapped, not for one
+        // this page already gave up on.
+        const stale = [...pending];
         pages.push(await recordPage(i, title));
-        pending.clear();
+        for (const request of stale) pending.delete(request);
       }
     } finally {
       await browser.close();
