@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { styleText } from 'node:util';
@@ -160,8 +161,6 @@ async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
   return kept.filter((r) => r.nodes.length > 0);
 }
 
-// Judged by the frame's URL: an about: or data: frame holds the course's markup
-// even when sandboxed; Chrome's error page for a failed embed does not.
 async function crossesOrigin(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   frame: any,
@@ -181,11 +180,19 @@ async function crossesOrigin(
     frame = await iframe.asElement()?.contentFrame();
     await iframe.dispose();
     if (!frame) return false;
-    const url = URL.parse(frame.url());
-    if (!url || url.protocol === 'about:' || url.protocol === 'data:') continue;
-    if (url.origin !== courseOrigin) return true;
+    if (isCrossOrigin(frame.url(), courseOrigin)) return true;
   }
   return false;
+}
+
+// Judged by the frame's URL: an about: or data: frame holds the course's markup
+// even when sandboxed; Chrome's error page for a failed embed does not.
+function isCrossOrigin(href: string, courseOrigin: string): boolean {
+  const url = URL.parse(href);
+  if (!url || url.protocol === 'about:' || url.protocol === 'data:') {
+    return false;
+  }
+  return url.origin !== courseOrigin;
 }
 
 export function isMissingBrowserError(message: string): boolean {
@@ -482,8 +489,38 @@ export async function runAudit(
       // ?__tessera_audit unlocks navigation so quiz-gated pages can be scanned.
       const auditUrl = new URL(baseUrl);
       auditUrl.searchParams.set('__tessera_audit', '1');
+
+      // Playwright's networkidle can't be awaited again after in-app
+      // navigation (#442), so track the main frame's requests to catch content
+      // a page renders after a fetch.
+      let pendingRequests = 0;
+      let lastRequestAt = 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const countRequest = (delta: number) => (request: any) => {
+        try {
+          if (request.frame() !== page.mainFrame()) return;
+        } catch {
+          return; // A service worker request has no frame.
+        }
+        pendingRequests += delta;
+        lastRequestAt = Date.now();
+      };
+      page.on('request', countRequest(1));
+      page.on('requestfinished', countRequest(-1));
+      page.on('requestfailed', countRequest(-1));
+      const mainFrameIdle = async () => {
+        const deadline = Date.now() + 10_000;
+        while (
+          Date.now() < deadline &&
+          (pendingRequests > 0 || Date.now() - lastRequestAt < 500)
+        ) {
+          await delay(100);
+        }
+      };
+
       await page.goto(auditUrl.href);
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
+      const courseOrigin = new URL(page.url()).origin;
 
       const scan = async (): Promise<AxeViolation[]> => {
         const builder = new AxeBuilder({ page }).withTags(tags);
@@ -493,18 +530,39 @@ export async function runAudit(
       };
 
       // A frame the page just added may still be loading, and axe would scan
-      // its half-parsed document. A lazy frame off screen never starts loading.
-      const framesLoaded = () =>
+      // its half-parsed document. A lazy frame loads only near the viewport,
+      // so it is made eager. Cross-origin frames go unscanned, so no wait.
+      const framesLoaded = (title: string) =>
         Promise.all(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           page.frames().map(async (frame: any) => {
-            if (!frame.url()) {
-              const el = await frame.frameElement().catch(() => null);
-              if ((await el?.getAttribute('loading')) === 'lazy') return;
+            if (frame === page.mainFrame()) return;
+            const el = await frame.frameElement().catch(() => null);
+            if (!el) return;
+            const src: string | undefined = await el
+              .evaluate((iframe: HTMLIFrameElement) =>
+                iframe.hasAttribute('srcdoc') ? '' : iframe.src,
+              )
+              .catch(() => undefined);
+            const local =
+              src !== undefined && !isCrossOrigin(src, courseOrigin);
+            if (local) {
+              await el
+                .evaluate((iframe: HTMLIFrameElement) => {
+                  if (iframe.loading === 'lazy') iframe.loading = 'eager';
+                })
+                .catch(() => {});
             }
+            await el.dispose();
+            if (!local) return;
             await frame
               .waitForLoadState('load', { timeout: 10_000 })
-              .catch(() => {});
+              .catch((err: Error) => {
+                if (err.name !== 'TimeoutError') return;
+                console.warn(
+                  `${stderrTag('yellow')} ${title}: a frame (${src || 'srcdoc'}) didn't load within 10s; scanned it as it was.`,
+                );
+              });
           }),
         );
 
@@ -523,6 +581,8 @@ export async function runAudit(
 
       const totalPages = manifest.pages.length;
       for (let i = 0; i < totalPages; i++) {
+        const title = manifest.pages[i]?.title ?? `Page ${i + 1}`;
+        lastRequestAt = Date.now();
         await page.evaluate(
           (idx: number) => window.__tesseraAudit!.goToIndex(idx),
           i,
@@ -534,10 +594,9 @@ export async function runAudit(
           i,
           { timeout: 20_000 },
         );
-        await framesLoaded();
-        pages.push(
-          await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
-        );
+        await mainFrameIdle();
+        await framesLoaded(title);
+        pages.push(await recordPage(i, title));
       }
     } finally {
       await browser.close();

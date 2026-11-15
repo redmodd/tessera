@@ -154,6 +154,11 @@ export default {};
         res.setHeader('Content-Type', 'text/javascript');
         return res.end('');
       }
+      if (req.url === '/data') {
+        await new Promise((r) => setTimeout(r, 5000));
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.end('{}');
+      }
       res.setHeader('Content-Type', 'text/html');
       res.end('<button></button><img src="data:,">');
     });
@@ -166,7 +171,7 @@ export default {};
       const source = readFileSync(config, 'utf-8');
       const withCsp = source.replace(
         'export: {',
-        "export: { csp: { 'frame-src': ['http://localhost:*'] },",
+        "export: { csp: { 'frame-src': ['http://localhost:*'], 'connect-src': ['http://localhost:*'] },",
       );
       // Without the CSP entry the embed is blocked and has no button to skip.
       expect(withCsp).not.toBe(source);
@@ -177,11 +182,17 @@ export default {};
         resolve(dir, 'pages/01-assessment/_meta.js'),
         `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice', 'frames-last'] };`,
       );
-      // "Asset" parses its button only after a slow script loads; "Poll" keeps
-      // the network busy. "Unloaded" is a lazy Video below the fold: still
-      // about:blank, so same-origin.
+      // The page renders a button only after a slow fetch. "Asset" parses its
+      // button only after a slow script loads; "Poll" keeps the network busy.
+      // "Unloaded" is a lazy Video below the fold: still about:blank, so
+      // same-origin. "Below" is a lazy same-origin frame the audit loads.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
+<script>
+  let late = $state(false);
+  fetch('${embedUrl}data').then(() => (late = true));
+</script>
 <h1>Frames</h1>
+{#if late}<button></button>{/if}
 <iframe title="Local" srcdoc="<button></button>"></iframe>
 <iframe title="Asset" src="./sim.html"></iframe>
 <iframe title="Poll" srcdoc="<script>setInterval(() => fetch('/poll'), 200)</script>"></iframe>
@@ -191,6 +202,7 @@ export default {};
 <iframe srcdoc="<p>Untitled</p>"></iframe>
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
+<iframe title="Below" loading="lazy" src="./sim.html"></iframe>
 `;
       mkdirSync(resolve(dir, 'public'), { recursive: true });
       writeFileSync(
@@ -216,7 +228,7 @@ export default {};
               v.nodes,
             ]),
           ),
-        ).toEqual({ 'button-name': 3, 'frame-title': 1 });
+        ).toEqual({ 'button-name': 5, 'frame-title': 1 });
       }
     } finally {
       embed.close();
