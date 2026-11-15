@@ -31,6 +31,13 @@
   transcript="A flower opening, used to demonstrate the native player."
 />
 
+<Video
+  src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+  poster="$assets/test.png"
+  title="Sample video with poster"
+  transcript="A flower opening, behind a poster image."
+/>
+
 <h2>Audio</h2>
 
 <Audio
