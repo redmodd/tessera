@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-Internal test simplifications.
+Internal cleanup; courses behave the same.
