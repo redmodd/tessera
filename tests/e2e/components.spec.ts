@@ -262,20 +262,20 @@ test.describe('Component — RevealModal', () => {
 
     // Past either end, a modal dialog may hand focus to the browser UI
     // (activeElement is body); the next press must bring it back inside.
-    const stop = () => {
+    const focusAt = () => {
       const el = document.activeElement;
       if (!el || el === document.body) return 'body';
       return el.closest('dialog.tessera-modal') ? 'dialog' : 'outside';
     };
     for (const key of ['Tab', 'Shift+Tab']) {
       await close.focus();
-      const stops: string[] = [];
+      const stops = [];
       for (let i = 0; i < 6; i++) {
         await page.keyboard.press(key);
-        stops.push(await page.evaluate(stop));
+        stops.push(await page.evaluate(focusAt));
       }
       expect(stops).not.toContain('outside');
-      expect(stops.join()).not.toMatch(/body,body/);
+      expect(stops.join()).not.toContain('body,body');
     }
   });
 
