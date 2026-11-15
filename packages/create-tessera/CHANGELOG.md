@@ -1,5 +1,15 @@
 # create-tessera
 
+## 0.14.0
+
+### Patch Changes
+
+- cdf8d49: `--help` shows help even when other options are passed.
+- 95795af: No longer ships unused type declarations.
+- 190433c: - `@vitest/coverage-v8` 5.0.5 → 5.1.0
+  - `tsdown` 0.23.4 → 0.23.7
+  - `vitest` 5.0.5 → 5.1.0
+
 ## 0.13.0
 
 ### Patch Changes
