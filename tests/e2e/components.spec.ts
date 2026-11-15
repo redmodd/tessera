@@ -259,18 +259,21 @@ test.describe('Component — RevealModal', () => {
     await page.locator('.tessera-reveal-trigger').click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // A modal dialog may hand focus to the browser UI (activeElement is body);
-    // Firefox does on Tab past the last control.
-    for (let i = 0; i < 5; i++) {
+    // A modal dialog hands focus to the browser UI (activeElement is body)
+    // once per Tab cycle, so where a given press lands depends on the markup.
+    const stops: string[] = [];
+    for (let i = 0; i < 6; i++) {
       await page.keyboard.press('Tab');
-      const escaped = await page.evaluate(() => {
-        const el = document.activeElement;
-        return (
-          !!el && el !== document.body && !el.closest('dialog.tessera-modal')
-        );
-      });
-      expect(escaped).toBe(false);
+      stops.push(
+        await page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el || el === document.body) return 'body';
+          return el.closest('dialog.tessera-modal') ? 'dialog' : 'outside';
+        }),
+      );
     }
+    expect(stops).not.toContain('outside');
+    expect(stops).toContain('dialog');
   });
 
   test('clicking the backdrop closes it', async ({ page }) => {
