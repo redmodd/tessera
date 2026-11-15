@@ -257,23 +257,27 @@ test.describe('Component — RevealModal', () => {
 
   test('focus never reaches the page behind the modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    const close = page.locator('.tessera-modal-close');
+    await expect(close).toBeFocused();
 
-    // A modal dialog hands focus to the browser UI (activeElement is body)
-    // once per Tab cycle, so where a given press lands depends on the markup.
-    const stops: string[] = [];
-    for (let i = 0; i < 6; i++) {
-      await page.keyboard.press('Tab');
-      stops.push(
-        await page.evaluate(() => {
-          const el = document.activeElement;
-          if (!el || el === document.body) return 'body';
-          return el.closest('dialog.tessera-modal') ? 'dialog' : 'outside';
-        }),
-      );
+    // Past either end, a modal dialog hands focus to the browser UI
+    // (activeElement is body) and the next press brings it back inside.
+    const stop = () => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return 'body';
+      return el.closest('dialog.tessera-modal') ? 'dialog' : 'outside';
+    };
+    for (const key of ['Tab', 'Shift+Tab']) {
+      await close.focus();
+      const stops: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        await page.keyboard.press(key);
+        stops.push(await page.evaluate(stop));
+      }
+      expect(stops).not.toContain('outside');
+      expect(stops.join()).toMatch(/body,dialog/);
+      expect(stops.join()).not.toMatch(/body,body/);
     }
-    expect(stops).not.toContain('outside');
-    expect(stops).toContain('dialog');
   });
 
   test('clicking the backdrop closes it', async ({ page }) => {
