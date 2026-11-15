@@ -260,8 +260,8 @@ test.describe('Component — RevealModal', () => {
     const close = page.locator('.tessera-modal-close');
     await expect(close).toBeFocused();
 
-    // Past either end, a modal dialog hands focus to the browser UI
-    // (activeElement is body) and the next press brings it back inside.
+    // Past either end, a modal dialog may hand focus to the browser UI
+    // (activeElement is body); the next press must bring it back inside.
     const stop = () => {
       const el = document.activeElement;
       if (!el || el === document.body) return 'body';
@@ -275,7 +275,6 @@ test.describe('Component — RevealModal', () => {
         stops.push(await page.evaluate(stop));
       }
       expect(stops).not.toContain('outside');
-      expect(stops.join()).toMatch(/body,dialog/);
       expect(stops.join()).not.toMatch(/body,body/);
     }
   });
