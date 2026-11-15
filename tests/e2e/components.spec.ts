@@ -257,19 +257,25 @@ test.describe('Component — RevealModal', () => {
 
   test('focus never reaches the page behind the modal', async ({ page }) => {
     await page.locator('.tessera-reveal-trigger').click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    const close = page.locator('.tessera-modal-close');
+    await expect(close).toBeFocused();
 
-    // A modal dialog may hand focus to the browser UI (activeElement is body);
-    // Firefox does on Tab past the last control.
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.press('Tab');
-      const escaped = await page.evaluate(() => {
-        const el = document.activeElement;
-        return (
-          !!el && el !== document.body && !el.closest('dialog.tessera-modal')
-        );
-      });
-      expect(escaped).toBe(false);
+    // Past either end, a modal dialog may hand focus to the browser UI
+    // (activeElement is body); the next press must bring it back inside.
+    const focusAt = () => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return 'body';
+      return el.closest('dialog.tessera-modal') ? 'dialog' : 'outside';
+    };
+    for (const key of ['Tab', 'Shift+Tab']) {
+      await close.focus();
+      const stops = [];
+      for (let i = 0; i < 6; i++) {
+        await page.keyboard.press(key);
+        stops.push(await page.evaluate(focusAt));
+      }
+      expect(stops).not.toContain('outside');
+      expect(stops.join()).not.toContain('body,body');
     }
   });
 
