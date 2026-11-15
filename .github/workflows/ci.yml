@@ -19,7 +19,7 @@ concurrency:
 jobs:
   static:
     name: Lint, types & format
-    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
+    if: &not-release-pr github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -40,7 +40,7 @@ jobs:
 
   test:
     name: Build & test (Node ${{ matrix.node }})
-    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
+    if: *not-release-pr
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -73,7 +73,7 @@ jobs:
 
   playwright-version:
     name: Playwright version
-    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
+    if: *not-release-pr
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.lockfile.outputs.version }}
@@ -91,7 +91,6 @@ jobs:
 
   e2e:
     name: Playwright e2e (${{ matrix.browser }})
-    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
     needs: playwright-version
     runs-on: ubuntu-latest
     # The image ships the browsers and their system packages; installing them
@@ -131,7 +130,7 @@ jobs:
 
   templates-e2e:
     name: Scaffold & build templates
-    if: github.event.pull_request.head.label != 'redmodd:changeset-release/main'
+    if: *not-release-pr
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -171,8 +170,7 @@ jobs:
 
       - run: pnpm changeset status --since=origin/main
 
-  # The only required check: a skipped matrix job never reports its expanded
-  # check names, so requiring those would block the release PR forever.
+  # Required check: skipped matrix jobs never report their expanded names.
   ci:
     name: CI
     if: always()
@@ -181,6 +179,7 @@ jobs:
     permissions:
       actions: read
       checks: read
+      contents: read
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
