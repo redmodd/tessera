@@ -8,9 +8,8 @@
    * @prop {Array<{ src: string, kind?: 'captions'|'subtitles', srclang?: string, label?: string }>} [tracks] -
    *   Caption/subtitle tracks for native (non-embed) video, rendered as <track>.
    *   Ignored for YouTube/Vimeo embeds: the platform owns their captions.
-   * @prop {string} [poster] - Image shown before play (URL or $assets/ path); its
-   *   ratio sizes the box until the video plays, so match the video's ratio or the
-   *   box resizes on play. Native video only: embeds show the platform's thumbnail.
+   * @prop {string} [poster] - Image shown before play (URL or $assets/ path);
+   *   native video only.
    * @prop {string} [transcript] - Transcript text shown in a <details> disclosure
    *   below the player. To load it from a file, import the file with Vite's ?raw
    *   suffix: `import t from '$assets/x.txt?raw'` then `transcript={t}`.

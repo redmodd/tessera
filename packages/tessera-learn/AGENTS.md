@@ -327,7 +327,7 @@ Modal triggered by interaction. Uses Svelte 5 snippets.
 | `tracks`     | `array`  | Caption tracks → `<track>`; `{ src, kind?: 'captions' \| 'subtitles', srclang?, label? }`. Native players only (ignored for YouTube/Vimeo) |
 | `transcript` | `string` | Transcript in a `<details>`. Load from file via `?raw` import                                                                              |
 
-`Video` also takes `poster` (URL or `$assets/` path): the image a native video shows before play. Its ratio sizes the box until the video plays, so use a frame of the video or an image of the same ratio, or the box resizes on play. Embeds ignore it and show the platform's thumbnail.
+`Video` also takes `poster` (URL or `$assets/` path), native video only; match the video's ratio, since the poster sizes the box until play.
 
 Captions rule (WCAG 1.2): native video needs `tracks` or `transcript`, an embed needs `transcript` (embeds can't carry `<track>`); the validator warns when `<Audio>` has no `transcript`.
 
