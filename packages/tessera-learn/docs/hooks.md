@@ -213,7 +213,7 @@ An answer does not come back when the widget has no `restore`, which also keeps 
 Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Throws on a page without `pageConfig.quiz`.
 
 - **A custom shell must render `children`**, visibly or hidden. Questions register only when they mount, so a shell that drops `children` has nothing to score.
-- **A question that unmounts leaves the quiz.** While answering, it goes with its answer and frees its id; after `submit()`, it keeps its result in `questions` until `retry()`. Remounting the questions under `{#key}` replaces the set (see [Recipe 2d](recipes.md#recipe-2d-draw-questions-from-a-pool)).
+- **A question that unmounts leaves the quiz.** While answering, it goes with its answer and frees its id. After `submit()`, it keeps its result in `questions` until `retry()`, and a widget that mounts again with its id takes its place and gets its answer back through `restore` (without one, `restored` turns `true`). To draw a new set, call `retry()`, then remount the questions under `{#key}` (see [Recipe 2d](recipes.md#recipe-2d-draw-questions-from-a-pool)).
 - **Only `submit()` scores the quiz.** It reports every question to the LMS, records the page score and marks the quiz Completed/Passed/Failed.
 - **`tessera-quiz-complete` is a notification, not the scoring path.** A shell that passes `element` gets it dispatched there after `submit()`, with `detail: { score, scored }` from that attempt. Dispatching it yourself is a build error.
 - **Widgets call `setAnswer()` only; the shell decides when an answer is final.** Call `q.commit()` to report one question before the end (the built-in `<Quiz>` does when `feedbackMode: 'immediate'` reveals it), and still call `submit()` at the end.
@@ -229,7 +229,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
   readonly scored: boolean; // false when no question has a `correct`: `score` is a placeholder 100
   readonly passingScore: number; // resolved at runtime (config + LMS mastery override)
   readonly attemptCount: number;
-  readonly restored: boolean; // results came from saved progress without their answers
+  readonly restored: boolean; // results show without their answers: restored from saved progress, or remounted without `restore`
   readonly feedbackMode: 'review' | 'immediate' | 'never'; // pageConfig.quiz value, default 'review'
   readonly maxAttempts: number; // pageConfig.quiz value, default Infinity
   submit(): void;

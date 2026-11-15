@@ -50,6 +50,8 @@ export interface QuizEngineDeps {
 type InternalQuestion = UseQuizQuestionApi & {
   /** The id the widget asked for; `id` is the unique one it is recorded under. */
   requestedId: string;
+  /** Set once the id is reported, saved or restored; until then it can still change. */
+  fixed?: boolean;
   weight: number;
   handle: UseQuestionHandle;
 };
@@ -75,6 +77,8 @@ export class QuizEngine implements UseQuizHandle {
   #reportedAnswers = new Map<InternalQuestion, string>();
   // Unmounted after submit: kept, with their results, until retry().
   #detached = new Set<InternalQuestion>();
+  // Registered in this task; a remount after submit can't replace one of these.
+  #arriving = new Set<InternalQuestion>();
   #reviewing = $state(false);
   #score = $state(0);
   #bestScore = $state(0);
@@ -181,7 +185,7 @@ export class QuizEngine implements UseQuizHandle {
 
   get restored(): boolean {
     return (
-      this.#fromSave && (this.#totalQuestions === 0 || this.#answerMissing)
+      (this.#fromSave && this.#totalQuestions === 0) || this.#answerMissing
     );
   }
 
@@ -205,25 +209,54 @@ export class QuizEngine implements UseQuizHandle {
       weight: normalizeWeight(api.weight),
     } as InternalQuestion;
     internal.handle = this.#makeQuestionHandle(internal);
-    this.#members.push(internal);
-    this.#publish();
-    const answer = this.#fromSave
-      ? restoreResponse(
-          internal,
-          this.#deps.restore?.responses?.get(internal.id),
+    const prev = this.#submittedNow
+      ? this.#members.find(
+          (m) => m.requestedId === api.id && !this.#arriving.has(m),
         )
       : undefined;
-    if (answer !== undefined) {
-      this.#answers.set(internal, answer);
+    if (prev) this.#replace(prev, internal);
+    else this.#members.push(internal);
+    if (this.#arriving.size === 0) {
+      queueMicrotask(() => this.#arriving.clear());
+    }
+    this.#arriving.add(internal);
+    this.#publish();
+    if (this.#submittedNow) this.#restoreAnswer(internal, prev);
+    return internal.handle;
+  }
+
+  /**
+   * A widget that remounts after submit takes over the question with its id,
+   * so the results keep one entry per question and the answer comes back.
+   */
+  #replace(prev: InternalQuestion, next: InternalQuestion): void {
+    this.#members[this.#members.indexOf(prev)] = next;
+    next.id = prev.id;
+    next.fixed = prev.fixed;
+    if (this.#feedbackShown.has(prev)) this.#feedbackShown.add(next);
+    this.#detached.delete(prev);
+  }
+
+  #restoreAnswer(
+    q: InternalQuestion,
+    prev: InternalQuestion | undefined,
+  ): void {
+    let response: unknown;
+    if (prev) {
+      if (this.#answers.has(prev)) response = prev.interaction?.()?.response;
+      this.#forget(prev);
     } else if (this.#fromSave) {
+      response = this.#deps.restore?.responses?.get(q.id);
+      this.#fix(q);
+    }
+    const answer = restoreResponse(q, response);
+    if (answer !== undefined) {
+      this.#answers.set(q, answer);
+    } else {
       // `restored` is now true, and a review of it would judge nothing.
       this.#answerMissing = true;
       this.#reviewing = false;
     }
-    // A keyed block mounts its new questions before the old ones leave, so
-    // a duplicate counts only once the swap has settled.
-    queueMicrotask(() => this.#warnDuplicate(internal));
-    return internal.handle;
   }
 
   /**
@@ -234,12 +267,17 @@ export class QuizEngine implements UseQuizHandle {
     const q = this.#questionOf(handle);
     if (!q || !this.#members.includes(q)) return;
     if (this.#submittedNow) this.#detached.add(q);
-    else this.#remove(q);
+    else this.#remove([q]);
   }
 
-  #remove(q: InternalQuestion): void {
-    this.#members = this.#members.filter((x) => x !== q);
+  #remove(leaving: Iterable<InternalQuestion>): void {
+    const gone = new Set(leaving);
+    this.#members = this.#members.filter((q) => !gone.has(q));
     this.#publish();
+    for (const q of gone) this.#forget(q);
+  }
+
+  #forget(q: InternalQuestion): void {
     this.#answers.delete(q);
     this.#renders.delete(q);
     this.#reportedAnswers.delete(q);
@@ -247,10 +285,17 @@ export class QuizEngine implements UseQuizHandle {
     this.#lockedCorrect.delete(q);
   }
 
-  /** Gives each question a unique id, the first to ask for one keeping it. */
+  /**
+   * Gives each question a unique id. A fixed id never changes; any other
+   * question takes the first free one from the id it asked for, so a keyed
+   * remount's question gets its plain id once its predecessor leaves.
+   */
   #publish(): void {
-    const taken = new Set<string>();
+    const taken = new Set(
+      this.#members.filter((q) => q.fixed).map((q) => q.id),
+    );
     for (const q of this.#members) {
+      if (q.fixed) continue;
       let id = q.requestedId;
       for (let n = 2; taken.has(id); n++) id = `${q.requestedId}-${n}`;
       taken.add(id);
@@ -259,16 +304,18 @@ export class QuizEngine implements UseQuizHandle {
     this.#questionHandles = this.#members.map((q) => q.handle);
   }
 
-  #warnDuplicate(q: InternalQuestion): void {
-    if (q.id === q.requestedId || !this.#members.includes(q)) return;
+  #fix(q: InternalQuestion): void {
+    if (q.fixed) return;
+    q.fixed = true;
+    if (q.id === q.requestedId) return;
     const holder = this.#members.find((m) => m.id === q.requestedId);
     console.warn(
       holder && holder.requestedId !== q.requestedId
         ? `[tessera] useQuiz: question id "${q.requestedId}" is already taken by an earlier question whose ` +
-            `duplicate id was rewritten to it, so it is registered as "${q.id}" instead. ` +
+            `duplicate id was rewritten to it, so it is recorded as "${q.id}" instead. ` +
             'Give the earlier duplicates unique ids, because the rewritten one is the key ' +
             "this question's LMS interaction is recorded under."
-        : `[tessera] useQuiz: duplicate question id "${q.requestedId}" is registered as "${q.id}" instead. ` +
+        : `[tessera] useQuiz: duplicate question id "${q.requestedId}" is recorded as "${q.id}" instead. ` +
             'Give each question in a quiz a unique id, because the rewritten one is the key ' +
             'its LMS interaction is recorded under.',
     );
@@ -303,7 +350,10 @@ export class QuizEngine implements UseQuizHandle {
       return;
     }
 
-    for (const q of this.#internalQuestions) this.#commit(q);
+    for (const q of this.#internalQuestions) {
+      this.#fix(q);
+      this.#commit(q);
+    }
 
     const computed = this.#computeScore();
     const scored = computed !== null;
@@ -328,6 +378,7 @@ export class QuizEngine implements UseQuizHandle {
     }
     this.#submitted = true;
     this.#fromSave = false;
+    this.#answerMissing = false;
     this.#attemptCount++;
 
     // A review needs every answer; short of that only an incorrect-only
@@ -366,7 +417,7 @@ export class QuizEngine implements UseQuizHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    for (const q of this.#detached) this.#remove(q);
+    this.#remove(this.#detached);
     this.#detached.clear();
     const kept = new Set<InternalQuestion>();
     this.#lockedCorrect.clear();
@@ -391,6 +442,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#feedbackShown.clear();
     this.#submitted = false;
     this.#fromSave = false;
+    this.#answerMissing = false;
     this.#reviewing = false;
     this.#score = 0;
   }
@@ -401,6 +453,7 @@ export class QuizEngine implements UseQuizHandle {
     if (!interaction) return;
     const fingerprint = JSON.stringify(interaction);
     if (this.#reportedAnswers.get(q) === fingerprint) return;
+    this.#fix(q);
     this.#deps.report(q.id, interaction, q.checkAnswer(), q.text?.());
     this.#reportedAnswers.set(q, fingerprint);
   }

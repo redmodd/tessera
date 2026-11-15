@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import RedrawQuiz from './fixtures/redraw-quiz.svelte';
+import ReviewRemountQuiz from './fixtures/review-remount-quiz.svelte';
 import { mountQuestion } from './helpers/mount.js';
 
 function mountRedraw(draws: string[][]) {
@@ -58,6 +59,24 @@ describe('a quiz that redraws its questions under {#key}', () => {
     );
   });
 
+  it('keeps the current question in range when a redraw has fewer', () => {
+    const quiz = mountRedraw([['a', 'b', 'c'], ['d']]);
+    for (let i = 0; i < 2; i++) {
+      quiz.click(
+        quiz.target.querySelector(
+          '.tessera-quiz-question-wrapper.active input',
+        )!,
+      );
+      quiz.click(quiz.button('Next'));
+    }
+
+    quiz.click(quiz.button('Redraw'));
+    expect(quiz.target.textContent).toContain('Question 1 of 1');
+    expect(
+      quiz.target.querySelectorAll('.tessera-quiz-question-wrapper.active'),
+    ).toHaveLength(1);
+  });
+
   it('scores only the new draw after a retry', () => {
     const quiz = mountRedraw([
       ['a', 'b'],
@@ -82,5 +101,37 @@ describe('a quiz that redraws its questions under {#key}', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/submit\(\) was never called/),
     );
+  });
+});
+
+describe('a custom shell that remounts its questions for review', () => {
+  it('reviews the submitted answers, one entry per question', async () => {
+    const ref: { quiz?: any } = {};
+    const { target } = mountQuestion(
+      ReviewRemountQuiz,
+      { ref },
+      { quiz: { graded: true } },
+    );
+    flushSync();
+    await Promise.resolve();
+    const radios = target.querySelectorAll<HTMLInputElement>('input');
+    radios[0].click();
+    radios[3].click();
+    flushSync();
+
+    ref.quiz.submit();
+    flushSync();
+    ref.quiz.startReview();
+    flushSync();
+    expect(ref.quiz.questions.map((q: any) => q.id)).toEqual(['a', 'b']);
+    expect(ref.quiz.questions.map((q: any) => q.correct)).toEqual([
+      true,
+      false,
+    ]);
+    expect(
+      [...target.querySelectorAll<HTMLInputElement>('input:checked')].map(
+        (r) => r.name,
+      ),
+    ).toEqual(['a', 'b']);
   });
 });

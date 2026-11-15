@@ -8,7 +8,7 @@
   const feedbackDisabled = handle.feedbackMode === 'never';
   const isImmediateMode = handle.feedbackMode === 'immediate';
 
-  let currentQuestionIndex = $state(0);
+  let questionIndex = $state(0);
   let reviewIndex = $state(0);
   let progressEl = $state();
   let resultsEl = $state();
@@ -25,6 +25,10 @@
   }
 
   let totalQuestions = $derived(handle.questions.length);
+  // Questions can leave the quiz while it is answered.
+  let currentQuestionIndex = $derived(
+    Math.min(questionIndex, Math.max(totalQuestions - 1, 0)),
+  );
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
   let results = $derived(handle.questions.map((q) => q.correct));
   let correctCount = $derived(results.filter((c) => c).length);
@@ -55,7 +59,7 @@
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
-      currentQuestionIndex++;
+      questionIndex = currentQuestionIndex + 1;
       focusPhase();
     }
   }
@@ -67,7 +71,7 @@
 
   function goPrevQuestion() {
     if (currentQuestionIndex === 0) return;
-    currentQuestionIndex--;
+    questionIndex = currentQuestionIndex - 1;
     focusPhase();
   }
 
@@ -102,7 +106,7 @@
 
   function handleRetry() {
     handle.retry();
-    currentQuestionIndex = 0;
+    questionIndex = 0;
     reviewIndex = 0;
     focusPhase();
   }
@@ -148,7 +152,7 @@
 
 {#snippet questionList(activeIndex)}
   <div class="tessera-quiz-questions">
-    {#each handle.questions as q, i (q.id)}
+    {#each handle.questions as q, i (q)}
       <div
         class="tessera-quiz-question-wrapper"
         class:active={i === activeIndex}

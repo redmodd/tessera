@@ -108,7 +108,7 @@ Drop `quiz.svelte` at the course root. It replaces the quiz UI on every quiz pag
 </script>
 
 <div class="my-quiz">
-  {#each quiz.questions as q (q.id)}
+  {#each quiz.questions as q (q)}
     <section data-question-id={q.id}>
       {#if q.render}{@render q.render()}{/if}
     </section>
@@ -311,6 +311,7 @@ The page draws its questions when it mounts. The shell remounts the page body on
 ```
 
 - **Give each question the id of its pool item**, not its slot (`q_1`). The LMS groups answers by id, so a slot id would mix answers to different questions.
+- **Pool keys follow the id rules: unique, and only ASCII letters, digits and underscores.** The build checks only ids written as literals, so it can't catch a bad key.
 - **A redraw replaces every question**, so `retryMode: 'incorrect-only'` has nothing to keep.
 - **Saved answers are keyed by id.** A return visit draws again, so the result comes back with `restored` true (score, no review) unless it draws the same ids.
 
