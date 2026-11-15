@@ -586,18 +586,21 @@ export async function runAudit(
         // the frame moves to another origin.
         if (underCrossOrigin(frame, courseOrigin)) return;
         const left = new Promise<void>((done) => leftOrigin.set(frame, done));
+        // An abandoned load wait still times out later, during another page.
+        let abandoned = false;
         // A 0 timeout would wait forever, so a frame past the deadline gets 1ms.
         const loaded = frame
           .waitForLoadState('load', {
             timeout: Math.max(1, deadline - Date.now()),
           })
           .catch((err: Error) => {
-            if (err.name !== 'TimeoutError') return;
+            if (abandoned || err.name !== 'TimeoutError') return;
             console.warn(
               `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within the page's ${SETTLE_TIMEOUT_MS / 1000}s wait; scanned it as it was.`,
             );
           });
         await Promise.race([loaded, left]);
+        abandoned = true;
         leftOrigin.delete(frame);
       };
 

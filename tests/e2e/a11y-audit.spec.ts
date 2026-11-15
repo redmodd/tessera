@@ -284,8 +284,8 @@ export default {
       // the fold: still about:blank, so same-origin. "Below" is a lazy
       // same-origin frame the audit loads, holding a lazy frame whose script
       // outlasts the page's fetches. "Hang" is a cross-origin <object> that
-      // never responds, and "Redirect" a same-origin frame that moves to a
-      // cross-origin page that never loads. The page starts a request when
+      // never responds, and "Redirect" a same-origin frame that moves, before
+      // it loads, to a cross-origin page that never loads. The page starts a request when
       // the audit first injects axe, so during its scan.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <script>
@@ -347,7 +347,7 @@ export default {
       );
       writeFileSync(
         resolve(dir, 'public/redirect.html'),
-        `<!doctype html><title>Redirect</title><script>location.replace('${embedUrl}stall')</script>`,
+        `<!doctype html><title>Redirect</title><script>setTimeout(() => location.replace('${embedUrl}stall'), 1000)</script><script src="${embedUrl}slow.js?3000"></script>`,
       );
       for (const name of ['frames', 'frames-last']) {
         writeFileSync(
