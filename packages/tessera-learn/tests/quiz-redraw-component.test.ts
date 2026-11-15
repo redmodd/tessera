@@ -78,20 +78,28 @@ describe('a quiz that redraws its questions under {#key}', () => {
     ).toHaveLength(1);
   });
 
-  it('starts from the first question when the current one leaves', () => {
-    const quiz = mountRedraw([['a', 'b', 'c'], ['d'], ['e', 'f', 'g']]);
-    for (let i = 0; i < 2; i++) {
-      quiz.click(
-        quiz.target.querySelector(
-          '.tessera-quiz-question-wrapper.active input',
-        )!,
-      );
-      quiz.click(quiz.button('Next'));
-    }
+  it('stays in place when the current question leaves, moving focus off it', async () => {
+    const quiz = mountRedraw([
+      ['a', 'b', 'c'],
+      ['d', 'e', 'f'],
+    ]);
+    quiz.click(quiz.target.querySelector('input')!);
+    quiz.click(quiz.button('Next'));
+    await new Promise((r) => setTimeout(r));
+    quiz.target
+      .querySelector<HTMLElement>(
+        '.tessera-quiz-question-wrapper.active input',
+      )!
+      .focus();
 
     quiz.click(quiz.button('Redraw'));
-    quiz.click(quiz.button('Redraw'));
-    expect(quiz.target.textContent).toContain('Question 1 of 3');
+    expect(quiz.target.textContent).toContain('Question 2 of 3');
+    expect(
+      quiz.target.querySelector('.tessera-quiz-question-wrapper.active')
+        ?.textContent,
+    ).toContain('e');
+    await new Promise((r) => setTimeout(r));
+    expect(document.activeElement?.tagName).toBe('H2');
   });
 
   it('scores only the new draw after a retry', () => {

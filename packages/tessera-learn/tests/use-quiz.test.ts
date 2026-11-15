@@ -1178,6 +1178,42 @@ describe('QuizEngine', () => {
       expect(original.id).toBe('a');
     });
 
+    it('leaves without a trace when a copy mounted after submit unmounts', () => {
+      const { engine } = makeEngine();
+      const original = engine.registerQuestion(restorable('a', true));
+      original.setAnswer(true);
+      engine.submit();
+      engine.startReview();
+
+      const copy = engine.registerQuestion(restorable('a', true));
+      expect(engine.restored).toBe(false);
+      expect(engine.state).toBe('reviewing');
+      engine.unregisterQuestion(copy);
+      expect(engine.questions).toEqual([original]);
+      expect(original.correct).toBe(true);
+    });
+
+    it('leaves the result reviewable when a new question mounts after submit', () => {
+      const { engine } = makeEngine();
+      engine.registerQuestion(restorable('a', true)).setAnswer(true);
+      engine.submit();
+
+      engine.registerQuestion(restorable('b', true));
+      expect(engine.restored).toBe(false);
+    });
+
+    it('keeps its slot when it remounts while answering', () => {
+      const { engine } = makeEngine();
+      const old = ['a', 'b', 'c'].map((id) =>
+        engine.registerQuestion(restorable(id, true)),
+      );
+      const next = engine.registerQuestion(restorable('b', true));
+
+      engine.unregisterQuestion(old[1]);
+      expect(engine.questions).toEqual([old[0], next, old[2]]);
+      expect(next.id).toBe('b');
+    });
+
     it('keeps its correct lock when it mounts again after submit', () => {
       const { engine } = makeEngine({
         graded: true,

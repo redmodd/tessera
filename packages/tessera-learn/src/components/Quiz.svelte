@@ -9,6 +9,7 @@
   const isImmediateMode = handle.feedbackMode === 'immediate';
 
   let current = $state.raw();
+  let currentSlot = $state(0);
   let reviewIndex = $state(0);
   let progressEl = $state();
   let resultsEl = $state();
@@ -17,19 +18,23 @@
   // The button the learner pressed is disabled or gone once the question or
   // phase changes, so focus moves to what replaced it. Arrow keys stay in the
   // quiz from there, even on what a page change focused first.
-  async function focusPhase() {
+  async function focusPhase(onlyIfLost = false) {
     await tick();
+    if (onlyIfLost && document.activeElement !== document.body) return;
     const node = handle.state === 'submitted' ? resultsEl : progressEl;
     node?.removeAttribute('data-tessera-page-focus');
     node?.focus();
   }
 
   let totalQuestions = $derived(handle.questions.length);
-  // Questions can leave the quiz while it is answered; when the current one
-  // does, the quiz starts again from the first.
-  let currentQuestionIndex = $derived(
-    Math.max(handle.questions.indexOf(current), 0),
-  );
+  // Follows the current question as others leave. When it leaves, the
+  // question now in its slot (a remount, or the next one) becomes current.
+  let currentQuestionIndex = $derived.by(() => {
+    const at = handle.questions.indexOf(current);
+    return at >= 0
+      ? at
+      : Math.max(Math.min(currentSlot, totalQuestions - 1), 0);
+  });
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
   let results = $derived(handle.questions.map((q) => q.correct));
   let correctCount = $derived(results.filter((c) => c).length);
@@ -37,6 +42,20 @@
   let attemptPassed = $derived(handle.score >= handle.passingScore);
   let passed = $derived(handle.bestScore >= handle.passingScore);
   let bestBeaten = $derived(handle.bestScore > handle.score);
+
+  $effect(() => {
+    const at = handle.questions.indexOf(current);
+    if (at >= 0) currentSlot = at;
+    if (at >= 0 || !current) return;
+    current = currentQuestion;
+    // Focus may have been in the widget that left.
+    focusPhase(true);
+  });
+
+  function goToQuestion(index) {
+    current = handle.questions[index];
+    focusPhase();
+  }
 
   function isAnswered(q) {
     if (!q) return false;
@@ -60,8 +79,7 @@
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
-      current = handle.questions[currentQuestionIndex + 1];
-      focusPhase();
+      goToQuestion(currentQuestionIndex + 1);
     }
   }
 
@@ -72,8 +90,7 @@
 
   function goPrevQuestion() {
     if (currentQuestionIndex === 0) return;
-    current = handle.questions[currentQuestionIndex - 1];
-    focusPhase();
+    goToQuestion(currentQuestionIndex - 1);
   }
 
   function goNextReview() {
@@ -108,6 +125,7 @@
   function handleRetry() {
     handle.retry();
     current = undefined;
+    currentSlot = 0;
     reviewIndex = 0;
     focusPhase();
   }

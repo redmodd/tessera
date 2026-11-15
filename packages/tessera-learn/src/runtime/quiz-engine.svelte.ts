@@ -78,8 +78,9 @@ export class QuizEngine implements UseQuizHandle {
   // Unmounted after submit: kept, with their results, until retry(). After an
   // incorrect-only retry, the kept answers wait here for their widgets.
   #detached = new Set<InternalQuestion>();
-  // Mounted after submit beside a question with the same id, as a keyed
-  // remount does: each takes over that question when it unmounts.
+  // Mounted beside a question with the same id, as a keyed remount does: each
+  // takes over that question's slot when it unmounts, and after submit its
+  // result too.
   #latecomers = new Set<InternalQuestion>();
   #reviewing = $state(false);
   #score = $state(0);
@@ -226,13 +227,12 @@ export class QuizEngine implements UseQuizHandle {
     const twin = this.#named(this.#members, api.id);
     this.#members.push(q);
     this.#publish();
-    if (!this.#submittedNow) return q.handle;
     const saved = this.#fromSave
       ? this.#deps.restore?.responses?.get(q.id)
       : undefined;
     if (twin && saved === undefined) this.#latecomers.add(q);
     else if (this.#fromSave) this.#fix(q);
-    if (!this.#restore(q, saved)) this.#unrestored.add(q);
+    if (this.#fromSave && !this.#restore(q, saved)) this.#unrestored.add(q);
     return q.handle;
   }
 
@@ -243,16 +243,28 @@ export class QuizEngine implements UseQuizHandle {
   unregisterQuestion(handle: Question): void {
     const q = this.#questionOf(handle);
     if (!q || !this.#members.includes(q)) return;
-    if (!this.#submittedNow) {
-      this.#members = this.#members.filter((m) => m !== q);
-      this.#publish();
-      this.#forget(q);
+    const latecomer = this.#latecomers.delete(q);
+    const next = this.#named(this.#latecomers, q.requestedId);
+    // A latecomer has no result of its own to keep.
+    if (this.#submittedNow && !latecomer) {
+      if (next) this.#takeOver(q, next);
+      else this.#detached.add(q);
       return;
     }
-    this.#latecomers.delete(q);
-    const next = this.#named(this.#latecomers, q.requestedId);
-    if (next) this.#takeOver(q, next);
-    else this.#detached.add(q);
+    if (next) this.#latecomers.delete(next);
+    this.#replace(q, next);
+    this.#publish();
+    this.#forget(q);
+  }
+
+  /** Takes `prev` out of the quiz, with `next` moving into its slot. */
+  #replace(prev: InternalQuestion, next?: InternalQuestion): void {
+    const members = this.#members.filter((m) => m !== next);
+    const at = members.indexOf(prev);
+    const slot = next ? [next] : [];
+    if (at >= 0) members.splice(at, 1, ...slot);
+    else members.push(...slot);
+    this.#members = members;
   }
 
   #named(
@@ -267,11 +279,7 @@ export class QuizEngine implements UseQuizHandle {
    * and answer, so a remount keeps one entry per question.
    */
   #takeOver(prev: InternalQuestion, next: InternalQuestion): void {
-    const members = this.#members.filter((m) => m !== next);
-    const at = members.indexOf(prev);
-    if (at >= 0) members[at] = next;
-    else members.push(next);
-    this.#members = members;
+    this.#replace(prev, next);
     next.id = prev.id;
     next.fixed = prev.fixed;
     const response = this.#answers.has(prev)
@@ -375,6 +383,7 @@ export class QuizEngine implements UseQuizHandle {
 
     for (const q of this.#detached) this.#forget(q);
     this.#detached.clear();
+    this.#latecomers.clear();
     for (const q of this.#internalQuestions) {
       this.#fix(q);
       this.#commit(q);
