@@ -1,5 +1,47 @@
 # tessera-learn
 
+## 0.14.0
+
+### Minor Changes
+
+- 807140f: Add `--tessera-on-primary` and `--tessera-primary-on-bg` so a light primary color can theme buttons, links and selection indicators with enough contrast. The quiz score label uses the success and error colors, so it follows a dark theme. The authoring guide covers light primaries and dark themes.
+  
+  **Breaking:** `--tessera-primary-light` and `--tessera-primary-dark` are gone. To upgrade, wherever you set or read them, use `--tessera-primary-bg` (now a translucent tint, so the surface behind it shows through) and `--tessera-primary-hover`.
+- c2c1e2a: Course text sent to the LMS or LRS (the cmi5.xml and tincan.xml course name and description, question and option text, and the SCORM 2004 interaction description) is tagged with the course `language` in canonical form (`EN-gb` becomes `en-GB`) instead of `en-US`. SCORM 2004 shortens the tag to a form Moodle accepts, such as `ca-ES` for `ca-ES-valencia`.
+  
+  **Breaking:** `language` is required. A missing or malformed tag (such as `en-x` or `en_US`), or one that names no language (`und`, `mul`, `zxx`), fails the build, and `a11y.ignore` no longer covers it. To upgrade, set `language` to the course's tag, such as `en` or `fr-CA`.
+  
+  **Behavior change:** a course with `language: 'en'` now reports these texts under `en` rather than `en-US`. Set `language: 'en-US'` to keep `en-US`. Verb names stay `en-US`.
+- b8e1690: **Breaking:** Theme colors and fonts now live in one place, your course CSS. Set `--tessera-primary` and `--tessera-font-family` on `:root` in `styles/` in place of `branding.primaryColor` and `branding.fontFamily`, which are removed. `tessera a11y` checks contrast as rendered, replacing the `tessera/primary-contrast` rule.
+- a4f35f5: **Breaking:** the course, every section and lesson `_meta.js`, and every page `pageConfig` need a non-empty `title`, and the build fails without one. Titles are no longer made from file and folder names. A section or lesson folder with no pages is left out of the course with a warning and needs no `_meta.js`.
+- df334af: `Video` takes an optional `poster` image for native videos, shown in place of the empty box before play.
+
+### Patch Changes
+
+- 1ec9625: `tessera a11y` no longer times out on a page that adds a frame, and waits for frames and fetched content to load before scanning.
+- fadaf0d: `tessera a11y` no longer reports findings inside cross-origin frames, such as a YouTube or Vimeo `Video`.
+- bc9b048: The `--tessera-primary-bg` and `--tessera-primary-hover` shades and the `Callout` backgrounds now derive from the theme colors in CSS, so they follow a `--tessera-primary` set on `:root` in a course stylesheet. A base theme color in a course stylesheet that isn't a color, such as a gradient on `--tessera-bg`, falls back to its default.
+- 3251cbe: Internal quiz cleanup; courses behave the same.
+- 190433c: - `@vitest/coverage-v8` 5.0.5 → 5.1.0
+  - `playwright` 1.64.1 → 1.65.0
+  - `svelte-check` 4.7.7 → 4.7.8
+  - `tsdown` 0.23.4 → 0.23.7
+  - `vitest` 5.0.5 → 5.1.0
+- 1319b3a: - `vite` 8.3.5 → 8.3.6
+- 20e3db1: Under cmi5 and xAPI, closing the window sends Terminated and any queued statements even when the saved progress is large. Progress too large to send while the page closes still goes first, but can be lost if the window closes before it arrives. When the last save failed, the Exit button resends the progress and waits for it before sending Terminated.
+- 831bd4d: `Video` uses the browser's native lazy loading and no longer shows a placeholder; a native video holds a 16:9 box with no preview frame until played. The `Sorting` card is a native `<button>`. An `AccordionItem` trigger no longer submits a surrounding form.
+- cdf8d49: CLI output skips color codes when it isn't going to a terminal or `NO_COLOR` is set. `tessera` shows help for `--help` even after an unknown option.
+- 82bbf9d: Screen readers announce `Sorting` and `Matching` as a group named by the question text.
+  
+  `tessera a11y` now also fails on an `aria-label` on an element with no role, such as a plain `<div>`, when the element has text. Screen readers ignore the label.
+- 20ebaf5: Internal cleanup; courses behave the same.
+- d3721d8: When an LRS rejects a statement on the retry after a 401, the error now includes the LRS response, as it does on the first attempt. A network error on that retry is now retried with backoff instead of dropping the statement.
+- 48c8c13: The build's skipped-heading-level warning (such as `<h2>` followed by `<h4>`) now looks only at real heading elements on the page. Text that merely looks like a heading tag, such as the string in `{'<h4>'}`, no longer triggers it.
+  
+  The warning for a page missing from a lesson's `pages` array now names the lesson's `_meta.js` file, where the fix goes.
+- 95795af: Internal cleanup; courses behave the same.
+- 557a712: Internal cleanup; courses behave the same.
+
 ## 0.13.0
 
 ### Minor Changes
