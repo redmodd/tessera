@@ -181,7 +181,22 @@ export default {};
       // load and by in-app navigation (#442).
       writeFileSync(
         resolve(dir, 'pages/01-assessment/_meta.js'),
-        `export default { title: 'Assessment', pages: ['frames', 'check', 'exam', 'practice', 'frames-last'] };`,
+        `export default { title: 'Assessment', pages: ['frames', 'check', 'chained', 'exam', 'practice', 'frames-last'] };`,
+      );
+      // A request that starts 200ms after the one before it ends, with no
+      // frame load to wait out in between.
+      writeFileSync(
+        resolve(dir, 'pages/01-assessment/chained.svelte'),
+        `<script module>export const pageConfig = { title: "Chained" };</script>
+<script>
+  let late = $state(false);
+  fetch('${embedUrl}data?1000').then(() =>
+    setTimeout(() => fetch('${embedUrl}data?100').then(() => (late = true)), 200),
+  );
+</script>
+<h1>Chained</h1>
+{#if late}<button></button>{/if}
+`,
       );
       // The page renders a button only after a slow fetch, and "Fetch" after
       // a slower one. "Asset" parses its button only after a slow script
@@ -230,6 +245,10 @@ export default {};
       await audit(dir);
 
       const report = readReport(dir);
+      expect(report.pages[2].title).toBe('Chained');
+      expect(report.pages[2].violations).toMatchObject([
+        { id: 'button-name', nodes: 1 },
+      ]);
       for (const page of [report.pages[0], report.pages.at(-1)]) {
         expect(page.title).toBe('Frames');
         expect(

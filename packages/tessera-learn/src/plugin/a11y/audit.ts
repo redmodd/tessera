@@ -507,9 +507,10 @@ export async function runAudit(
 
       // Playwright's networkidle can't be awaited again after in-app
       // navigation (#442), so track requests to catch content a page renders
-      // after a fetch. Only main-frame requests must also go quiet for 500ms:
-      // a polling frame's requests are rarely in flight, so it can't hold the
-      // audit. A frame's own document is waited on by frameLoaded.
+      // after a fetch. Only the main frame must also go 500ms without a
+      // request starting or finishing: a polling frame's requests are rarely
+      // in flight, so it can't hold the audit. A frame's own document is
+      // waited on by frameLoaded.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pending = new Set<any>();
       let lastRequestAt = 0;
@@ -536,7 +537,11 @@ export async function runAudit(
         pending.add(request);
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const settled = (request: any) => pending.delete(request);
+      const settled = (request: any) => {
+        if (pending.delete(request) && request.frame() === page.mainFrame()) {
+          lastRequestAt = Date.now();
+        }
+      };
       page.on('requestfinished', settled);
       page.on('requestfailed', settled);
       const networkBusy = () =>
@@ -557,8 +562,12 @@ export async function runAudit(
       // A frame the page just added may still be loading, and axe would scan
       // its half-parsed document. A lazy frame loads only near the viewport,
       // so it is made eager. Cross-origin frames go unscanned, so no wait.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const frameLoaded = async (frame: any, title: string) => {
+      const frameLoaded = async (
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        frame: any,
+        title: string,
+        deadline: number,
+      ) => {
         if (frame === page.mainFrame()) return;
         if (underCrossOrigin(frame.parentFrame(), courseOrigin)) return;
         const el = await frame.frameElement().catch(() => null);
@@ -581,8 +590,11 @@ export async function runAudit(
         }
         await el.dispose();
         if (!local) return;
+        // A 0 timeout would wait forever, so a frame past the deadline gets 1ms.
         await frame
-          .waitForLoadState('load', { timeout: 10_000 })
+          .waitForLoadState('load', {
+            timeout: Math.max(1, deadline - Date.now()),
+          })
           .catch((err: Error) => {
             if (err.name !== 'TimeoutError') return;
             console.warn(
@@ -596,16 +608,17 @@ export async function runAudit(
       const settle = async (title: string) => {
         const deadline = Date.now() + 10_000;
         const seen = new Set<unknown>();
-        let busy = false;
-        for (let depth = 0; depth < 5; depth++) {
+        let busy: boolean;
+        for (let depth = 0; ; depth++) {
           while ((busy = networkBusy()) && Date.now() < deadline) {
             await delay(100);
           }
+          if (depth === 5) break;
           const fresh = page.frames().filter((f: unknown) => !seen.has(f));
           if (fresh.length === 0) break;
           for (const frame of fresh) seen.add(frame);
           await Promise.all(
-            fresh.map((frame: unknown) => frameLoaded(frame, title)),
+            fresh.map((frame: unknown) => frameLoaded(frame, title, deadline)),
           );
         }
         if (busy) {
