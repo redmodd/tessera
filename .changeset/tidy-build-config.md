@@ -2,4 +2,4 @@
 'tessera-learn': patch
 ---
 
-Internal build config cleanup; no user-facing change.
+Internal cleanup; courses behave the same.
