@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { styleText } from 'node:util';
 import { styleErr } from '../cli-args.js';
+import type { Frame, Page, Request } from 'playwright';
 import type { Plugin, PreviewServer } from 'vite';
 import type { ContextPluginApi } from '../build-context.js';
 import { a11ySettingsFrom, type A11ySettings } from '../validation/a11y.js';
@@ -127,9 +129,13 @@ export function auditFindings(out: { violations: any[]; incomplete: any[] }) {
 
 // A node inside a cross-origin frame is a third-party embed's markup (Video's
 // YouTube or Vimeo player) that the author can't fix. The <iframe> stays checked.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
-  const courseOrigin = new URL(page.url()).origin;
+async function dropCrossOriginNodes(
+  page: Page,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  results: any[],
+  courseOrigin: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
   const verdicts = new Map<string, Promise<boolean>>();
   const inCrossOriginFrame = (
     frames: (string | string[])[],
@@ -160,11 +166,8 @@ async function dropCrossOriginNodes(page: any, results: any[]): Promise<any[]> {
   return kept.filter((r) => r.nodes.length > 0);
 }
 
-// Judged by the frame's URL: an about: or data: frame holds the course's markup
-// even when sandboxed; Chrome's error page for a failed embed does not.
 async function crossesOrigin(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  frame: any,
+  frame: Frame,
   selectors: (string | string[])[],
   courseOrigin: string,
 ): Promise<boolean> {
@@ -178,12 +181,28 @@ async function crossesOrigin(
       }
       return el;
     }, selector);
-    frame = await iframe.asElement()?.contentFrame();
+    const inner = await iframe.asElement()?.contentFrame();
     await iframe.dispose();
-    if (!frame) return false;
-    const url = URL.parse(frame.url());
-    if (!url || url.protocol === 'about:' || url.protocol === 'data:') continue;
-    if (url.origin !== courseOrigin) return true;
+    if (!inner) return false;
+    frame = inner;
+    if (isCrossOrigin(frame.url(), courseOrigin)) return true;
+  }
+  return false;
+}
+
+// An about: or data: frame holds the course's markup even when sandboxed;
+// Chrome's error page for a failed embed (chrome-error:) does not.
+function isCrossOrigin(href: string, courseOrigin: string): boolean {
+  const url = URL.parse(href);
+  if (!url || url.protocol === 'about:' || url.protocol === 'data:') {
+    return false;
+  }
+  return url.origin !== courseOrigin;
+}
+
+function underCrossOrigin(frame: Frame | null, courseOrigin: string): boolean {
+  for (; frame; frame = frame.parentFrame()) {
+    if (isCrossOrigin(frame.url(), courseOrigin)) return true;
   }
   return false;
 }
@@ -239,6 +258,7 @@ function resolvePlaywrightBin():
 }
 
 const INSTALL_TIMEOUT_MS = 10 * 60_000;
+const SETTLE_TIMEOUT_MS = 10_000;
 
 // Run the workspace's own `playwright` bin with the current Node binary so the
 // install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
@@ -482,14 +502,164 @@ export async function runAudit(
       // ?__tessera_audit unlocks navigation so quiz-gated pages can be scanned.
       const auditUrl = new URL(baseUrl);
       auditUrl.searchParams.set('__tessera_audit', '1');
-      await page.goto(auditUrl.href, { waitUntil: 'networkidle' });
+
+      const courseOrigin = auditUrl.origin;
+
+      // networkidle can't be awaited again after in-app navigation (#442).
+      // Only main-frame requests start the 500ms quiet window, so a polling
+      // frame can't hold the audit.
+      const pending = new Set<Request>();
+      let lastRequestAt = 0;
+      let lastRequestUrl = '';
+      page.on('request', (request: Request) => {
+        // An EventSource never finishes, and Chromium holds a preload="auto"
+        // media request open while it buffers.
+        if (['eventsource', 'media'].includes(request.resourceType())) return;
+        const frame = request.frame();
+        if (frame === page.mainFrame()) {
+          lastRequestAt = Date.now();
+          lastRequestUrl = request.url();
+        } else if (
+          // A navigating frame still has its old URL, so judge the new one.
+          request.isNavigationRequest()
+            ? isCrossOrigin(request.url(), courseOrigin) ||
+              underCrossOrigin(frame.parentFrame(), courseOrigin)
+            : underCrossOrigin(frame, courseOrigin)
+        ) {
+          return;
+        }
+        pending.add(request);
+      });
+      const settled = (request: Request) => {
+        if (pending.delete(request) && request.frame() === page.mainFrame()) {
+          lastRequestAt = Date.now();
+        }
+      };
+      page.on('requestfinished', settled);
+      page.on('requestfailed', settled);
+
+      await page.goto(auditUrl.href);
       await page.waitForSelector('#tessera-app', { timeout: 20_000 });
 
       const scan = async (): Promise<AxeViolation[]> => {
         const builder = new AxeBuilder({ page }).withTags(tags);
         if (disableRules.length > 0) builder.disableRules(disableRules);
         const found = auditFindings(await builder.analyze());
-        return (await dropCrossOriginNodes(page, found)).map(mapViolation);
+        return (await dropCrossOriginNodes(page, found, courseOrigin)).map(
+          mapViolation,
+        );
+      };
+
+      // A lazy frame loads only near the viewport, so it is made eager.
+      const frameLoaded = async (
+        frame: Frame,
+        title: string,
+        deadline: number,
+      ) => {
+        const el = await frame.frameElement().catch(() => null);
+        if (!el) return;
+        // A lazy frame is still about:blank, so judge it by what it will load.
+        const target = await el
+          .evaluate((frameEl: HTMLIFrameElement | HTMLObjectElement) => ({
+            src: frameEl.hasAttribute('srcdoc')
+              ? 'about:srcdoc'
+              : (frameEl instanceof HTMLObjectElement
+                  ? frameEl.data
+                  : frameEl.src) || 'about:blank',
+            lazy:
+              frameEl instanceof HTMLIFrameElement &&
+              frameEl.loading === 'lazy',
+          }))
+          .catch(() => undefined);
+        const src = target?.src;
+        const local = src !== undefined && !isCrossOrigin(src, courseOrigin);
+        if (local && target?.lazy) {
+          await el
+            .evaluate((iframe: HTMLIFrameElement) => {
+              iframe.loading = 'eager';
+            })
+            .catch(() => {});
+        }
+        await el.dispose();
+        if (!local) return;
+        // The load wait follows the frame across navigations, so end it when
+        // the frame moves to another origin.
+        if (underCrossOrigin(frame, courseOrigin)) return;
+        const left = new Promise<void>((done) => leftOrigin.set(frame, done));
+        // An abandoned load wait still times out later, during another page.
+        let abandoned = false;
+        // A 0 timeout would wait forever, so a frame past the deadline gets 1ms.
+        const loaded = frame
+          .waitForLoadState('load', {
+            timeout: Math.max(1, deadline - Date.now()),
+          })
+          .catch((err: Error) => {
+            if (abandoned || err.name !== 'TimeoutError') return;
+            console.warn(
+              `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within the page's ${SETTLE_TIMEOUT_MS / 1000}s wait; scanned it as it was.`,
+            );
+          });
+        await Promise.race([loaded, left]);
+        abandoned = true;
+        leftOrigin.delete(frame);
+      };
+
+      const networkQuiet = async (deadline: number) => {
+        while (pending.size > 0 || Date.now() - lastRequestAt < 500) {
+          if (Date.now() >= deadline) return false;
+          await delay(100);
+        }
+        return true;
+      };
+
+      // A frame that navigates gets its new document waited on too.
+      const seen = new Set<Frame>();
+      const leftOrigin = new Map<Frame, () => void>();
+      page.on('framenavigated', (frame: Frame) => {
+        seen.delete(frame);
+        if (underCrossOrigin(frame, courseOrigin)) leftOrigin.get(frame)?.();
+      });
+
+      // Cross-origin frames go unscanned, so they get no wait.
+      const unseen = () =>
+        page
+          .frames()
+          .filter(
+            (f: Frame) =>
+              !seen.has(f) &&
+              f !== page.mainFrame() &&
+              !underCrossOrigin(f, courseOrigin),
+          );
+
+      // Each frame pass reaches one level deeper, and a fetch can add frames.
+      const settle = async (title: string) => {
+        const deadline = Date.now() + SETTLE_TIMEOUT_MS;
+        seen.clear();
+        const framesLoaded = async () => {
+          for (let fresh = unseen(); fresh.length > 0; fresh = unseen()) {
+            for (const frame of fresh) seen.add(frame);
+            await Promise.all(
+              fresh.map((frame: Frame) => frameLoaded(frame, title, deadline)),
+            );
+            if (Date.now() >= deadline) return;
+          }
+        };
+        let quiet: boolean;
+        do {
+          await framesLoaded();
+          quiet = await networkQuiet(deadline);
+        } while (quiet && Date.now() < deadline && unseen().length > 0);
+        const [frame] = unseen();
+        if (!quiet) {
+          const [request] = pending;
+          console.warn(
+            `${stderrTag('yellow')} ${title}: the network was still busy after ${SETTLE_TIMEOUT_MS / 1000}s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
+          );
+        } else if (frame) {
+          console.warn(
+            `${stderrTag('yellow')} ${title}: frames were still being added after ${SETTLE_TIMEOUT_MS / 1000}s (${frame.url()}); scanned the page as it was.`,
+          );
+        }
       };
 
       const recordPage = async (
@@ -507,6 +677,8 @@ export async function runAudit(
 
       const totalPages = manifest.pages.length;
       for (let i = 0; i < totalPages; i++) {
+        const title = manifest.pages[i]?.title ?? `Page ${i + 1}`;
+        lastRequestAt = Date.now();
         await page.evaluate(
           (idx: number) => window.__tesseraAudit!.goToIndex(idx),
           i,
@@ -518,10 +690,11 @@ export async function runAudit(
           i,
           { timeout: 20_000 },
         );
-        await page.waitForLoadState('networkidle');
-        pages.push(
-          await recordPage(i, manifest.pages[i]?.title ?? `Page ${i + 1}`),
-        );
+        await settle(title);
+        // The next page waits for a request the scan overlaps, not for one
+        // this page already gave up on.
+        pending.clear();
+        pages.push(await recordPage(i, title));
       }
     } finally {
       await browser.close();
