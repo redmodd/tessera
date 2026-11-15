@@ -7,7 +7,9 @@
    * @prop {string} title - Accessible label for the video (required; rule 1.4)
    * @prop {Array<{ src: string, kind?: 'captions'|'subtitles', srclang?: string, label?: string }>} [tracks] -
    *   Caption/subtitle tracks for native (non-embed) video, rendered as <track>.
-   *   Ignored for YouTube/Vimeo embeds — the platform owns their captions.
+   *   Ignored for YouTube/Vimeo embeds: the platform owns their captions.
+   * @prop {string} [poster] - Image shown before play (URL or $assets/ path);
+   *   native video only.
    * @prop {string} [transcript] - Transcript text shown in a <details> disclosure
    *   below the player. To load it from a file, import the file with Vite's ?raw
    *   suffix: `import t from '$assets/x.txt?raw'` then `transcript={t}`.
@@ -17,7 +19,7 @@
   import MediaTracks from './MediaTracks.svelte';
   import Transcript from './Transcript.svelte';
 
-  let { src, title, tracks = [], transcript = '' } = $props();
+  let { src, title, tracks = [], poster, transcript = '' } = $props();
   let resolvedSrc = $derived(resolveAsset(src));
   let embedUrl = $derived(resolveVideoEmbedUrl(src));
 </script>
@@ -36,6 +38,7 @@
     <video
       controls
       preload="none"
+      poster={resolveAsset(poster)}
       class="tessera-video-native"
       aria-label={title}
     >

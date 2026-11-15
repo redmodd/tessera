@@ -298,8 +298,21 @@ test.describe('Component — Video', () => {
   test('the native player holds a 16:9 box before loading', async ({
     page,
   }) => {
-    const box = await page.locator('video.tessera-video-native').boundingBox();
+    const box = await page
+      .locator('video[aria-label="Sample video"]')
+      .boundingBox();
     expect(box!.width / box!.height).toBeCloseTo(16 / 9, 2);
+  });
+
+  test('a poster shows before play and sizes the box', async ({ page }) => {
+    const video = page.locator('video[aria-label="Sample video with poster"]');
+    await expect(video).toHaveAttribute('poster', './assets/test.png');
+    await expect
+      .poll(async () => {
+        const box = await video.boundingBox();
+        return box!.width / box!.height;
+      })
+      .toBeCloseTo(640 / 485, 2);
   });
 });
 
