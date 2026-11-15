@@ -458,10 +458,11 @@ export interface UseQuizHandle {
   readonly passingScore: number;
   readonly attemptCount: number;
   /**
-   * True while the results shown came from saved progress without every
-   * question's answer: the save had no room for them, or a question has no
-   * `restore`. Per-question results and review are unavailable until the
-   * learner retries.
+   * True while the results show without every question's answer: they came
+   * from saved progress that had no room for them, or a question mounted
+   * after submit could not take its answer back, as one without `restore`
+   * can't. Per-question results and review are unavailable until the learner
+   * retries.
    */
   readonly restored: boolean;
   /** `pageConfig.quiz.feedbackMode`, defaulting to `'review'`. */

@@ -8,7 +8,7 @@
   const feedbackDisabled = handle.feedbackMode === 'never';
   const isImmediateMode = handle.feedbackMode === 'immediate';
 
-  let questionIndex = $state(0);
+  let current = $state.raw();
   let reviewIndex = $state(0);
   let progressEl = $state();
   let resultsEl = $state();
@@ -25,9 +25,10 @@
   }
 
   let totalQuestions = $derived(handle.questions.length);
-  // Questions can leave the quiz while it is answered.
+  // Questions can leave the quiz while it is answered; when the current one
+  // does, the quiz starts again from the first.
   let currentQuestionIndex = $derived(
-    Math.min(questionIndex, Math.max(totalQuestions - 1, 0)),
+    Math.max(handle.questions.indexOf(current), 0),
   );
   let currentQuestion = $derived(handle.questions[currentQuestionIndex]);
   let results = $derived(handle.questions.map((q) => q.correct));
@@ -59,7 +60,7 @@
       return;
     }
     if (currentQuestionIndex < totalQuestions - 1) {
-      questionIndex = currentQuestionIndex + 1;
+      current = handle.questions[currentQuestionIndex + 1];
       focusPhase();
     }
   }
@@ -71,7 +72,7 @@
 
   function goPrevQuestion() {
     if (currentQuestionIndex === 0) return;
-    questionIndex = currentQuestionIndex - 1;
+    current = handle.questions[currentQuestionIndex - 1];
     focusPhase();
   }
 
@@ -106,7 +107,7 @@
 
   function handleRetry() {
     handle.retry();
-    questionIndex = 0;
+    current = undefined;
     reviewIndex = 0;
     focusPhase();
   }

@@ -547,6 +547,53 @@ describe('QuizEngine', () => {
         expect(engine.questions.every((q) => q.feedbackVisible)).toBe(true);
       });
 
+      it('takes each answer back when the shell remounts its questions at once', () => {
+        const { engine } = makeEngine(
+          { graded: true },
+          {
+            restore: {
+              attempts: 1,
+              score: 50,
+              responses: { a: true, b: false },
+            },
+          },
+        );
+        const old = [
+          engine.registerQuestion(widget('a', true)),
+          engine.registerQuestion(widget('b', true)),
+        ];
+        const next = [
+          engine.registerQuestion(widget('a', true)),
+          engine.registerQuestion(widget('b', true)),
+        ];
+        for (const q of old) engine.unregisterQuestion(q);
+
+        expect(engine.questions).toEqual(next);
+        expect(next.map((q) => q.id)).toEqual(['a', 'b']);
+        expect(next.map((q) => q.answer)).toEqual([true, false]);
+        expect(engine.restored).toBe(false);
+      });
+
+      it('restores a duplicate id from the key it was saved under', () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const { engine } = makeEngine(
+          { graded: true },
+          {
+            restore: {
+              attempts: 1,
+              score: 50,
+              responses: { x: true, 'x-2': false },
+            },
+          },
+        );
+        engine.registerQuestion(widget('x', true));
+        engine.registerQuestion(widget('x', true));
+
+        expect(engine.questions.map((q) => q.id)).toEqual(['x', 'x-2']);
+        expect(engine.questions.map((q) => q.answer)).toEqual([true, false]);
+        expect(engine.restored).toBe(false);
+      });
+
       it('counts as submitted, so leaving the page raises no unsubmitted-quiz warning', () => {
         const { engine } = makeEngine(
           { graded: true },
@@ -1073,7 +1120,12 @@ describe('QuizEngine', () => {
   });
 
   describe('a question that unmounts', () => {
-    it('hands its id to a replacement mounted before it left, without a warning', async () => {
+    const restorable = (id: string, response: boolean) => ({
+      ...tfQuestion(id, response, true),
+      restore: (r: unknown) => r,
+    });
+
+    it('hands its id to a replacement mounted before it left, without a warning', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const { engine } = makeEngine();
       const old = engine.registerQuestion(tfQuestion('a', true, true));
@@ -1081,18 +1133,13 @@ describe('QuizEngine', () => {
       expect(next.id).toBe('a-2');
 
       engine.unregisterQuestion(old);
-      await Promise.resolve();
       expect(next.id).toBe('a');
       expect(engine.questions).toEqual([next]);
       expect(warn).not.toHaveBeenCalled();
     });
 
-    it('is replaced by a widget that mounts again with its id after submit', async () => {
+    it('is replaced by a widget that mounts again with its id after submit', () => {
       const { engine } = makeEngine();
-      const restorable = (id: string, response: boolean) => ({
-        ...tfQuestion(id, response, true),
-        restore: (r: unknown) => r,
-      });
       const old = [
         engine.registerQuestion(restorable('a', true)),
         engine.registerQuestion(restorable('b', false)),
@@ -1100,7 +1147,6 @@ describe('QuizEngine', () => {
       old[0].setAnswer(true);
       old[1].setAnswer(false);
       engine.submit();
-      await Promise.resolve();
 
       engine.unregisterQuestion(old[0]);
       const a = engine.registerQuestion(restorable('a', true));
@@ -1115,13 +1161,92 @@ describe('QuizEngine', () => {
       expect(engine.questions).toEqual([a, b]);
     });
 
-    it('reports restored when a widget mounted after submit cannot take its answer back', async () => {
+    it('stays a question of its own when its id mounts again while it is still mounted', async () => {
+      const { engine } = makeEngine();
+      const original = engine.registerQuestion(restorable('a', true));
+      original.setAnswer(true);
+      engine.submit();
+      await Promise.resolve();
+
+      const copy = engine.registerQuestion(restorable('a', true));
+      expect(engine.questions).toEqual([original, copy]);
+      expect(original.answer).toBe(true);
+
+      engine.retry();
+      engine.unregisterQuestion(copy);
+      expect(engine.questions).toEqual([original]);
+      expect(original.id).toBe('a');
+    });
+
+    it('keeps its correct lock when it mounts again after submit', () => {
+      const { engine } = makeEngine({
+        graded: true,
+        retryMode: 'incorrect-only',
+      });
+      const a = engine.registerQuestion(restorable('a', true));
+      const b = engine.registerQuestion(restorable('b', false));
+      a.setAnswer(true);
+      b.setAnswer(false);
+      engine.submit();
+      engine.retry();
+      b.setAnswer(true);
+      engine.submit();
+
+      engine.unregisterQuestion(a);
+      const again = engine.registerQuestion(restorable('a', true));
+      expect(again.isLockedCorrect).toBe(true);
+    });
+
+    it('holds a locked answer through retry for its widget to mount again', () => {
+      const { engine } = makeEngine({
+        graded: true,
+        retryMode: 'incorrect-only',
+      });
+      const old = [
+        engine.registerQuestion(restorable('a', true)),
+        engine.registerQuestion(restorable('b', false)),
+      ];
+      old[0].setAnswer(true);
+      old[1].setAnswer(false);
+      engine.submit();
+      for (const q of old) engine.unregisterQuestion(q);
+
+      engine.retry();
+      expect(engine.questions).toEqual([]);
+      const a = engine.registerQuestion(restorable('a', true));
+      const b = engine.registerQuestion(restorable('b', false));
+      expect(engine.questions).toEqual([a, b]);
+      expect([a.answer, b.answer]).toEqual([true, undefined]);
+      expect([a.isLockedCorrect, b.isLockedCorrect]).toEqual([true, false]);
+    });
+
+    it('drops a held answer whose widget does not mount again before submit', () => {
+      const { engine, completed, reports } = makeEngine({
+        graded: true,
+        retryMode: 'incorrect-only',
+      });
+      const old = [
+        engine.registerQuestion(restorable('a', true)),
+        engine.registerQuestion(restorable('b', false)),
+      ];
+      old[0].setAnswer(true);
+      old[1].setAnswer(false);
+      engine.submit();
+      for (const q of old) engine.unregisterQuestion(q);
+
+      engine.retry();
+      engine.registerQuestion(restorable('b', true)).setAnswer(true);
+      engine.submit();
+      expect(completed).toEqual([50, 100]);
+      expect(reports.map((r) => r.id)).toEqual(['a', 'b', 'b']);
+    });
+
+    it('reports restored when a widget mounted after submit cannot take its answer back', () => {
       const { engine } = makeEngine();
       const old = engine.registerQuestion(tfQuestion('a', true, true));
       old.setAnswer(true);
       engine.submit();
       engine.startReview();
-      await Promise.resolve();
 
       engine.unregisterQuestion(old);
       const next = engine.registerQuestion(tfQuestion('a', true, true));

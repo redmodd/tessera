@@ -75,10 +75,12 @@ export class QuizEngine implements UseQuizHandle {
   #answers = new SvelteMap<InternalQuestion, unknown>();
   #renders = new SvelteMap<InternalQuestion, unknown>();
   #reportedAnswers = new Map<InternalQuestion, string>();
-  // Unmounted after submit: kept, with their results, until retry().
+  // Unmounted after submit: kept, with their results, until retry(). After an
+  // incorrect-only retry, the kept answers wait here for their widgets.
   #detached = new Set<InternalQuestion>();
-  // Registered in this task; a remount after submit can't replace one of these.
-  #arriving = new Set<InternalQuestion>();
+  // Mounted after submit beside a question with the same id, as a keyed
+  // remount does: each takes over that question when it unmounts.
+  #latecomers = new Set<InternalQuestion>();
   #reviewing = $state(false);
   #score = $state(0);
   #bestScore = $state(0);
@@ -86,7 +88,9 @@ export class QuizEngine implements UseQuizHandle {
   #bestScored = true;
   #attemptCount = $state(0);
   #fromSave = $state(false);
-  #answerMissing = $state(false);
+  // Mounted after submit without its answer, which a later setAnswer() does
+  // not make reviewable.
+  #unrestored = new SvelteSet<InternalQuestion>();
   // Plain fields, not $state: only the wrapper's onDestroy reads them, after
   // the questions have unmounted and taken their answers with them.
   #submitCalled = false;
@@ -143,8 +147,12 @@ export class QuizEngine implements UseQuizHandle {
     );
   }
 
+  get #inReview(): boolean {
+    return this.#reviewing && !this.restored;
+  }
+
   get state(): 'answering' | 'submitted' | 'reviewing' {
-    return this.#reviewing
+    return this.#inReview
       ? 'reviewing'
       : this.#submitted
         ? 'submitted'
@@ -185,7 +193,8 @@ export class QuizEngine implements UseQuizHandle {
 
   get restored(): boolean {
     return (
-      (this.#fromSave && this.#totalQuestions === 0) || this.#answerMissing
+      this.#submitted &&
+      (this.#totalQuestions === 0 || this.#unrestored.size > 0)
     );
   }
 
@@ -203,60 +212,28 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle {
-    const internal = {
+    const q = {
       ...api,
       requestedId: api.id,
       weight: normalizeWeight(api.weight),
     } as InternalQuestion;
-    internal.handle = this.#makeQuestionHandle(internal);
-    const prev = this.#submittedNow
-      ? this.#members.find(
-          (m) => m.requestedId === api.id && !this.#arriving.has(m),
-        )
-      : undefined;
-    if (prev) this.#replace(prev, internal);
-    else this.#members.push(internal);
-    if (this.#arriving.size === 0) {
-      queueMicrotask(() => this.#arriving.clear());
-    }
-    this.#arriving.add(internal);
-    this.#publish();
-    if (this.#submittedNow) this.#restoreAnswer(internal, prev);
-    return internal.handle;
-  }
-
-  /**
-   * A widget that remounts after submit takes over the question with its id,
-   * so the results keep one entry per question and the answer comes back.
-   */
-  #replace(prev: InternalQuestion, next: InternalQuestion): void {
-    this.#members[this.#members.indexOf(prev)] = next;
-    next.id = prev.id;
-    next.fixed = prev.fixed;
-    if (this.#feedbackShown.has(prev)) this.#feedbackShown.add(next);
-    this.#detached.delete(prev);
-  }
-
-  #restoreAnswer(
-    q: InternalQuestion,
-    prev: InternalQuestion | undefined,
-  ): void {
-    let response: unknown;
+    q.handle = this.#makeQuestionHandle(q);
+    const prev = this.#named(this.#detached, api.id);
     if (prev) {
-      if (this.#answers.has(prev)) response = prev.interaction?.()?.response;
-      this.#forget(prev);
-    } else if (this.#fromSave) {
-      response = this.#deps.restore?.responses?.get(q.id);
-      this.#fix(q);
+      this.#takeOver(prev, q);
+      return q.handle;
     }
-    const answer = restoreResponse(q, response);
-    if (answer !== undefined) {
-      this.#answers.set(q, answer);
-    } else {
-      // `restored` is now true, and a review of it would judge nothing.
-      this.#answerMissing = true;
-      this.#reviewing = false;
-    }
+    const twin = this.#named(this.#members, api.id);
+    this.#members.push(q);
+    this.#publish();
+    if (!this.#submittedNow) return q.handle;
+    const saved = this.#fromSave
+      ? this.#deps.restore?.responses?.get(q.id)
+      : undefined;
+    if (twin && saved === undefined) this.#latecomers.add(q);
+    else if (this.#fromSave) this.#fix(q);
+    if (!this.#restore(q, saved)) this.#unrestored.add(q);
+    return q.handle;
   }
 
   /**
@@ -266,15 +243,60 @@ export class QuizEngine implements UseQuizHandle {
   unregisterQuestion(handle: Question): void {
     const q = this.#questionOf(handle);
     if (!q || !this.#members.includes(q)) return;
-    if (this.#submittedNow) this.#detached.add(q);
-    else this.#remove([q]);
+    if (!this.#submittedNow) {
+      this.#members = this.#members.filter((m) => m !== q);
+      this.#publish();
+      this.#forget(q);
+      return;
+    }
+    this.#latecomers.delete(q);
+    const next = this.#named(this.#latecomers, q.requestedId);
+    if (next) this.#takeOver(q, next);
+    else this.#detached.add(q);
   }
 
-  #remove(leaving: Iterable<InternalQuestion>): void {
-    const gone = new Set(leaving);
-    this.#members = this.#members.filter((q) => !gone.has(q));
+  #named(
+    questions: Iterable<InternalQuestion>,
+    id: string,
+  ): InternalQuestion | undefined {
+    for (const q of questions) if (q.requestedId === id) return q;
+  }
+
+  /**
+   * A widget that mounts again with a question's id takes over its place, id
+   * and answer, so a remount keeps one entry per question.
+   */
+  #takeOver(prev: InternalQuestion, next: InternalQuestion): void {
+    const members = this.#members.filter((m) => m !== next);
+    const at = members.indexOf(prev);
+    if (at >= 0) members[at] = next;
+    else members.push(next);
+    this.#members = members;
+    next.id = prev.id;
+    next.fixed = prev.fixed;
+    const response = this.#answers.has(prev)
+      ? prev.interaction?.()?.response
+      : undefined;
+    const shown = this.#feedbackShown.has(prev);
+    const locked = this.#lockedCorrect.has(prev);
+    this.#detached.delete(prev);
+    this.#latecomers.delete(next);
+    this.#forget(prev);
     this.#publish();
-    for (const q of gone) this.#forget(q);
+    if (shown) this.#feedbackShown.add(next);
+    if (this.#restore(next, response)) {
+      this.#unrestored.delete(next);
+      if (locked) this.#lockedCorrect.add(next);
+    } else if (this.#submittedNow) {
+      this.#unrestored.add(next);
+    }
+  }
+
+  #restore(q: InternalQuestion, response: unknown): boolean {
+    const answer = restoreResponse(q, response);
+    if (answer === undefined) return false;
+    this.#answers.set(q, answer);
+    return true;
   }
 
   #forget(q: InternalQuestion): void {
@@ -283,6 +305,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#reportedAnswers.delete(q);
     this.#feedbackShown.delete(q);
     this.#lockedCorrect.delete(q);
+    this.#unrestored.delete(q);
   }
 
   /**
@@ -330,7 +353,7 @@ export class QuizEngine implements UseQuizHandle {
   #feedbackVisible(q: InternalQuestion): boolean {
     const mode = this.feedbackMode;
     if (mode === 'never') return false;
-    if (this.#reviewing) return true;
+    if (this.#inReview) return true;
     return mode === 'immediate' && this.#feedbackShown.has(q);
   }
 
@@ -350,6 +373,8 @@ export class QuizEngine implements UseQuizHandle {
       return;
     }
 
+    for (const q of this.#detached) this.#forget(q);
+    this.#detached.clear();
     for (const q of this.#internalQuestions) {
       this.#fix(q);
       this.#commit(q);
@@ -378,7 +403,7 @@ export class QuizEngine implements UseQuizHandle {
     }
     this.#submitted = true;
     this.#fromSave = false;
-    this.#answerMissing = false;
+    this.#unrestored.clear();
     this.#attemptCount++;
 
     // A review needs every answer; short of that only an incorrect-only
@@ -417,8 +442,6 @@ export class QuizEngine implements UseQuizHandle {
 
   retry(): void {
     if (!this.canRetry) return;
-    this.#remove(this.#detached);
-    this.#detached.clear();
     const kept = new Set<InternalQuestion>();
     this.#lockedCorrect.clear();
     if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
@@ -436,13 +459,19 @@ export class QuizEngine implements UseQuizHandle {
       if (!kept.has(q)) this.#answers.delete(q);
     }
     this.#reportedAnswers.clear();
+    this.#feedbackShown.clear();
+    const unmounted = this.#detached;
+    this.#detached = new Set([...unmounted].filter((q) => kept.has(q)));
+    this.#members = this.#members.filter((q) => !unmounted.has(q));
+    this.#publish();
+    for (const q of unmounted) if (!kept.has(q)) this.#forget(q);
+    this.#latecomers.clear();
+    this.#unrestored.clear();
     for (const q of this.#internalQuestions) {
       if (!kept.has(q)) q.reset?.();
     }
-    this.#feedbackShown.clear();
     this.#submitted = false;
     this.#fromSave = false;
-    this.#answerMissing = false;
     this.#reviewing = false;
     this.#score = 0;
   }
@@ -477,6 +506,7 @@ export class QuizEngine implements UseQuizHandle {
     return {
       [engine.#questionKey]: q,
       get id() {
+        void engine.#questionHandles; // #publish() can rewrite an unfixed id
         return q.id;
       },
       get submitted() {
