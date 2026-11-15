@@ -167,8 +167,7 @@ async function dropCrossOriginNodes(
 }
 
 async function crossesOrigin(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  frame: any,
+  frame: Frame,
   selectors: (string | string[])[],
   courseOrigin: string,
 ): Promise<boolean> {
@@ -182,9 +181,10 @@ async function crossesOrigin(
       }
       return el;
     }, selector);
-    frame = await iframe.asElement()?.contentFrame();
+    const inner = await iframe.asElement()?.contentFrame();
     await iframe.dispose();
-    if (!frame) return false;
+    if (!inner) return false;
+    frame = inner;
     if (isCrossOrigin(frame.url(), courseOrigin)) return true;
   }
   return false;
@@ -259,8 +259,6 @@ function resolvePlaywrightBin():
 
 const INSTALL_TIMEOUT_MS = 10 * 60_000;
 const SETTLE_TIMEOUT_MS = 10_000;
-// Also ends the frame passes on a page that keeps adding frames.
-const MAX_FRAME_DEPTH = 5;
 
 // Run the workspace's own `playwright` bin with the current Node binary so the
 // install is package-manager-agnostic. No --with-deps: it needs sudo on Linux.
@@ -516,8 +514,10 @@ export async function runAudit(
       let lastRequestAt = 0;
       let lastRequestUrl = '';
       page.on('request', (request: Request) => {
-        // An EventSource never finishes; networkidle ignores it too.
-        if (request.resourceType() === 'eventsource') return;
+        // An EventSource never finishes; networkidle ignores it too. Chromium
+        // holds a preload="auto" media request open while it buffers, and
+        // media never changes the markup axe scans.
+        if (['eventsource', 'media'].includes(request.resourceType())) return;
         const frame = request.frame();
         if (frame === page.mainFrame()) {
           lastRequestAt = Date.now();
@@ -562,7 +562,7 @@ export async function runAudit(
         deadline: number,
       ) => {
         if (frame === page.mainFrame()) return;
-        if (underCrossOrigin(frame.parentFrame(), courseOrigin)) return;
+        if (underCrossOrigin(frame, courseOrigin)) return;
         const el = await frame.frameElement().catch(() => null);
         if (!el) return;
         // A lazy frame is still about:blank, so judge it by what it will load.
@@ -585,17 +585,23 @@ export async function runAudit(
         }
         await el.dispose();
         if (!local) return;
+        // The load wait follows the frame to its next document, so it ends
+        // when the frame moves to another origin, even mid-wait.
+        if (underCrossOrigin(frame, courseOrigin)) return;
+        const left = new Promise<void>((done) => leftOrigin.set(frame, done));
         // A 0 timeout would wait forever, so a frame past the deadline gets 1ms.
-        await frame
+        const loaded = frame
           .waitForLoadState('load', {
             timeout: Math.max(1, deadline - Date.now()),
           })
           .catch((err: Error) => {
             if (err.name !== 'TimeoutError') return;
             console.warn(
-              `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within ${SETTLE_TIMEOUT_MS / 1000}s; scanned it as it was.`,
+              `${stderrTag('yellow')} ${title}: a frame (${src}) didn't load within the page's ${SETTLE_TIMEOUT_MS / 1000}s wait; scanned it as it was.`,
             );
           });
+        await Promise.race([loaded, left]);
+        leftOrigin.delete(frame);
       };
 
       const networkQuiet = async (deadline: number) => {
@@ -608,27 +614,45 @@ export async function runAudit(
 
       // A frame that navigates gets its new document waited on too.
       const seen = new Set<Frame>();
-      page.on('framenavigated', (frame: Frame) => seen.delete(frame));
+      const leftOrigin = new Map<Frame, () => void>();
+      page.on('framenavigated', (frame: Frame) => {
+        seen.delete(frame);
+        if (underCrossOrigin(frame, courseOrigin)) leftOrigin.get(frame)?.();
+      });
 
-      // Each pass reaches frames one level deeper: a loaded frame can hold
-      // lazy frames of its own and start requests. Frames load while the
-      // network wait runs, so a slow fetch doesn't use up their time.
+      const unseen = () => page.frames().filter((f: Frame) => !seen.has(f));
+
+      // Each frame pass reaches frames one level deeper: a loaded frame can
+      // hold lazy frames of its own. The passes run beside the network wait,
+      // so a slow fetch doesn't use up the frames' time, and repeat after it,
+      // since a fetch can add frames.
       const settle = async (title: string) => {
         const deadline = Date.now() + SETTLE_TIMEOUT_MS;
         seen.clear();
-        for (let depth = 0; depth < MAX_FRAME_DEPTH; depth++) {
-          const fresh = page.frames().filter((f: Frame) => !seen.has(f));
-          if (fresh.length === 0) break;
-          for (const frame of fresh) seen.add(frame);
-          await Promise.all([
-            networkQuiet(deadline),
-            ...fresh.map((frame: Frame) => frameLoaded(frame, title, deadline)),
-          ]);
-        }
-        if (!(await networkQuiet(deadline))) {
+        const framesLoaded = async () => {
+          for (let fresh = unseen(); fresh.length > 0; fresh = unseen()) {
+            for (const frame of fresh) seen.add(frame);
+            await Promise.all(
+              fresh.map((frame: Frame) => frameLoaded(frame, title, deadline)),
+            );
+            if (Date.now() >= deadline) return;
+          }
+        };
+        let quiet: boolean;
+        do {
+          await Promise.all([networkQuiet(deadline), framesLoaded()]);
+          // A frame can outlast the wait and start requests of its own.
+          quiet = await networkQuiet(deadline);
+        } while (quiet && Date.now() < deadline && unseen().length > 0);
+        const [frame] = unseen();
+        if (!quiet) {
           const [request] = pending;
           console.warn(
             `${stderrTag('yellow')} ${title}: the network was still busy after ${SETTLE_TIMEOUT_MS / 1000}s (${request?.url() ?? lastRequestUrl}); scanned the page as it was.`,
+          );
+        } else if (frame) {
+          console.warn(
+            `${stderrTag('yellow')} ${title}: frames were still being added after ${SETTLE_TIMEOUT_MS / 1000}s (${frame.url()}); scanned the page as it was.`,
           );
         }
       };

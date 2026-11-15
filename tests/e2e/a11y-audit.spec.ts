@@ -151,8 +151,12 @@ export default {};
     // embeds are out-of-process cross-origin frames, like a YouTube Video.
     const embed = createServer(async (req, res) => {
       if (req.url === '/hang') return;
-      if (req.url === '/slow.js') {
-        await delay(1000);
+      if (req.url === '/stall') {
+        res.setHeader('Content-Type', 'text/html');
+        return res.end('<img src="/hang">');
+      }
+      if (req.url?.startsWith('/slow.js')) {
+        await delay(Number(req.url.split('?')[1] ?? 1000));
         res.setHeader('Content-Type', 'text/javascript');
         return res.end('');
       }
@@ -178,9 +182,24 @@ export default {};
       // Without the CSP entry the embed is blocked and has no button to skip.
       expect(withCsp).not.toBe(source);
       writeFileSync(config, withCsp);
+      // A WAV long enough that Chromium holds its preload="auto" request open
+      // while it buffers.
+      const wavBytes = 400 * 1024 * 1024;
+      const wavHeader = Buffer.alloc(44);
+      wavHeader.write('RIFFxxxxWAVEfmt ', 0);
+      wavHeader.writeUInt32LE(36 + wavBytes, 4);
+      wavHeader.writeUInt32LE(16, 16);
+      wavHeader.writeUInt16LE(1, 20);
+      wavHeader.writeUInt16LE(2, 22);
+      wavHeader.writeUInt32LE(44100, 24);
+      wavHeader.writeUInt32LE(44100 * 4, 28);
+      wavHeader.writeUInt16LE(4, 32);
+      wavHeader.writeUInt16LE(16, 34);
+      wavHeader.write('data', 36);
+      wavHeader.writeUInt32LE(wavBytes, 40);
       // The audit's preview server loads the course's vite.config.js, which
       // sends late.html slowly, so a frame navigating to it is mid-navigation
-      // for a while.
+      // for a while, and streams the WAV.
       writeFileSync(
         resolve(dir, 'vite.config.js'),
         `import { tesseraPlugin } from 'tessera-learn/plugin';
@@ -190,9 +209,23 @@ export default {
     {
       name: 'slow-late-html',
       configurePreviewServer(server) {
-        server.middlewares.use((req, res, next) =>
-          req.url.endsWith('/late.html') ? setTimeout(next, 1000) : next(),
-        );
+        server.middlewares.use((req, res, next) => {
+          if (req.url.endsWith('/late.html')) return setTimeout(next, 1000);
+          if (!req.url.endsWith('/long.wav')) return next();
+          res.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': ${44 + wavBytes} });
+          res.write(Buffer.from('${wavHeader.toString('base64')}', 'base64'));
+          const chunk = Buffer.alloc(65536);
+          let left = ${wavBytes};
+          req.on('close', () => (left = 0));
+          const pump = () => {
+            while (left > 0) {
+              left -= chunk.length;
+              if (!res.write(chunk)) return res.once('drain', pump);
+            }
+            res.end();
+          };
+          pump();
+        });
       },
     },
   ],
@@ -230,7 +263,7 @@ export default {
 `,
       );
       // A request that starts 200ms after the one before it ends, with no
-      // frame load to wait out in between.
+      // frame load to wait out in between, beside audio that keeps buffering.
       writeFileSync(
         resolve(dir, 'pages/01-assessment/chained.svelte'),
         `<script module>export const pageConfig = { title: "Chained" };</script>
@@ -242,15 +275,18 @@ export default {
 </script>
 <h1>Chained</h1>
 {#if late}<button></button>{/if}
+<audio preload="auto" src="./long.wav"></audio>
 `,
       );
       // The page renders a button only after a slow fetch, and "Fetch" after
       // a slower one. "Asset" parses its button only after a slow script
       // loads; "Poll" keeps the network busy. "Unloaded" is a lazy Video below
       // the fold: still about:blank, so same-origin. "Below" is a lazy
-      // same-origin frame the audit loads, holding a lazy frame of its own.
-      // "Hang" is a cross-origin <object> that never responds. The page starts
-      // a request when the audit first injects axe, so during its scan.
+      // same-origin frame the audit loads, holding a lazy frame whose script
+      // outlasts the page's fetches. "Hang" is a cross-origin <object> that
+      // never responds, and "Redirect" a same-origin frame that moves to a
+      // cross-origin page that never loads. The page starts a request when
+      // the audit first injects axe, so during its scan.
       const frames = `<script module>export const pageConfig = { title: "Frames" };</script>
 <script>
   let late = $state(false);
@@ -283,6 +319,7 @@ export default {
 <iframe title="Nested" srcdoc="<iframe title='Inner' src='${embedUrl}'></iframe>"></iframe>
 <iframe srcdoc="<p>Untitled</p>"></iframe>
 <object title="Hang" data="${embedUrl}hang"></object>
+<iframe title="Redirect" src="./redirect.html"></iframe>
 <div style="height: 30000px"></div>
 <iframe title="Unloaded" loading="lazy" src="${embedUrl}"></iframe>
 <iframe title="Below" loading="lazy" src="./nest.html"></iframe>
@@ -302,7 +339,15 @@ export default {
       );
       writeFileSync(
         resolve(dir, 'public/nest.html'),
-        `<!doctype html><title>Nest</title><div style="height: 30000px"></div><iframe title="Deep" loading="lazy" src="./sim.html"></iframe>`,
+        `<!doctype html><title>Nest</title><div style="height: 30000px"></div><iframe title="Deep" loading="lazy" src="./deep.html"></iframe>`,
+      );
+      writeFileSync(
+        resolve(dir, 'public/deep.html'),
+        `<!doctype html><title>Deep</title><script src="${embedUrl}slow.js?7500"></script><button></button>`,
+      );
+      writeFileSync(
+        resolve(dir, 'public/redirect.html'),
+        `<!doctype html><title>Redirect</title><script>location.replace('${embedUrl}stall')</script>`,
       );
       for (const name of ['frames', 'frames-last']) {
         writeFileSync(
