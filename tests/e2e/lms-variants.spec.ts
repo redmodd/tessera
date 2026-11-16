@@ -165,6 +165,47 @@ test.describe.serial('quiz reporting timing — review and never', () => {
       .poll(() => interactionField(page, 'id'), { timeout: 5000 })
       .toEqual(['dupid', 'dupid_2']);
   });
+  test('a bank quiz reports only the drawn questions and resumes them, in order, for review', async ({
+    page,
+  }) => {
+    await launchQuiz(page, BASE, 'Bank Quiz');
+    const active = page.locator('.tessera-quiz-question-wrapper.active');
+    const primary = page.locator('.tessera-quiz-nav .tessera-btn-primary');
+    await expect(page.locator('.tessera-content h1')).toHaveText('Bank Quiz');
+    await expect(page.locator('.tessera-quiz-progress-text')).toContainText(
+      'of 3',
+    );
+
+    const asked: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      asked.push(
+        (await active.locator('.tessera-mc-question').innerText()).trim(),
+      );
+      await active.locator('.tessera-mc-option').nth(0).click();
+      await primary.click();
+    }
+    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+    expect(asked).toContain('Intro question');
+    expect(new Set(asked).size).toBe(3);
+
+    const ids = asked.map((text) => `bank_${text.match(/\d/)?.[0] ?? 'intro'}`);
+    await expect
+      .poll(() => interactionField(page, 'id'), { timeout: 5000 })
+      .toEqual(ids);
+
+    await page.reload();
+    await waitForTesseraContent(page);
+    await expect(page.locator('.tessera-content h1')).toHaveText('Bank Quiz');
+    await page.getByRole('button', { name: 'Review Answers' }).click();
+    const reviewed: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      reviewed.push(
+        (await active.locator('.tessera-mc-question').innerText()).trim(),
+      );
+      await primary.click();
+    }
+    expect(reviewed).toEqual(asked);
+  });
 });
 
 /**

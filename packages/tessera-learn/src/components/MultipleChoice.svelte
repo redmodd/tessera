@@ -24,6 +24,7 @@
     optionFeedback = [],
     graded,
     maxRetries,
+    pool,
     weight,
   } = $props();
 
@@ -34,21 +35,24 @@
   const groupId = `mc-${componentId}`;
 
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
-      response: () => ({
-        type: 'choice',
-        response: selectedOption !== null ? [String(selectedOption)] : [],
-        correct: [String(correct)],
-        options: indexOptions(options),
-      }),
-      reset: () => {
-        selectedOption = null;
+    questionOptions(
+      () => ({ id, question, graded, weight, maxRetries, pool }),
+      {
+        response: () => ({
+          type: 'choice',
+          response: selectedOption !== null ? [String(selectedOption)] : [],
+          correct: [String(correct)],
+          options: indexOptions(options),
+        }),
+        reset: () => {
+          selectedOption = null;
+        },
+        restore: (response) => {
+          selectedOption = savedIndex(response[0], options);
+          return selectedOption;
+        },
       },
-      restore: (response) => {
-        selectedOption = savedIndex(response[0], options);
-        return selectedOption;
-      },
-    }),
+    ),
   );
 
   function handleSelect(optIndex) {

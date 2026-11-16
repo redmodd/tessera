@@ -8,6 +8,8 @@ import {
   walkPages,
   isLiterallyGradedQuestion,
   listedGradedQuestions,
+  literalValue,
+  staticQuestionId,
   QUESTION_COMPONENT_NAMES,
   READ_FAILURE_MESSAGES,
   STATIC_LITERAL_RULE,
@@ -166,6 +168,11 @@ function validatePageFile(
 
   validateAssetRefs(content, assetsDir, d, { existsCache: assetExistsCache });
   validateQuestionComponents(questionComponents, d, profile);
+  if (isQuiz) {
+    validateQuestionPools(quiz.draw, questionComponents, d, {
+      seesEveryQuestion: !hasCustomWidget && useQuestions === 'absent',
+    });
+  }
   validateMediaComponents(content, d);
   validateHeadingOrder(content, d);
   validateContractBypass(content, d);
@@ -437,6 +444,8 @@ const KNOWN_QUIZ_FIELDS = new Set(
     maxAttempts: true,
     feedbackMode: true,
     retryMode: true,
+    draw: true,
+    shuffle: true,
   } satisfies Record<keyof QuizConfig, true>),
 );
 const PAGE_LEVEL_FIELDS = new Set<string>([
@@ -461,7 +470,7 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
     }
   }
 
-  for (const field of ['graded', 'gatesProgress']) {
+  for (const field of ['graded', 'gatesProgress', 'shuffle']) {
     validateBoolean(quiz[field], `quiz.${field}`, d);
   }
 
@@ -476,6 +485,76 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
 
   checkOneOf('quiz.feedbackMode', FEEDBACK_MODES, quiz.feedbackMode, d);
   checkOneOf('quiz.retryMode', RETRY_MODES, quiz.retryMode, d);
+
+  const { draw } = quiz;
+  const isCount = (n: unknown) => Number.isInteger(n) && (n as number) > 0;
+  const validDraw =
+    draw === undefined ||
+    isCount(draw) ||
+    (isRecord(draw) &&
+      Object.keys(draw).length > 0 &&
+      Object.values(draw).every(isCount));
+  if (!validDraw) {
+    d.error(
+      'quiz.draw must be a positive whole number, or { pool: count } with a ' +
+        `positive whole number per pool, got ${formatValue(draw)}`,
+    );
+  }
+}
+
+/**
+ * Pools named on the page's built-in questions against `quiz.draw`. Counts
+ * are checked only when the build sees every question the page renders.
+ */
+function validateQuestionPools(
+  draw: unknown,
+  questions: ComponentMatch[],
+  d: Diagnostics,
+  { seesEveryQuestion }: { seesEveryQuestion: boolean },
+): void {
+  const pools = isRecord(draw) ? draw : null;
+  const sizes = new Map<string | undefined, number>();
+  let counted = seesEveryQuestion;
+  for (const match of questions) {
+    const id = staticQuestionId(match);
+    const subject = `<${match.name}>${id === null ? '' : ` "${id}"`}`;
+    const prop = match.props.get('pool');
+    const literal = literalValue(prop);
+    if (match.hasSpread || match.branches.size > 0 || (prop && !literal))
+      counted = false;
+    const value = literal?.value;
+    if (value !== undefined && typeof value !== 'string') {
+      d.error(`${subject} pool must be a string, got ${formatValue(value)}`);
+      continue;
+    }
+    const pool = value;
+    if (pool !== undefined && !pools) {
+      d.error(
+        `${subject} names pool "${pool}", but quiz.draw is not { pool: count }, ` +
+          'so the pool is ignored. Name the pool in quiz.draw, or drop pool.',
+      );
+    } else if (pool !== undefined && pools && !Object.hasOwn(pools, pool)) {
+      d.error(
+        `${subject} names pool "${pool}", which quiz.draw does not list, ` +
+          'so it is never drawn. Add the pool to quiz.draw, or fix the name.',
+      );
+    }
+    const key = pools ? pool : undefined;
+    sizes.set(key, (sizes.get(key) ?? 0) + 1);
+  }
+  if (!counted) return;
+  const wanted: [string | undefined, unknown][] = pools
+    ? Object.entries(pools)
+    : [[undefined, draw]];
+  for (const [pool, count] of wanted) {
+    const size = sizes.get(pool) ?? 0;
+    if (typeof count === 'number' && count > size) {
+      d.error(
+        `quiz.draw asks for ${count} ${pool === undefined ? 'questions' : `from pool "${pool}"`}, ` +
+          `but the page has ${size}`,
+      );
+    }
+  }
 }
 
 /**

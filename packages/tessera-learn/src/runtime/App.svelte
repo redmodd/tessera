@@ -204,6 +204,7 @@
           score: progress.quizScore(index) ?? 0,
           unscored: progress.quizUnscored(index),
           responses: progress.quizResponses(index),
+          questionIds: progress.quizQuestionIds(index),
         };
         mounting = { index, focusBefore, gen };
         PageComponent = mod.default;

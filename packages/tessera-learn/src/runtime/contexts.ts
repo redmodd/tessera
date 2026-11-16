@@ -36,6 +36,8 @@ export interface QuizPageState {
   score: number;
   unscored?: boolean;
   responses?: ReadonlyMap<string, unknown>;
+  /** The best attempt's question ids, in order, under `draw` or `shuffle`. */
+  questionIds?: readonly string[];
 }
 
 export interface PageContext {

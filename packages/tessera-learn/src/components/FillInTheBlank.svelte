@@ -22,6 +22,7 @@
     incorrectFeedback = '',
     graded,
     maxRetries,
+    pool,
     weight,
   } = $props();
 
@@ -32,22 +33,25 @@
   const inputId = `fitb-${componentId}`;
 
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
-      complete: () => inputValue.trim() !== '',
-      response: () => ({
-        type: 'fill-in',
-        response: inputValue.trim(),
-        correct: answerList,
-        caseMatters: !!caseSensitive,
-      }),
-      reset: () => {
-        inputValue = '';
+    questionOptions(
+      () => ({ id, question, graded, weight, maxRetries, pool }),
+      {
+        complete: () => inputValue.trim() !== '',
+        response: () => ({
+          type: 'fill-in',
+          response: inputValue.trim(),
+          correct: answerList,
+          caseMatters: !!caseSensitive,
+        }),
+        reset: () => {
+          inputValue = '';
+        },
+        restore: (response) => {
+          inputValue = String(response);
+          return inputValue;
+        },
       },
-      restore: (response) => {
-        inputValue = String(response);
-        return inputValue;
-      },
-    }),
+    ),
   );
 
   const inQuiz = q.mode === 'quiz';

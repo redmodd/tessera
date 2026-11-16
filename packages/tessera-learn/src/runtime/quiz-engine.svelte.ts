@@ -35,14 +35,15 @@ export interface QuizEngineDeps {
     score: number,
     responses: Map<string, unknown>,
     scored: boolean,
+    questionIds?: string[],
   ) => void;
   /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
   notify?: (name: string, detail?: unknown) => void;
   /**
-   * Saved attempt count, best score and that attempt's responses for this
-   * quiz page. With attempts > 0 the engine starts in the results phase, and
-   * can review them once every question has taken its answer back: see
-   * {@link QuizEngine.restored}.
+   * Saved attempt count, best score and that attempt's responses and
+   * question ids for this quiz page. With attempts > 0 the engine starts in
+   * the results phase, and can review them once every question has taken its
+   * answer back: see {@link QuizEngine.restored}.
    */
   restore?: QuizPageState;
 }
@@ -82,6 +83,11 @@ export class QuizEngine implements UseQuizHandle {
   #indexKey = Symbol('tessera.questionIndex');
   #seenIds = new Set<string>();
   #rewrittenIds = new Set<string>();
+  #indexById = new Map<string, number>();
+  // The attempt's question ids in order; null when every registered question
+  // is in it, in page order (no `draw` or `shuffle`).
+  #attemptIds = $state.raw<string[] | null>(null);
+  #mounted = false;
 
   constructor(deps: QuizEngineDeps) {
     this.#deps = deps;
@@ -96,13 +102,35 @@ export class QuizEngine implements UseQuizHandle {
       this.#fromSave = true;
       this.#submitCalled = true;
     }
+    if (this.#bank) {
+      this.#attemptIds = this.#fromSave
+        ? [...(deps.restore?.questionIds ?? [])]
+        : [];
+    }
+  }
+
+  get #bank(): boolean {
+    const { draw, shuffle } = this.#deps.quizConfig;
+    return draw !== undefined || !!shuffle;
   }
 
   // Derived values are plain getters over $state, not $derived. Getters
   // recompute on read with or without a tracking effect, so
   // engine-construction tests need no $effect.root.
-  get #totalQuestions(): number {
-    return this.#internalQuestions.length;
+  get #attempt(): number[] {
+    const all = this.#questionHandles.map((_, i) => i);
+    if (!this.#attemptIds) return all;
+    return this.#attemptIds.flatMap((id) => {
+      const i = this.#indexById.get(id);
+      return i === undefined ? [] : [i];
+    });
+  }
+
+  #inAttempt(i: number): boolean {
+    return (
+      !this.#attemptIds ||
+      this.#attemptIds.includes(this.#internalQuestions[i].id)
+    );
   }
 
   #answerComplete(i: number): boolean {
@@ -112,10 +140,8 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   get #allAnswered(): boolean {
-    return (
-      this.#totalQuestions > 0 &&
-      this.#internalQuestions.every((_, i) => this.#answerComplete(i))
-    );
+    const attempt = this.#attempt;
+    return attempt.length > 0 && attempt.every((i) => this.#answerComplete(i));
   }
 
   get state(): 'answering' | 'submitted' | 'reviewing' {
@@ -127,7 +153,8 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   get questions(): ReadonlyArray<Question> {
-    return this.#questionHandles;
+    const handles = this.#questionHandles;
+    return this.#attemptIds ? this.#attempt.map((i) => handles[i]) : handles;
   }
 
   get canSubmit(): boolean {
@@ -159,8 +186,12 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   get restored(): boolean {
+    if (!this.#fromSave) return false;
+    const attempt = this.#attempt;
     return (
-      this.#fromSave && (this.#totalQuestions === 0 || this.#answerMissing)
+      attempt.length === 0 ||
+      attempt.length < (this.#attemptIds?.length ?? 0) ||
+      this.#answerMissing
     );
   }
 
@@ -174,15 +205,86 @@ export class QuizEngine implements UseQuizHandle {
 
   /** Dev-warning inputs the wrapper reads in onDestroy. */
   get stats(): {
+    registeredCount: number;
     questionsCount: number;
     answersCount: number;
     submitCalled: boolean;
   } {
+    const attempt = this.#attempt;
     return {
-      questionsCount: this.#internalQuestions.length,
-      answersCount: this.#answers.size,
+      registeredCount: this.#internalQuestions.length,
+      questionsCount: attempt.length,
+      answersCount: attempt.filter((i) => this.#answers.has(i)).length,
       submitCalled: this.#submitCalled,
     };
+  }
+
+  /**
+   * Draws the first attempt once every question on the page has registered.
+   * A restored result keeps its saved questions.
+   */
+  mount(): void {
+    this.#mounted = true;
+    if (!this.#bank) return;
+    if (import.meta.env?.DEV) this.#checkPools();
+    if (!this.#fromSave) this.#attemptIds = this.#draw();
+  }
+
+  #draw(): string[] {
+    const { draw, shuffle } = this.#deps.quizConfig;
+    const questions = this.#internalQuestions;
+    let picked: InternalQuestion[];
+    if (draw === undefined) {
+      picked = [...questions];
+    } else if (typeof draw === 'number') {
+      picked = sample(questions, draw);
+    } else {
+      picked = questions.filter((q) => q.pool === undefined);
+      for (const [pool, count] of Object.entries(draw)) {
+        picked.push(
+          ...sample(
+            questions.filter((q) => q.pool === pool),
+            count,
+          ),
+        );
+      }
+    }
+    if (shuffle) picked = sample(picked, picked.length);
+    else picked.sort((a, b) => questions.indexOf(a) - questions.indexOf(b));
+    return picked.map((q) => q.id);
+  }
+
+  #checkPools(): void {
+    const { draw } = this.#deps.quizConfig;
+    const questions = this.#internalQuestions;
+    const tooFew = (count: number, size: number, from: string) => {
+      if (count <= size) return;
+      console.warn(
+        `[tessera] useQuiz: quiz.draw asks for ${count} ${from}, but only ` +
+          `${size} registered, so each attempt gets ${size}.`,
+      );
+    };
+    if (typeof draw === 'number') tooFew(draw, questions.length, 'questions');
+    if (typeof draw === 'object') {
+      for (const [pool, count] of Object.entries(draw)) {
+        const size = questions.filter((q) => q.pool === pool).length;
+        tooFew(count, size, `from pool "${pool}"`);
+      }
+    }
+    for (const q of questions) {
+      if (q.pool === undefined) continue;
+      if (typeof draw !== 'object') {
+        console.warn(
+          `[tessera] useQuiz: question "${q.id}" names pool "${q.pool}", but quiz.draw ` +
+            'is not { pool: count }, so the pool is ignored. Name the pool in draw, or drop pool.',
+        );
+      } else if (!Object.hasOwn(draw, q.pool)) {
+        console.warn(
+          `[tessera] useQuiz: question "${q.id}" names pool "${q.pool}", which quiz.draw ` +
+            'does not list, so it is never drawn. Add the pool to draw, or fix the name.',
+        );
+      }
+    }
   }
 
   registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle {
@@ -212,12 +314,22 @@ export class QuizEngine implements UseQuizHandle {
     };
     this.#internalQuestions.push(internal);
     const index = this.#internalQuestions.length - 1;
-    const answer = this.#fromSave
-      ? restoreResponse(internal, this.#deps.restore?.responses?.get(id))
-      : undefined;
+    this.#indexById.set(id, index);
+    const inAttempt = this.#inAttempt(index);
+    if (import.meta.env?.DEV && this.#mounted && !inAttempt) {
+      console.warn(
+        `[tessera] useQuiz: question "${id}" registered after the quiz drew its ` +
+          'questions, so it is left out of this attempt. Render every question ' +
+          'when the quiz mounts, not inside {#await}, a lazy import or an {#if}.',
+      );
+    }
+    const answer =
+      this.#fromSave && inAttempt
+        ? restoreResponse(internal, this.#deps.restore?.responses?.get(id))
+        : undefined;
     if (answer !== undefined) {
       this.#answers.set(index, answer);
-    } else if (this.#fromSave) {
+    } else if (this.#fromSave && inAttempt) {
       // `restored` is now true, and a review of it would judge nothing.
       this.#answerMissing = true;
       this.#reviewing = false;
@@ -267,7 +379,8 @@ export class QuizEngine implements UseQuizHandle {
 
   submit(): void {
     this.#submitCalled = true;
-    if (this.#submitted || this.#totalQuestions === 0) return;
+    const attempt = this.#attempt;
+    if (this.#submitted || attempt.length === 0) return;
     if (!this.#allAnswered) {
       console.warn(
         '[tessera] useQuiz: submit() ran with an unanswered or half-built question, ' +
@@ -276,9 +389,9 @@ export class QuizEngine implements UseQuizHandle {
       return;
     }
 
-    for (let i = 0; i < this.#internalQuestions.length; i++) this.#commit(i);
+    for (const i of attempt) this.#commit(i);
 
-    const computed = this.#computeScore();
+    const computed = this.#computeScore(attempt);
     const scored = computed !== null;
     // A quiz of only survey or reflection questions has nothing to fail.
     const score = computed ?? 100;
@@ -305,18 +418,24 @@ export class QuizEngine implements UseQuizHandle {
 
     // A review needs every answer; short of that only an incorrect-only
     // retry reads them, to lock the correct ones.
+    const questions = attempt.map((i) => this.#internalQuestions[i]);
     const responses = new Map<string, unknown>();
     if (
       this.#deps.quizConfig.retryMode === 'incorrect-only' ||
-      this.#internalQuestions.every((q) => q.restore)
+      questions.every((q) => q.restore)
     ) {
-      for (const q of this.#internalQuestions) {
+      for (const q of questions) {
         if (!q.restore) continue;
         const response = q.interaction?.()?.response;
         if (response !== undefined) responses.set(q.id, response);
       }
     }
-    this.#deps.onComplete(score, responses, scored);
+    this.#deps.onComplete(
+      score,
+      responses,
+      scored,
+      this.#attemptIds ? questions.map((q) => q.id) : undefined,
+    );
     this.#deps.notify?.('tessera-quiz-complete', { score, scored });
   }
 
@@ -341,16 +460,19 @@ export class QuizEngine implements UseQuizHandle {
     if (!this.canRetry) return;
     const kept = new Set<number>();
     this.#lockedCorrect.clear();
-    if (this.#deps.quizConfig.retryMode === 'incorrect-only') {
-      this.#internalQuestions.forEach((q, i) => {
+    const incorrectOnly = this.#deps.quizConfig.retryMode === 'incorrect-only';
+    // A restored attempt missing a question can't be asked again as it was.
+    const redraw = this.#bank && (!incorrectOnly || this.restored);
+    if (incorrectOnly && !redraw) {
+      for (const i of this.#attempt) {
         // A question restored without its answer can read as correct, and
         // locked it could never be answered.
-        if (!this.#answers.has(i)) return;
-        const correct = q.checkAnswer();
+        if (!this.#answers.has(i)) continue;
+        const correct = this.#internalQuestions[i].checkAnswer();
         if (correct) this.#lockedCorrect.add(i);
         // An answer with no `correct` can't be wrong: it stays, still editable.
         if (correct !== false) kept.add(i);
-      });
+      }
     }
     for (const i of [...this.#answers.keys()]) {
       if (!kept.has(i)) this.#answers.delete(i);
@@ -364,6 +486,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#fromSave = false;
     this.#reviewing = false;
     this.#score = 0;
+    if (redraw) this.#attemptIds = this.#draw();
   }
 
   #commit(index: number): void {
@@ -378,9 +501,10 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   /** Null when no question has a `correct` to score. */
-  #computeScore(): number | null {
+  #computeScore(attempt: number[]): number | null {
     return scoredMean(
-      this.#internalQuestions.map((q) => {
+      attempt.map((i) => {
+        const q = this.#internalQuestions[i];
         const correct = q.checkAnswer();
         return {
           score: correct ? 100 : 0,
@@ -428,12 +552,15 @@ export class QuizEngine implements UseQuizHandle {
       get render() {
         return engine.getRender(i);
       },
+      get inAttempt() {
+        return engine.#inAttempt(i);
+      },
       setAnswer(a: unknown) {
         engine.setAnswer(i, a);
       },
       commit() {
         // A submitted answer is already reported, in this visit or an earlier one.
-        if (!engine.#submitted) engine.#commit(i);
+        if (!engine.#submitted && engine.#inAttempt(i)) engine.#commit(i);
       },
       setRender(r: unknown) {
         engine.setRender(i, r);
@@ -448,4 +575,14 @@ export class QuizEngine implements UseQuizHandle {
       mode: 'quiz',
     };
   }
+}
+
+/** `count` of `items` in random order (Fisher–Yates). */
+function sample<T>(items: readonly T[], count: number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, count);
 }

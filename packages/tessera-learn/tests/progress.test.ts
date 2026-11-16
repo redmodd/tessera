@@ -493,6 +493,22 @@ describe('ProgressState', () => {
       expect(restored.quizResponses(3).size).toBe(0);
     });
 
+    it("saves the best attempt's question ids beside its answers, and drops them with the answers", () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizCompleted(2, 100, [['b', 'x']], true, ['b', 'a']);
+      progress.quizCompleted(3, 100, [], true, ['c']);
+
+      const { saved, restored } = roundTrip(progress);
+      expect(saved.g[2]).toEqual({ s: 100, r: { b: 'x' }, o: ['b', 'a'] });
+      expect(saved.g[3]).toEqual({ s: 100 });
+      expect(restored.quizQuestionIds(2)).toEqual(['b', 'a']);
+      expect(restored.quizQuestionIds(3)).toBeUndefined();
+
+      const { saved: tight, restored: cut } = roundTrip(progress, 0);
+      expect(tight.g[2]).toEqual({ s: 100 });
+      expect(cut.quizQuestionIds(2)).toBeUndefined();
+    });
+
     it('drops the saved answers when a better attempt has none', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.quizCompleted(2, 50, [['a', ['0']]]);

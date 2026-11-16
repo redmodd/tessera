@@ -62,6 +62,11 @@ export interface Question {
   readonly isLockedCorrect: boolean;
   /** Snippet the widget registered with `setRender` (shell calls `{@render q.render()}`). */
   readonly render: unknown;
+  /**
+   * Whether the question is in the quiz's current attempt. False before the
+   * first draw and for a question `draw` left out; always true standalone.
+   */
+  readonly inAttempt: boolean;
   /** Record the learner's current answer. Called from the widget on user input. */
   setAnswer(answer: unknown): void;
   /** Signal the answer is final; triggers the per-question LMS write. */
@@ -75,6 +80,8 @@ export interface UseQuestionOptions<I extends Interaction = Interaction> {
   text?: string;
   /** Whether this question counts toward its page score. Default false. */
   graded?: boolean;
+  /** The `quiz.draw` pool this question is drawn from. Ignored outside a quiz. */
+  pool?: string;
   /**
    * How much this question pulls on the page score, in a quiz host and
    * standalone alike: `Σ(w·score)/Σ(w)`. Default 1; a non-positive or
@@ -208,6 +215,7 @@ export function useQuestion<I extends Interaction = Interaction>(
     return quizCtx.registerQuestion({
       id: opts.id,
       weight: opts.weight,
+      pool: opts.pool,
       checkAnswer: () => {
         const response = opts.response();
         return response ? isCorrect(response) : false;
@@ -421,6 +429,7 @@ export function useCourse(): {
  */
 export interface UseQuizQuestionApi {
   id: string;
+  pool?: string;
   /** Optional weight for the score rollup, default 1: `Σ(w·correct)/Σ(w)·100` over the questions with a `correct`. */
   weight?: number;
   /** `null` when the question has no `correct`: it is left out of the score. */
@@ -456,8 +465,8 @@ export interface UseQuizHandle {
   readonly attemptCount: number;
   /**
    * True while the results shown came from saved progress without every
-   * question's answer: the save had no room for them, or a question has no
-   * `restore`. Per-question results and review are unavailable until the
+   * question's answer: the save had no room for them, a question has no
+   * `restore`, or a question of a drawn attempt never registered. Per-question results and review are unavailable until the
    * learner retries.
    */
   readonly restored: boolean;
@@ -473,11 +482,7 @@ export interface UseQuizHandle {
   revealFeedback(q: Question): void;
 }
 
-function warnUnsubmittedQuiz(stats: {
-  questionsCount: number;
-  answersCount: number;
-  submitCalled: boolean;
-}): void {
+function warnUnsubmittedQuiz(stats: QuizEngine['stats']): void {
   if (stats.submitCalled) return;
   if (stats.answersCount <= 0) return;
   console.warn(
@@ -521,8 +526,8 @@ export function useQuiz(
     quizConfig: pageCtx.quiz,
     passingScore: () => pageCtx.passingScore,
     report: reporter(),
-    onComplete: (score, responses, scored) =>
-      progress.quizCompleted(pageIndex, score, responses, scored),
+    onComplete: (score, responses, scored, questionIds) =>
+      progress.quizCompleted(pageIndex, score, responses, scored, questionIds),
     notify: (name, detail) => {
       opts
         .element?.()
@@ -536,8 +541,9 @@ export function useQuiz(
   });
 
   onMount(() => {
+    engine.mount();
     if (!import.meta.env?.DEV) return;
-    void tick().then(() => warnEmptyQuiz(engine.questions.length));
+    void tick().then(() => warnEmptyQuiz(engine.stats.registeredCount));
   });
 
   onDestroy(() => {

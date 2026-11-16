@@ -90,6 +90,9 @@ export interface QuizConfig {
   maxAttempts?: number;
   feedbackMode?: (typeof FEEDBACK_MODES)[number];
   retryMode?: (typeof RETRY_MODES)[number];
+  /** Questions per attempt: a count from every question, or a count per named pool. */
+  draw?: number | Record<string, number>;
+  shuffle?: boolean;
 }
 
 /**

@@ -19,6 +19,8 @@ interface EngineProbe {
   completed: number[];
   /** The responses handed to progress with each score, in order. */
   responses: Array<Record<string, unknown>>;
+  /** The attempt's question ids handed to progress with each score, in order. */
+  questionIds: Array<string[] | undefined>;
   /** Every interaction reported to the (injected) adapter, in order. */
   reports: Array<{
     id: string;
@@ -38,6 +40,7 @@ function makeEngine(
       score: number;
       unscored?: boolean;
       responses?: Record<string, unknown>;
+      questionIds?: string[];
     };
   } = {},
 ): EngineProbe {
@@ -45,14 +48,16 @@ function makeEngine(
   const reports: EngineProbe['reports'] = [];
   const completed: number[] = [];
   const responses: EngineProbe['responses'] = [];
+  const questionIds: EngineProbe['questionIds'] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
     report: (id, interaction, correct, text) =>
       reports.push({ id, interaction, correct, text }),
-    onComplete: (score, answered) => {
+    onComplete: (score, answered, _scored, ids) => {
       completed.push(score);
       responses.push(Object.fromEntries(answered));
+      questionIds.push(ids);
     },
     notify: opts.noElement
       ? undefined
@@ -62,7 +67,7 @@ function makeEngine(
       responses: new Map(Object.entries(opts.restore.responses ?? {})),
     },
   });
-  return { engine, events, reports, completed, responses };
+  return { engine, events, reports, completed, responses, questionIds };
 }
 
 function completeScore(events: EngineProbe['events']): number | undefined {
@@ -554,6 +559,7 @@ describe('QuizEngine', () => {
         engine.registerQuestion(widget('a', true));
 
         expect(engine.stats).toEqual({
+          registeredCount: 1,
           questionsCount: 1,
           answersCount: 1,
           submitCalled: true,
@@ -1083,6 +1089,227 @@ describe('QuizEngine', () => {
 });
 
 // ---- Wrapper-only tests: context wiring + lifecycle, where mounting is the point ----
+
+describe('QuizEngine quiz bank', () => {
+  /** A true/false question answered right, in pool `pool` when given. */
+  function pooled(id: string, pool?: string, restore = true) {
+    return {
+      ...tfQuestion(id, true, true),
+      pool,
+      ...(restore ? { restore: (r: unknown) => r } : {}),
+    };
+  }
+
+  function register(
+    engine: QuizEngine,
+    ...questions: ReturnType<typeof pooled>[]
+  ) {
+    return questions.map((q) => engine.registerQuestion(q));
+  }
+
+  const ids = (engine: QuizEngine) => engine.questions.map((q) => q.id);
+
+  function answerAll(engine: QuizEngine) {
+    for (const q of engine.questions) q.setAnswer(true);
+  }
+
+  it('draws the attempt when the quiz mounts, in page order', () => {
+    const { engine } = makeEngine({ graded: true, draw: 2 });
+    register(engine, pooled('a'), pooled('b'), pooled('c'), pooled('d'));
+    expect(engine.questions).toEqual([]);
+
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    engine.mount();
+
+    expect(ids(engine)).toHaveLength(2);
+    expect(ids(engine)).toEqual([...ids(engine)].sort());
+  });
+
+  it('includes every question with no pool and draws the count from each named pool', () => {
+    const { engine } = makeEngine({
+      graded: true,
+      draw: { basics: 2, advanced: 1 },
+    });
+    register(
+      engine,
+      pooled('intro'),
+      pooled('b1', 'basics'),
+      pooled('b2', 'basics'),
+      pooled('b3', 'basics'),
+      pooled('a1', 'advanced'),
+      pooled('a2', 'advanced'),
+    );
+    engine.mount();
+
+    const drawn = ids(engine);
+    expect(drawn[0]).toBe('intro');
+    expect(drawn.filter((id) => id.startsWith('b'))).toHaveLength(2);
+    expect(drawn.filter((id) => id.startsWith('a'))).toHaveLength(1);
+  });
+
+  it('shuffles every question when shuffle is set without draw', () => {
+    const { engine } = makeEngine({ graded: true, shuffle: true });
+    register(engine, pooled('a'), pooled('b'), pooled('c'));
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    engine.mount();
+
+    expect(ids(engine)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('submits, scores, reports and saves only the attempt', () => {
+    const { engine, reports, responses, questionIds, completed } = makeEngine({
+      graded: true,
+      draw: 1,
+    });
+    const [a, b] = register(engine, pooled('a'), {
+      ...pooled('b'),
+      checkAnswer: () => false,
+    });
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    engine.mount();
+    expect(ids(engine)).toEqual(['b']);
+    expect(a.inAttempt).toBe(false);
+    expect(b.inAttempt).toBe(true);
+
+    a.commit();
+    expect(reports).toEqual([]);
+    expect(engine.canSubmit).toBe(false);
+    b.setAnswer(false);
+    expect(engine.canSubmit).toBe(true);
+    engine.submit();
+
+    expect(completed).toEqual([0]);
+    expect(reports.map((r) => r.id)).toEqual(['b']);
+    expect(Object.keys(responses[0])).toEqual(['b']);
+    expect(questionIds).toEqual([['b']]);
+  });
+
+  it('saves no question ids when the quiz neither draws nor shuffles', () => {
+    const { engine, questionIds } = makeEngine({ graded: true });
+    register(engine, pooled('a'));
+    engine.mount();
+    answerAll(engine);
+    engine.submit();
+
+    expect(questionIds).toEqual([undefined]);
+  });
+
+  it("draws again on a full retry and keeps the attempt's order on an incorrect-only one", () => {
+    const random = vi.spyOn(Math, 'random');
+    for (const [retryMode, expected] of [
+      ['full', ['b', 'c']],
+      ['incorrect-only', ['a', 'b']],
+    ] as const) {
+      const { engine } = makeEngine({ graded: true, draw: 2, retryMode });
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+      random.mockReturnValue(0.99);
+      engine.mount();
+      expect(ids(engine)).toEqual(['a', 'b']);
+      answerAll(engine);
+      engine.submit();
+
+      random.mockReturnValue(0);
+      engine.retry();
+      expect(ids(engine)).toEqual(expected);
+    }
+  });
+
+  describe('resumed', () => {
+    const saved = {
+      attempts: 1,
+      score: 100,
+      responses: { b: true, c: true },
+      questionIds: ['c', 'b'],
+    };
+
+    it('sets the attempt from the saved ids at once, ready to review', () => {
+      const { engine } = makeEngine(
+        { graded: true, draw: 2, shuffle: true },
+        { restore: saved },
+      );
+      const [a] = register(engine, pooled('a'), pooled('b'), pooled('c'));
+      engine.mount();
+
+      expect(ids(engine)).toEqual(['c', 'b']);
+      expect(a.inAttempt).toBe(false);
+      expect(a.answer).toBeUndefined();
+      expect(engine.restored).toBe(false);
+      engine.startReview();
+      expect(engine.state).toBe('reviewing');
+    });
+
+    it('comes back restored when a saved question never registers, and draws again on retry', () => {
+      const { engine } = makeEngine(
+        { graded: true, draw: 2, retryMode: 'incorrect-only' },
+        { restore: saved },
+      );
+      register(engine, pooled('a'), pooled('b'));
+      engine.mount();
+
+      expect(ids(engine)).toEqual(['b']);
+      expect(engine.restored).toBe(true);
+
+      engine.retry();
+      expect(ids(engine)).toEqual(['a', 'b']);
+      expect(engine.questions.every((q) => q.answer === undefined)).toBe(true);
+    });
+
+    it('comes back restored with no questions when the save kept no ids', () => {
+      const { engine } = makeEngine(
+        { graded: true, draw: 1 },
+        { restore: { attempts: 1, score: 80 } },
+      );
+      register(engine, pooled('a'), pooled('b'));
+      engine.mount();
+
+      expect(engine.questions).toEqual([]);
+      expect(engine.restored).toBe(true);
+      expect(engine.score).toBe(80);
+
+      engine.retry();
+      expect(engine.questions).toHaveLength(1);
+    });
+  });
+
+  it('leaves out a question that registers after the draw, with a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true, shuffle: true });
+    register(engine, pooled('a'));
+    engine.mount();
+    const [late] = register(engine, pooled('late'));
+
+    expect(ids(engine)).toEqual(['a']);
+    expect(late.inAttempt).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/"late" registered after the quiz drew/),
+    );
+  });
+
+  it('warns about pools that cannot be drawn as configured', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true, draw: { basics: 3 } });
+    register(engine, pooled('b1', 'basics'), pooled('x', 'typo'));
+    engine.mount();
+
+    expect(ids(engine)).toEqual(['b1']);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/asks for 3 from pool "basics", but only 1/),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/pool "typo", which quiz.draw does not list/),
+    );
+  });
+
+  it('puts every question in the attempt of a quiz that neither draws nor shuffles', () => {
+    const { engine } = makeEngine({ graded: true });
+    const [a] = register(engine, pooled('a'));
+    expect(a.inAttempt).toBe(true);
+    engine.mount();
+    const [late] = register(engine, pooled('late'));
+    expect(late.inAttempt).toBe(true);
+    expect(ids(engine)).toEqual(['a', 'late']);
+  });
+});
 
 describe('useQuiz (Svelte wrapper)', () => {
   it('throws when called on a page with no quiz config', () => {

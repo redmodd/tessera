@@ -34,6 +34,7 @@ interface Question {
   readonly locked: boolean; // input read-only: submitted OR feedbackVisible OR isLockedCorrect
   readonly isLockedCorrect: boolean; // quiz: retry policy preserved this as already-correct. standalone: submitted scoring 100 (not one with no `correct` and no `score()`), no retry
   readonly render: unknown; // snippet the widget registered; shell calls {@render q.render()}
+  readonly inAttempt: boolean; // in the quiz's current attempt (see `draw`); always true standalone
   setAnswer(answer: unknown): void;
   commit(): void; // report this answer to the LMS now. Idempotent. The shell calls it once the answer is final.
 }
@@ -155,6 +156,7 @@ function useQuestion(opts: {
   id: string; // required non-blank string (throws otherwise); unique on the page; LMS interaction id (ASCII letters, digits, underscores)
   text?: string; // the question as the learner reads it; the LMS shows it as the interaction's description (not in SCORM 1.2)
   graded?: boolean; // standalone only
+  pool?: string; // the quiz.draw pool this question is drawn from; ignored standalone
   response: () => Interaction | undefined; // current answer, or undefined while unanswered; read at submit (and on each commit())
   score?: () => number; // standalone-only override (0–100)
   weight?: number; // page-level rollup weight (default 1)
@@ -213,6 +215,8 @@ An answer does not come back when the widget has no `restore`, which also keeps 
 Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Throws on a page without `pageConfig.quiz`.
 
 - **A custom shell must render `children`**, visibly or hidden. Questions register only when they mount, so a shell that drops `children` has nothing to score.
+- **A question stays registered once it mounts.** To show one question at a time, hide the others rather than unmounting them.
+- **`questions` lists only the current attempt, in its order.** Under `draw` or `shuffle` it is empty until the quiz mounts and draws. Every per-question rule (`canSubmit`, the score, LMS reporting, the save, review) covers only the attempt. An inline-layout widget renders nothing when `q.inAttempt` is false.
 - **Only `submit()` scores the quiz.** It reports every question to the LMS, records the page score and marks the quiz Completed/Passed/Failed.
 - **`tessera-quiz-complete` is a notification, not the scoring path.** A shell that passes `element` gets it dispatched there after `submit()`, with `detail: { score, scored }` from that attempt. Dispatching it yourself is a build error.
 - **Widgets call `setAnswer()` only; the shell decides when an answer is final.** Call `q.commit()` to report one question before the end (the built-in `<Quiz>` does when `feedbackMode: 'immediate'` reveals it), and still call `submit()` at the end.
@@ -240,7 +244,7 @@ function useQuiz(opts?: { element?: () => HTMLElement | null }): {
 ```
 
 - **Show `bestScore` whenever `bestScore > score`.** `score` is the latest attempt; the LMS and the navigation gate use `bestScore`.
-- **Branch on `restored`.** A result restored from saved progress opens in the `submitted` state with the best score, the attempt count and that attempt's answers, ready to review. `restored` is `true` when the answers did not come back (see [Returning to a question](#returning-to-a-question)): every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
+- **Branch on `restored`.** A result restored from saved progress opens in the `submitted` state with the best score, the attempt count and that attempt's answers, ready to review. `restored` is `true` when the answers did not come back (see [Returning to a question](#returning-to-a-question)), or a question of a drawn attempt did not register: every `q.correct` is `null`, `q.feedbackVisible` is `false`, and `startReview()` is a no-op. Show the score and a Retry button; don't offer Review or a per-question breakdown.
 - **Hide the score when `scored` is `false`.** No question has a `correct`, so show only that the answers were submitted, on a restored result too.
 - **Read `passingScore` from this hook**, not from `course.config.js`: an LMS mastery score overrides the config at launch.
 

@@ -27,6 +27,7 @@
     incorrectFeedback = '',
     graded,
     maxRetries,
+    pool,
     weight,
   } = $props();
 
@@ -55,32 +56,35 @@
   }
 
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
-      complete: () => matches.size === pairs.length,
-      response: () => {
-        const left = indexOptions(pairs.map((p) => p.left));
-        return {
-          type: 'matching',
-          response: [...matches.entries()].map(([l, r]) => [
-            String(l),
-            String(r),
-          ]),
-          correct: left.map(({ id }) => [id, id]),
-          optionPairs: {
-            left,
-            right: indexOptions(pairs.map((p) => p.right)),
-          },
-        };
+    questionOptions(
+      () => ({ id, question, graded, weight, maxRetries, pool }),
+      {
+        complete: () => matches.size === pairs.length,
+        response: () => {
+          const left = indexOptions(pairs.map((p) => p.left));
+          return {
+            type: 'matching',
+            response: [...matches.entries()].map(([l, r]) => [
+              String(l),
+              String(r),
+            ]),
+            correct: left.map(({ id }) => [id, id]),
+            optionPairs: {
+              left,
+              right: indexOptions(pairs.map((p) => p.right)),
+            },
+          };
+        },
+        reset: resetState,
+        restore: (response) => {
+          const saved = response.map((pair) =>
+            pair.map((index) => savedIndex(index, pairs)),
+          );
+          for (const [left, right] of saved) matches.set(left, right);
+          return new Map(matches);
+        },
       },
-      reset: resetState,
-      restore: (response) => {
-        const saved = response.map((pair) =>
-          pair.map((index) => savedIndex(index, pairs)),
-        );
-        for (const [left, right] of saved) matches.set(left, right);
-        return new Map(matches);
-      },
-    }),
+    ),
   );
 
   const inQuiz = q.mode === 'quiz';

@@ -6,6 +6,7 @@ import {
   isPageIndex,
   isRecord,
   isRequiredGradedPage,
+  isStringArray,
   resolveSuccess,
   type CourseConfig,
   type SuccessConfig,
@@ -190,6 +191,8 @@ export interface GradedUnit {
   questions?: Map<string, StandaloneResult>;
   /** The best quiz attempt's responses, questionId → encoded response. */
   responses?: ReadonlyMap<string, string>;
+  /** The best quiz attempt's question ids in order, kept only with its responses. */
+  questionIds?: readonly string[];
 }
 
 export class ProgressState {
@@ -287,6 +290,10 @@ export class ProgressState {
     return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
   }
 
+  quizQuestionIds(pageIndex: number): readonly string[] | undefined {
+    return this.gradedUnits.get(pageIndex)?.questionIds;
+  }
+
   quizResponses(pageIndex: number): Map<string, unknown> {
     const responses = this.gradedUnits.get(pageIndex)?.responses ?? [];
     return new Map(
@@ -306,8 +313,10 @@ export class ProgressState {
     score: number,
     responses: Iterable<[string, unknown]> = [],
     scored = true,
+    questionIds?: readonly string[],
   ) {
     const unit = this.gradedUnits.get(pageIndex);
+    const encoded = encodeResponses(responses);
     // An unscored attempt's 100 is a placeholder, so any scored attempt beats it.
     const best =
       unit?.quizScore === undefined ||
@@ -318,7 +327,8 @@ export class ProgressState {
         ? {
             quizScore: score,
             unscored: !scored,
-            responses: encodeResponses(responses),
+            responses: encoded,
+            questionIds: encoded && questionIds,
           }
         : {}),
     });
@@ -678,8 +688,11 @@ export class ProgressState {
             savedResponse(response),
           ]),
         );
-        if (afford(() => jsonSize({ ...entry, r }) - jsonSize(entry)))
+        const o = unit.questionIds;
+        if (afford(() => jsonSize({ ...entry, r, o }) - jsonSize(entry))) {
           entry.r = r;
+          if (o) entry.o = [...o];
+        }
       }
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
@@ -736,6 +749,7 @@ export class ProgressState {
                 ([qid, response]) => [qid, swapIds(response)],
               ),
             ),
+            questionIds: isStringArray(unit.o) ? unit.o : undefined,
           });
         }
         const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
