@@ -688,10 +688,17 @@ export class ProgressState {
             savedResponse(response),
           ]),
         );
-        const o = unit.questionIds;
+        // `r`'s keys stand in for the attempt when they list it in order.
+        const keys = Object.keys(r);
+        const ids = unit.questionIds;
+        const o =
+          ids &&
+          !(ids.length === keys.length && ids.every((id, i) => id === keys[i]))
+            ? [...ids]
+            : undefined;
         if (afford(() => jsonSize({ ...entry, r, o }) - jsonSize(entry))) {
           entry.r = r;
-          if (o) entry.o = [...o];
+          if (o) entry.o = o;
         }
       }
       const unanswered = this.#unlistedUnanswered(pageIndex);
@@ -749,7 +756,11 @@ export class ProgressState {
                 ([qid, response]) => [qid, swapIds(response)],
               ),
             ),
-            questionIds: isStringArray(unit.o) ? unit.o : undefined,
+            questionIds: isStringArray(unit.o)
+              ? unit.o
+              : isRecord(unit.r)
+                ? Object.keys(unit.r)
+                : undefined,
           });
         }
         const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(

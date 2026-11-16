@@ -1254,6 +1254,27 @@ describe('QuizEngine quiz bank', () => {
       expect(engine.questions.every((q) => q.answer === undefined)).toBe(true);
     });
 
+    it('keeps the attempt and locks correct answers on an incorrect-only retry when only an answer is missing', () => {
+      const { engine } = makeEngine(
+        { graded: true, draw: 2, retryMode: 'incorrect-only' },
+        { restore: { ...saved, responses: { c: true } } },
+      );
+      const [, b, c] = register(
+        engine,
+        pooled('a'),
+        pooled('b', undefined, false),
+        pooled('c'),
+      );
+      engine.mount();
+      expect(engine.restored).toBe(true);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      engine.retry();
+      expect(ids(engine)).toEqual(['c', 'b']);
+      expect(c.isLockedCorrect).toBe(true);
+      expect(b.answer).toBeUndefined();
+    });
+
     it('comes back restored with no questions when the save kept no ids', () => {
       const { engine } = makeEngine(
         { graded: true, draw: 1 },
@@ -1282,6 +1303,22 @@ describe('QuizEngine quiz bank', () => {
     expect(late.inAttempt).toBe(false);
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/"late" registered after the quiz drew/),
+    );
+  });
+
+  it('does not blame the draw for a late question left out of a restored attempt', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine(
+      { graded: true, draw: 1 },
+      { restore: { attempts: 1, score: 100, questionIds: ['a'] } },
+    );
+    register(engine, pooled('a'));
+    engine.mount();
+    const [late] = register(engine, pooled('late'));
+
+    expect(late.inAttempt).toBe(false);
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringMatching(/registered after the quiz drew/),
     );
   });
 

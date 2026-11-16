@@ -509,6 +509,36 @@ describe('ProgressState', () => {
       expect(cut.quizQuestionIds(2)).toBeUndefined();
     });
 
+    it("leaves out the question ids when the answers' keys already list them in order", () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizCompleted(
+        2,
+        100,
+        [
+          ['b', 'x'],
+          ['a', 'y'],
+        ],
+        true,
+        ['b', 'a'],
+      );
+      progress.quizCompleted(
+        3,
+        100,
+        [
+          ['2', 'x'],
+          ['1', 'y'],
+        ],
+        true,
+        ['2', '1'],
+      );
+
+      const { saved, restored } = roundTrip(progress);
+      expect(saved.g[2]).toEqual({ s: 100, r: { b: 'x', a: 'y' } });
+      expect(restored.quizQuestionIds(2)).toEqual(['b', 'a']);
+      expect(saved.g[3].o).toEqual(['2', '1']);
+      expect(restored.quizQuestionIds(3)).toEqual(['2', '1']);
+    });
+
     it('drops the saved answers when a better attempt has none', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.quizCompleted(2, 50, [['a', ['0']]]);

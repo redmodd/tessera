@@ -168,7 +168,7 @@ function validatePageFile(
 
   validateAssetRefs(content, assetsDir, d, { existsCache: assetExistsCache });
   validateQuestionComponents(questionComponents, d, profile);
-  if (isQuiz) {
+  if (isQuiz && isValidDraw(quiz.draw)) {
     validateQuestionPools(quiz.draw, questionComponents, d, {
       seesEveryQuestion: !hasCustomWidget && useQuestions === 'absent',
     });
@@ -486,20 +486,23 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
   checkOneOf('quiz.feedbackMode', FEEDBACK_MODES, quiz.feedbackMode, d);
   checkOneOf('quiz.retryMode', RETRY_MODES, quiz.retryMode, d);
 
-  const { draw } = quiz;
+  if (!isValidDraw(quiz.draw)) {
+    d.error(
+      'quiz.draw must be a positive whole number, or { pool: count } with a ' +
+        `positive whole number per pool, got ${formatValue(quiz.draw)}`,
+    );
+  }
+}
+
+function isValidDraw(draw: unknown): boolean {
   const isCount = (n: unknown) => Number.isInteger(n) && (n as number) > 0;
-  const validDraw =
+  return (
     draw === undefined ||
     isCount(draw) ||
     (isRecord(draw) &&
       Object.keys(draw).length > 0 &&
-      Object.values(draw).every(isCount));
-  if (!validDraw) {
-    d.error(
-      'quiz.draw must be a positive whole number, or { pool: count } with a ' +
-        `positive whole number per pool, got ${formatValue(draw)}`,
-    );
-  }
+      Object.values(draw).every(isCount))
+  );
 }
 
 /**
@@ -525,6 +528,7 @@ function validateQuestionPools(
     const value = literal?.value;
     if (value !== undefined && typeof value !== 'string') {
       d.error(`${subject} pool must be a string, got ${formatValue(value)}`);
+      counted = false;
       continue;
     }
     const pool = value;

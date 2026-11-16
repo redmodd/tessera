@@ -1592,6 +1592,25 @@ ${questions}`,
       );
     });
 
+    it('reports one error for a bad draw or a bad pool, not a cascade', () => {
+      const badDraw = bankPage(
+        '{ draw: "3" }',
+        mc('a', 'basics') + mc('b', 'basics'),
+      );
+      expect(badDraw.errors.filter((e) => /quiz\.draw|pool/.test(e))).toEqual([
+        expect.stringContaining('quiz.draw must be a positive whole number'),
+      ]);
+
+      const badPool = bankPage(
+        '{ draw: 2 }',
+        mc('a') +
+          `<MultipleChoice id="b" pool={1} question="Q?" options={['x', 'y']} correct={0} />`,
+      );
+      expect(badPool.errors.filter((e) => /quiz\.draw|pool/.test(e))).toEqual([
+        expect.stringContaining('pool must be a string'),
+      ]);
+    });
+
     it('skips the count when an imported component can add questions', () => {
       const { errors } = bankPage(
         '{ draw: { basics: 2 } }',

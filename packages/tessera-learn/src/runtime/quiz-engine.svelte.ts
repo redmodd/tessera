@@ -3,6 +3,7 @@ import { normalizeWeight, scoredMean } from './progress.svelte.js';
 import { restoreResponse, type Interaction } from './interaction.js';
 import type { QuizConfig } from './types.js';
 import type { QuizPageState } from './contexts.js';
+import { shuffle } from '../components/util.js';
 import type {
   UseQuizHandle,
   UseQuizQuestionApi,
@@ -186,12 +187,14 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   get restored(): boolean {
-    if (!this.#fromSave) return false;
+    return this.#fromSave && (this.#questionMissing || this.#answerMissing);
+  }
+
+  /** The save kept no questions, or one of its attempt never registered. */
+  get #questionMissing(): boolean {
     const attempt = this.#attempt;
     return (
-      attempt.length === 0 ||
-      attempt.length < (this.#attemptIds?.length ?? 0) ||
-      this.#answerMissing
+      attempt.length === 0 || attempt.length < (this.#attemptIds?.length ?? 0)
     );
   }
 
@@ -231,26 +234,25 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   #draw(): string[] {
-    const { draw, shuffle } = this.#deps.quizConfig;
+    const { draw, shuffle: reorder } = this.#deps.quizConfig;
     const questions = this.#internalQuestions;
     let picked: InternalQuestion[];
     if (draw === undefined) {
-      picked = [...questions];
+      picked = questions;
     } else if (typeof draw === 'number') {
-      picked = sample(questions, draw);
+      picked = shuffle(questions).slice(0, draw);
     } else {
       picked = questions.filter((q) => q.pool === undefined);
       for (const [pool, count] of Object.entries(draw)) {
-        picked.push(
-          ...sample(
-            questions.filter((q) => q.pool === pool),
-            count,
-          ),
-        );
+        const inPool = questions.filter((q) => q.pool === pool);
+        picked.push(...shuffle(inPool).slice(0, count));
       }
     }
-    if (shuffle) picked = sample(picked, picked.length);
-    else picked.sort((a, b) => questions.indexOf(a) - questions.indexOf(b));
+    if (reorder) picked = shuffle(picked);
+    else {
+      const chosen = new Set(picked);
+      picked = questions.filter((q) => chosen.has(q));
+    }
     return picked.map((q) => q.id);
   }
 
@@ -316,7 +318,12 @@ export class QuizEngine implements UseQuizHandle {
     const index = this.#internalQuestions.length - 1;
     this.#indexById.set(id, index);
     const inAttempt = this.#inAttempt(index);
-    if (import.meta.env?.DEV && this.#mounted && !inAttempt) {
+    if (
+      import.meta.env?.DEV &&
+      this.#mounted &&
+      !this.#fromSave &&
+      !inAttempt
+    ) {
       console.warn(
         `[tessera] useQuiz: question "${id}" registered after the quiz drew its ` +
           'questions, so it is left out of this attempt. Render every question ' +
@@ -462,7 +469,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#lockedCorrect.clear();
     const incorrectOnly = this.#deps.quizConfig.retryMode === 'incorrect-only';
     // A restored attempt missing a question can't be asked again as it was.
-    const redraw = this.#bank && (!incorrectOnly || this.restored);
+    const redraw = this.#bank && (!incorrectOnly || this.#questionMissing);
     if (incorrectOnly && !redraw) {
       for (const i of this.#attempt) {
         // A question restored without its answer can read as correct, and
@@ -575,14 +582,4 @@ export class QuizEngine implements UseQuizHandle {
       mode: 'quiz',
     };
   }
-}
-
-/** `count` of `items` in random order (Fisher–Yates). */
-function sample<T>(items: readonly T[], count: number): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, count);
 }
