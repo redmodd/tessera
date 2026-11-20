@@ -223,9 +223,9 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   /**
-   * The saved draw while every question in it has registered, else a new one.
-   * With none registered yet (a shell that renders them later), the draw
-   * waits for them.
+   * The saved draw while it is still a draw of the questions registered now,
+   * else a new one. With none registered yet (a shell that renders them
+   * later), the draw waits for them.
    */
   #drawAttempt(): void {
     if (this.#indexById.size === 0) {
@@ -233,9 +233,7 @@ export class QuizEngine implements UseQuizHandle {
       return;
     }
     const saved = this.#savedDraw;
-    const ids = saved?.every((id) => this.#indexById.has(id))
-      ? saved
-      : this.#draw();
+    const ids = saved && this.#fitsDraw(saved) ? saved : this.#draw();
     this.#attemptIds = ids;
     if (ids === this.#persistedDraw) return;
     this.#persistedDraw = ids;
@@ -247,8 +245,36 @@ export class QuizEngine implements UseQuizHandle {
    * page renders them at mount or a shell renders them later (behind a Start
    * button, say). After the learner answers one, a late question stays out.
    */
+  /**
+   * Whether `ids` holds what {@link #draw} would pick from the questions
+   * registered now: a draw saved before a shell rendered its other questions
+   * holds too few.
+   */
+  #fitsDraw(ids: readonly string[]): boolean {
+    if (!ids.every((id) => this.#indexById.has(id))) return false;
+    const { draw } = this.#deps.quizConfig;
+    const pools = this.#internalQuestions.map((q) => q.pool);
+    if (draw === undefined) return ids.length === pools.length;
+    if (typeof draw === 'number')
+      return ids.length === Math.min(draw, pools.length);
+    const drawn = ids.map((id) => pools[this.#indexById.get(id)!]);
+    const count = (list: (string | undefined)[], pool?: string) =>
+      list.filter((p) => p === pool).length;
+    return (
+      count(drawn) === count(pools) &&
+      Object.entries(draw).every(
+        ([pool, n]) => count(drawn, pool) === Math.min(n, count(pools, pool)),
+      )
+    );
+  }
+
+  /** An answer to a question outside the attempt doesn't start it. */
+  get #started(): boolean {
+    return this.#submitted || this.#attempt.some((i) => this.#answers.has(i));
+  }
+
   #queueDraw(id: string): void {
-    if (this.#submitted || this.#answers.size > 0) {
+    if (this.#started) {
       if (import.meta.env?.DEV) {
         console.warn(
           `[tessera] useQuiz: question "${id}" registered after the learner started ` +
@@ -262,7 +288,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#drawQueued = true;
     queueMicrotask(() => {
       this.#drawQueued = false;
-      if (this.#submitted || this.#answers.size > 0) return;
+      if (this.#started) return;
       this.#drawAttempt();
     });
   }
@@ -354,7 +380,7 @@ export class QuizEngine implements UseQuizHandle {
 
   setAnswer(index: number, answer: unknown): void {
     // The first answer fixes which questions the attempt draws from.
-    if (import.meta.env?.DEV && !this.#poolsChecked && this.#attemptIds) {
+    if (import.meta.env?.DEV && !this.#poolsChecked) {
       this.#poolsChecked = true;
       this.#checkPools();
     }

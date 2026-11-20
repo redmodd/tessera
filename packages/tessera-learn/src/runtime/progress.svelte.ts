@@ -659,6 +659,7 @@ export class ProgressState {
       return true;
     };
     const g: Record<string, GradedUnitState> = {};
+    const draws: [number, GradedUnitState, string[]][] = [];
     for (const [pageIndex, unit] of this.gradedUnits) {
       const entry: GradedUnitState = {};
       if (unit.quizScore !== undefined) entry.s = unit.quizScore;
@@ -712,12 +713,20 @@ export class ProgressState {
           if (o) entry.o = o;
         }
       }
-      const d = unit.drawn && [...unit.drawn];
-      if (d && afford(() => jsonSize({ ...entry, d }) - jsonSize(entry)))
-        entry.d = d;
+      if (unit.drawn) draws.push([pageIndex, entry, [...unit.drawn]]);
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[pageIndex] = entry;
+    }
+    // A draw not yet submitted gets only what every page's answers leave. Its
+    // page may have no entry yet, and `g` no key, so both are measured.
+    const gSize = (graded: typeof g) =>
+      jsonSize(Object.keys(graded).length > 0 ? { v: 0, g: graded } : { v: 0 });
+    for (const [pageIndex, entry, d] of draws) {
+      const withDraw = { ...g, [pageIndex]: { ...entry, d } };
+      if (!afford(() => gSize(withDraw) - gSize(g))) continue;
+      entry.d = d;
+      g[pageIndex] = entry;
     }
     return {
       v: [...this.visitedPages],

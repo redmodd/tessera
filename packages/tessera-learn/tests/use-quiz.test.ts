@@ -1411,6 +1411,27 @@ describe('QuizEngine quiz bank', () => {
       expect(draws.at(-1)).toEqual(['c', 'a']);
     });
 
+    it('draws again when questions a shell renders later leave the saved draw short', async () => {
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: { bank: 2 } },
+        { restore: { attempts: 0, score: 0, drawn: ['intro'] } },
+      );
+      register(engine, pooled('intro'));
+      await Promise.resolve();
+      expect(ids(engine)).toEqual(['intro']);
+
+      register(
+        engine,
+        pooled('b1', 'bank'),
+        pooled('b2', 'bank'),
+        pooled('b3', 'bank'),
+      );
+      await Promise.resolve();
+      expect(ids(engine)[0]).toBe('intro');
+      expect(ids(engine)).toHaveLength(3);
+      expect(draws).toEqual([ids(engine)]);
+    });
+
     it('waits for the questions of a Retry pressed before any register', async () => {
       const { engine, draws } = makeEngine(
         { graded: true, draw: 2 },
@@ -1447,6 +1468,32 @@ describe('QuizEngine quiz bank', () => {
     );
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/pool "typo", which quiz.draw does not list/),
+    );
+  });
+
+  it('warns about a pool on a quiz that does not draw from pools', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true });
+    register(engine, pooled('x', 'basics'));
+
+    answerAll(engine);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/"x" names pool "basics", but quiz.draw is not/),
+    );
+  });
+
+  it('draws late questions in after an answer to a question outside the attempt', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine, draws } = makeEngine({ graded: true, draw: 2 });
+    const handles = register(engine, pooled('a'), pooled('b'), pooled('c'));
+    await Promise.resolve();
+    handles.find((q) => !q.inAttempt)!.setAnswer(true);
+
+    register(engine, pooled('d'));
+    await Promise.resolve();
+    expect(draws).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringMatching(/after the learner started/),
     );
   });
 

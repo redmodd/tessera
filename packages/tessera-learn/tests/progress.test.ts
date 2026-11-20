@@ -630,8 +630,9 @@ describe('ProgressState', () => {
     });
 
     describe('when the save has no room', () => {
-      function answered() {
+      function answered(drawn?: string[]) {
         const progress = new ProgressState(createManifest(6), createConfig());
+        if (drawn) progress.quizDraw(1, drawn);
         progress.markStandaloneQuestion(0, 'essay', 100, true, 1, {
           retries: 1,
           response: 'x'.repeat(80),
@@ -679,6 +680,31 @@ describe('ProgressState', () => {
           expect(size - bare).toBeLessThanOrEqual(budget);
         }
         expect(progress.toSaved(200)).toEqual(progress.toSaved());
+      });
+
+      it("saves an unsubmitted draw only in the room every page's answers leave", () => {
+        const answers = answered();
+        const size = (budget?: number) =>
+          JSON.stringify(answers.toSaved(budget)).length;
+        const progress = answered(['c', 'a']);
+
+        expect(roundTrip(progress, size() - size(0)).saved.g).toEqual(
+          answers.toSaved().g,
+        );
+      });
+
+      it('never spends more than the budget on a page saved only for its draw', () => {
+        const empty = new ProgressState(createManifest(6), createConfig());
+        for (const progress of [answered(), empty]) {
+          progress.quizDraw(4, ['c', 'a']);
+          const bare = JSON.stringify(progress.toSaved(0)).length;
+
+          for (let budget = 0; budget <= 250; budget++) {
+            const size = JSON.stringify(progress.toSaved(budget)).length;
+            expect(size - bare).toBeLessThanOrEqual(budget);
+          }
+          expect(progress.toSaved(250)).toEqual(progress.toSaved());
+        }
       });
 
       it('charges an answer only the bytes it adds to the save', () => {
