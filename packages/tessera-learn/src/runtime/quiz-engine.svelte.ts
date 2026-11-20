@@ -1,7 +1,12 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { normalizeWeight, scoredMean } from './progress.svelte.js';
 import { restoreResponse, type Interaction } from './interaction.js';
-import { drawShortfalls, poolProblem, type QuizConfig } from './types.js';
+import {
+  drawGroups,
+  drawShortfalls,
+  poolProblem,
+  type QuizConfig,
+} from './types.js';
 import type { QuizPageState } from './contexts.js';
 import { shuffle } from '../components/util.js';
 import type {
@@ -119,8 +124,7 @@ export class QuizEngine implements UseQuizHandle {
   // recompute on read with or without a tracking effect, so
   // engine-construction tests need no $effect.root.
   get #attempt(): number[] {
-    const all = this.#questionHandles.map((_, i) => i);
-    if (!this.#attemptIds) return all;
+    if (!this.#attemptIds) return this.#questionHandles.map((_, i) => i);
     return this.#attemptIds.flatMap((id) => {
       const i = this.#indexById.get(id);
       return i === undefined ? [] : [i];
@@ -240,11 +244,14 @@ export class QuizEngine implements UseQuizHandle {
     this.#deps.onDraw?.(ids);
   }
 
-  /**
-   * Draws once every question registering in this update has, whether the
-   * page renders them at mount or a shell renders them later (behind a Start
-   * button, say). After the learner answers one, a late question stays out.
-   */
+  #drawGroups() {
+    return drawGroups(
+      this.#deps.quizConfig.draw,
+      this.#internalQuestions,
+      (q) => q.pool,
+    );
+  }
+
   /**
    * Whether `ids` holds what {@link #draw} would pick from the questions
    * registered now: a draw saved before a shell rendered its other questions
@@ -252,19 +259,11 @@ export class QuizEngine implements UseQuizHandle {
    */
   #fitsDraw(ids: readonly string[]): boolean {
     if (!ids.every((id) => this.#indexById.has(id))) return false;
-    const { draw } = this.#deps.quizConfig;
-    const pools = this.#internalQuestions.map((q) => q.pool);
-    if (draw === undefined) return ids.length === pools.length;
-    if (typeof draw === 'number')
-      return ids.length === Math.min(draw, pools.length);
-    const drawn = ids.map((id) => pools[this.#indexById.get(id)!]);
-    const count = (list: (string | undefined)[], pool?: string) =>
-      list.filter((p) => p === pool).length;
-    return (
-      count(drawn) === count(pools) &&
-      Object.entries(draw).every(
-        ([pool, n]) => count(drawn, pool) === Math.min(n, count(pools, pool)),
-      )
+    const drawn = new Set(ids);
+    return this.#drawGroups().every(
+      ({ count, members }) =>
+        members.filter((q) => drawn.has(q.id)).length ===
+        Math.min(count, members.length),
     );
   }
 
@@ -273,6 +272,11 @@ export class QuizEngine implements UseQuizHandle {
     return this.#submitted || this.#attempt.some((i) => this.#answers.has(i));
   }
 
+  /**
+   * Draws once every question registering in this update has, whether the
+   * page renders them at mount or a shell renders them later (behind a Start
+   * button, say). After the learner answers one, a late question stays out.
+   */
   #queueDraw(id: string): void {
     if (this.#started) {
       if (import.meta.env?.DEV) {
@@ -294,24 +298,13 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   #draw(): string[] {
-    const { draw, shuffle: reorder } = this.#deps.quizConfig;
-    const questions = this.#internalQuestions;
-    let picked: InternalQuestion[];
-    if (draw === undefined) {
-      picked = questions;
-    } else if (typeof draw === 'number') {
-      picked = shuffle(questions).slice(0, draw);
-    } else {
-      picked = questions.filter((q) => q.pool === undefined);
-      for (const [pool, count] of Object.entries(draw)) {
-        const inPool = questions.filter((q) => q.pool === pool);
-        picked.push(...shuffle(inPool).slice(0, count));
-      }
-    }
-    if (reorder) picked = shuffle(picked);
+    let picked = this.#drawGroups().flatMap(({ count, members }) =>
+      count < members.length ? shuffle(members).slice(0, count) : members,
+    );
+    if (this.#deps.quizConfig.shuffle) picked = shuffle(picked);
     else {
       const chosen = new Set(picked);
-      picked = questions.filter((q) => chosen.has(q));
+      picked = this.#internalQuestions.filter((q) => chosen.has(q));
     }
     return picked.map((q) => q.id);
   }

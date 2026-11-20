@@ -466,8 +466,9 @@ export interface UseQuizHandle {
   /**
    * True while the results shown came from saved progress without every
    * question's answer: the save had no room for them, a question has no
-   * `restore`, or a question of a drawn attempt never registered. Per-question results and review are unavailable until the
-   * learner retries.
+   * `restore`, or a question of a drawn attempt never registered.
+   * Per-question results and review are unavailable until the learner
+   * retries.
    */
   readonly restored: boolean;
   /** `pageConfig.quiz.feedbackMode`, defaulting to `'review'`. */

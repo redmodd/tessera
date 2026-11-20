@@ -14,16 +14,12 @@
    * }}
    */
   let {
-    id,
     question,
     answers,
     caseSensitive = false,
     correctFeedback = '',
     incorrectFeedback = '',
-    graded,
-    maxRetries,
-    pool,
-    weight,
+    ...rest
   } = $props();
 
   const answerList = $derived(fillInAnswers(answers));
@@ -33,25 +29,22 @@
   const inputId = `fitb-${componentId}`;
 
   const q = useQuestion(
-    questionOptions(
-      () => ({ id, question, graded, weight, maxRetries, pool }),
-      {
-        complete: () => inputValue.trim() !== '',
-        response: () => ({
-          type: 'fill-in',
-          response: inputValue.trim(),
-          correct: answerList,
-          caseMatters: !!caseSensitive,
-        }),
-        reset: () => {
-          inputValue = '';
-        },
-        restore: (response) => {
-          inputValue = String(response);
-          return inputValue;
-        },
+    questionOptions(() => ({ question, ...rest }), {
+      complete: () => inputValue.trim() !== '',
+      response: () => ({
+        type: 'fill-in',
+        response: inputValue.trim(),
+        correct: answerList,
+        caseMatters: !!caseSensitive,
+      }),
+      reset: () => {
+        inputValue = '';
       },
-    ),
+      restore: (response) => {
+        inputValue = String(response);
+        return inputValue;
+      },
+    }),
   );
 
   const inQuiz = q.mode === 'quiz';

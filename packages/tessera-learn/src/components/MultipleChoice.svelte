@@ -15,17 +15,13 @@
    * }}
    */
   let {
-    id,
     question,
     options,
     correct,
     correctFeedback = '',
     incorrectFeedback = '',
     optionFeedback = [],
-    graded,
-    maxRetries,
-    pool,
-    weight,
+    ...rest
   } = $props();
 
   let selectedOption = $state(null);
@@ -35,24 +31,21 @@
   const groupId = `mc-${componentId}`;
 
   const q = useQuestion(
-    questionOptions(
-      () => ({ id, question, graded, weight, maxRetries, pool }),
-      {
-        response: () => ({
-          type: 'choice',
-          response: selectedOption !== null ? [String(selectedOption)] : [],
-          correct: [String(correct)],
-          options: indexOptions(options),
-        }),
-        reset: () => {
-          selectedOption = null;
-        },
-        restore: (response) => {
-          selectedOption = savedIndex(response[0], options);
-          return selectedOption;
-        },
+    questionOptions(() => ({ question, ...rest }), {
+      response: () => ({
+        type: 'choice',
+        response: selectedOption !== null ? [String(selectedOption)] : [],
+        correct: [String(correct)],
+        options: indexOptions(options),
+      }),
+      reset: () => {
+        selectedOption = null;
       },
-    ),
+      restore: (response) => {
+        selectedOption = savedIndex(response[0], options);
+        return selectedOption;
+      },
+    }),
   );
 
   function handleSelect(optIndex) {

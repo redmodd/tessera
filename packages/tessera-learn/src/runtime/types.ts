@@ -116,21 +116,51 @@ export function poolProblem(
   return undefined;
 }
 
+/**
+ * The questions each `draw` count draws from. Without a count (no `draw`, or
+ * the questions with no `pool` under `{ pool: count }`), every one is drawn;
+ * a question in a pool `draw` does not name is in no group.
+ */
+export function drawGroups<T>(
+  draw: QuizConfig['draw'],
+  items: readonly T[],
+  poolOf: (item: T) => string | undefined,
+): { pool?: string; count: number; members: T[] }[] {
+  const group = (members: T[], count = members.length, pool?: string) => ({
+    pool,
+    count,
+    members,
+  });
+  if (typeof draw !== 'object') return [group([...items], draw)];
+  return [
+    group(items.filter((item) => poolOf(item) === undefined)),
+    ...Object.entries(draw).map(([pool, count]) =>
+      group(
+        items.filter((item) => poolOf(item) === pool),
+        count,
+        pool,
+      ),
+    ),
+  ];
+}
+
 /** Each `draw` count larger than the questions, given by `pools`, it draws from. */
 export function drawShortfalls(
   draw: QuizConfig['draw'],
   pools: readonly (string | undefined)[],
 ): { count: number; size: number; from: string }[] {
-  const wanted: [string | undefined, number][] =
-    typeof draw === 'number' ? [[undefined, draw]] : Object.entries(draw ?? {});
-  return wanted.flatMap(([pool, count]) => {
-    const size =
-      pool === undefined
-        ? pools.length
-        : pools.filter((p) => p === pool).length;
-    const from = pool === undefined ? 'questions' : `from pool "${pool}"`;
-    return count > size ? [{ count, size, from }] : [];
-  });
+  return drawGroups(draw, pools, (pool) => pool).flatMap(
+    ({ pool, count, members: { length: size } }) =>
+      count > size
+        ? [
+            {
+              count,
+              size,
+              from: pool === undefined ? 'questions' : `from pool "${pool}"`,
+            },
+          ]
+        : [],
+  );
 }
 
 /**

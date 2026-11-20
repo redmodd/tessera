@@ -17,17 +17,13 @@
    * }}
    */
   let {
-    id,
     question,
     items,
     targets,
     correct,
     correctFeedback = '',
     incorrectFeedback = '',
-    graded,
-    maxRetries,
-    pool,
-    weight,
+    ...rest
   } = $props();
 
   let queue = $state([]); // item indices not yet placed; queue[0] is current
@@ -56,36 +52,33 @@
   // cleanly to SCORM 2004's `matching` interaction. We emit [itemIdx, targetIdx]
   // pairs as stringified ids.
   const q = useQuestion(
-    questionOptions(
-      () => ({ id, question, graded, weight, maxRetries, pool }),
-      {
-        complete: () => placements.size === items.length,
-        response: () => {
-          const left = indexOptions(items);
-          return {
-            type: 'matching',
-            response: [...placements.entries()].map(([i, t]) => [
-              String(i),
-              String(t),
-            ]),
-            correct: left.map(({ id }, i) => [id, String(correct[i])]),
-            optionPairs: {
-              left,
-              right: indexOptions(targets),
-            },
-          };
-        },
-        reset: resetState,
-        restore: (response) => {
-          const saved = response.map(([item, target]) => [
-            savedIndex(item, items),
-            savedIndex(target, targets),
-          ]);
-          for (const [item, target] of saved) placements.set(item, target);
-          return new Map(placements);
-        },
+    questionOptions(() => ({ question, ...rest }), {
+      complete: () => placements.size === items.length,
+      response: () => {
+        const left = indexOptions(items);
+        return {
+          type: 'matching',
+          response: [...placements.entries()].map(([i, t]) => [
+            String(i),
+            String(t),
+          ]),
+          correct: left.map(({ id }, i) => [id, String(correct[i])]),
+          optionPairs: {
+            left,
+            right: indexOptions(targets),
+          },
+        };
       },
-    ),
+      reset: resetState,
+      restore: (response) => {
+        const saved = response.map(([item, target]) => [
+          savedIndex(item, items),
+          savedIndex(target, targets),
+        ]);
+        for (const [item, target] of saved) placements.set(item, target);
+        return new Map(placements);
+      },
+    }),
   );
 
   const inQuiz = q.mode === 'quiz';
