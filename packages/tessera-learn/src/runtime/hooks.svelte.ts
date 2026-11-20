@@ -528,6 +528,7 @@ export function useQuiz(
     report: reporter(),
     onComplete: (score, responses, scored, questionIds) =>
       progress.quizCompleted(pageIndex, score, responses, scored, questionIds),
+    onDraw: (ids) => progress.quizDraw(pageIndex, ids),
     notify: (name, detail) => {
       opts
         .element?.()

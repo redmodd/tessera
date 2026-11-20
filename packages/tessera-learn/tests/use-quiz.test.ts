@@ -21,6 +21,8 @@ interface EngineProbe {
   responses: Array<Record<string, unknown>>;
   /** The attempt's question ids handed to progress with each score, in order. */
   questionIds: Array<string[] | undefined>;
+  /** Every fresh draw handed to progress, in order. */
+  draws: string[][];
   /** Every interaction reported to the (injected) adapter, in order. */
   reports: Array<{
     id: string;
@@ -41,6 +43,7 @@ function makeEngine(
       unscored?: boolean;
       responses?: Record<string, unknown>;
       questionIds?: string[];
+      drawn?: string[];
     };
   } = {},
 ): EngineProbe {
@@ -49,6 +52,7 @@ function makeEngine(
   const completed: number[] = [];
   const responses: EngineProbe['responses'] = [];
   const questionIds: EngineProbe['questionIds'] = [];
+  const draws: string[][] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
@@ -59,6 +63,7 @@ function makeEngine(
       responses.push(Object.fromEntries(answered));
       questionIds.push(ids);
     },
+    onDraw: (ids) => draws.push(ids),
     notify: opts.noElement
       ? undefined
       : (name, detail) => events.push({ name, detail }),
@@ -67,7 +72,7 @@ function makeEngine(
       responses: new Map(Object.entries(opts.restore.responses ?? {})),
     },
   });
-  return { engine, events, reports, completed, responses, questionIds };
+  return { engine, events, reports, completed, responses, questionIds, draws };
 }
 
 function completeScore(events: EngineProbe['events']): number | undefined {
@@ -1345,6 +1350,82 @@ describe('QuizEngine quiz bank', () => {
     expect(warn).not.toHaveBeenCalledWith(
       expect.stringMatching(/registered after the learner started/),
     );
+  });
+
+  describe('an unsubmitted draw', () => {
+    it('keeps a fresh draw until it is submitted', () => {
+      const { engine, draws } = makeEngine({ graded: true, draw: 2 });
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+      engine.mount();
+
+      expect(draws).toEqual([ids(engine)]);
+    });
+
+    it('asks a saved draw again, in its order, without drawing', () => {
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: 2 },
+        { restore: { attempts: 0, score: 0, drawn: ['c', 'a'] } },
+      );
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+      engine.mount();
+
+      expect(ids(engine)).toEqual(['c', 'a']);
+      expect(draws).toEqual([]);
+    });
+
+    it('asks a saved draw again behind a shell that renders questions late', async () => {
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: 2 },
+        { restore: { attempts: 0, score: 0, drawn: ['c', 'a'] } },
+      );
+      engine.mount();
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+
+      await Promise.resolve();
+      expect(ids(engine)).toEqual(['c', 'a']);
+      expect(draws).toEqual([]);
+    });
+
+    it('draws again when a saved question no longer registers', () => {
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: 2 },
+        { restore: { attempts: 0, score: 0, drawn: ['gone', 'a'] } },
+      );
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+      engine.mount();
+
+      expect(ids(engine)).not.toContain('gone');
+      expect(draws).toEqual([ids(engine)]);
+    });
+
+    it("asks a restored result's saved draw on Retry, then draws fresh after it is submitted", () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: 2 },
+        {
+          restore: {
+            attempts: 1,
+            score: 50,
+            responses: { a: true, b: true },
+            questionIds: ['a', 'b'],
+            drawn: ['c', 'a'],
+          },
+        },
+      );
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+      engine.mount();
+      expect(ids(engine)).toEqual(['a', 'b']);
+
+      engine.retry();
+      expect(ids(engine)).toEqual(['c', 'a']);
+      expect(draws).toEqual([]);
+
+      answerAll(engine);
+      engine.submit();
+      random.mockReturnValue(0.99);
+      engine.retry();
+      expect(draws).toEqual([ids(engine)]);
+    });
   });
 
   it('warns about pools that cannot be drawn as configured', () => {

@@ -165,7 +165,7 @@ test.describe.serial('quiz reporting timing — review and never', () => {
       .poll(() => interactionField(page, 'id'), { timeout: 5000 })
       .toEqual(['dupid', 'dupid_2']);
   });
-  test('a bank quiz reports only the drawn questions and resumes them, in order, for review', async ({
+  test('a bank quiz keeps its draw across a reload, reports only the drawn questions and resumes them, in order, for review', async ({
     page,
   }) => {
     await launchQuiz(page, BASE, 'Bank Quiz');
@@ -175,6 +175,17 @@ test.describe.serial('quiz reporting timing — review and never', () => {
     await expect(page.locator('.tessera-quiz-progress-text')).toContainText(
       'of 3',
     );
+    const drawn = () =>
+      page
+        .locator('.tessera-quiz-question-wrapper .tessera-mc-question')
+        .allTextContents()
+        .then((texts) => texts.map((text) => text.trim()));
+    const before = await drawn();
+    expect(before).toHaveLength(3);
+
+    await page.reload();
+    await expect(page.locator('.tessera-content h1')).toHaveText('Bank Quiz');
+    await expect.poll(drawn, { timeout: 5000 }).toEqual(before);
 
     const asked: string[] = [];
     for (let i = 0; i < 3; i++) {

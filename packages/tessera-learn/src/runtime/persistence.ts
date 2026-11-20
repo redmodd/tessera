@@ -59,6 +59,8 @@ export interface GradedUnitState {
   r?: Record<string, unknown>;
   /** The best quiz attempt's question ids in order under `draw` or `shuffle`, saved only with `r` and only when `r`'s keys don't list them in order */
   o?: string[];
+  /** The quiz's drawn attempt not yet submitted, under `draw` or `shuffle` */
+  d?: string[];
   /** Graded standalone questions on the page not yet answered, omitted when none */
   w?: string[];
 }

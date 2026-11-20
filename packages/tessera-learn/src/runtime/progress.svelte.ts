@@ -193,6 +193,8 @@ export interface GradedUnit {
   responses?: ReadonlyMap<string, string>;
   /** The best quiz attempt's question ids in order, kept only with its responses. */
   questionIds?: readonly string[];
+  /** The drawn quiz attempt not yet submitted, so a return visit asks it again. */
+  drawn?: readonly string[];
 }
 
 export class ProgressState {
@@ -294,6 +296,14 @@ export class ProgressState {
     return this.gradedUnits.get(pageIndex)?.questionIds;
   }
 
+  quizDrawn(pageIndex: number): readonly string[] | undefined {
+    return this.gradedUnits.get(pageIndex)?.drawn;
+  }
+
+  quizDraw(pageIndex: number, questionIds: readonly string[]) {
+    this.#write(pageIndex, { drawn: questionIds });
+  }
+
   quizResponses(pageIndex: number): Map<string, unknown> {
     const responses = this.gradedUnits.get(pageIndex)?.responses ?? [];
     return new Map(
@@ -323,6 +333,7 @@ export class ProgressState {
       (scored === !unit.unscored ? score >= unit.quizScore : scored);
     this.#write(pageIndex, {
       attempts: (unit?.attempts ?? 0) + 1,
+      drawn: undefined,
       ...(best
         ? {
             quizScore: score,
@@ -701,6 +712,9 @@ export class ProgressState {
           if (o) entry.o = o;
         }
       }
+      const d = unit.drawn && [...unit.drawn];
+      if (d && afford(() => jsonSize({ ...entry, d }) - jsonSize(entry)))
+        entry.d = d;
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[pageIndex] = entry;
@@ -763,6 +777,7 @@ export class ProgressState {
                 : undefined,
           });
         }
+        if (isStringArray(unit.d)) this.#write(pageIndex, { drawn: unit.d });
         const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
           (id): id is string => typeof id === 'string',
         );

@@ -38,6 +38,8 @@ export interface QuizEngineDeps {
     scored: boolean,
     questionIds?: string[],
   ) => void;
+  /** Keeps a fresh draw until it is submitted, so leaving the page can't redraw it. */
+  onDraw?: (questionIds: string[]) => void;
   /** Author-facing DOM notification; a no-op unless the shell supplies an element. */
   notify?: (name: string, detail?: unknown) => void;
   /**
@@ -90,6 +92,7 @@ export class QuizEngine implements UseQuizHandle {
   #attemptIds = $state.raw<string[] | null>(null);
   #mounted = false;
   #redrawQueued = false;
+  #savedDraw: readonly string[] | null = null;
 
   constructor(deps: QuizEngineDeps) {
     this.#deps = deps;
@@ -105,9 +108,11 @@ export class QuizEngine implements UseQuizHandle {
       this.#submitCalled = true;
     }
     if (this.#bank) {
-      this.#attemptIds = this.#fromSave
-        ? [...(deps.restore?.questionIds ?? [])]
-        : [];
+      this.#savedDraw = deps.restore?.drawn?.length ? deps.restore.drawn : null;
+      this.#attemptIds = [
+        ...((this.#fromSave ? deps.restore?.questionIds : this.#savedDraw) ??
+          []),
+      ];
     }
   }
 
@@ -225,17 +230,25 @@ export class QuizEngine implements UseQuizHandle {
 
   /**
    * Draws the first attempt once the questions rendered at mount have
-   * registered. A restored result keeps its saved questions.
+   * registered, or asks a saved unsubmitted draw again. A restored result
+   * keeps its saved questions.
    */
   mount(): void {
     this.#mounted = true;
-    if (this.#bank && !this.#fromSave && this.#internalQuestions.length > 0)
-      this.#drawAttempt();
+    if (!this.#bank || this.#internalQuestions.length === 0) return;
+    if (import.meta.env?.DEV) this.#checkPools();
+    if (!this.#fromSave) this.#drawAttempt();
   }
 
+  /** The saved draw while every question in it has registered, else a new one. */
   #drawAttempt(): void {
-    if (import.meta.env?.DEV) this.#checkPools();
+    const saved = this.#savedDraw;
+    if (saved?.every((id) => this.#indexById.has(id))) {
+      this.#attemptIds = [...saved];
+      return;
+    }
     this.#attemptIds = this.#draw();
+    this.#deps.onDraw?.(this.#attemptIds);
   }
 
   /**
@@ -249,7 +262,9 @@ export class QuizEngine implements UseQuizHandle {
       this.#redrawQueued = true;
       queueMicrotask(() => {
         this.#redrawQueued = false;
-        if (!this.#submitted && this.#answers.size === 0) this.#drawAttempt();
+        if (this.#submitted || this.#answers.size > 0) return;
+        if (import.meta.env?.DEV) this.#checkPools();
+        this.#drawAttempt();
       });
     }
     return true;
@@ -420,6 +435,7 @@ export class QuizEngine implements UseQuizHandle {
     }
 
     for (const i of attempt) this.#commit(i);
+    this.#savedDraw = null;
 
     const computed = this.#computeScore(attempt);
     const scored = computed !== null;
@@ -516,7 +532,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#fromSave = false;
     this.#reviewing = false;
     this.#score = 0;
-    if (redraw) this.#attemptIds = this.#draw();
+    if (redraw) this.#drawAttempt();
   }
 
   #commit(index: number): void {

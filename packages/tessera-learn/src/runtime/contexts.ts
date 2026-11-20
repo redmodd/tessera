@@ -38,6 +38,8 @@ export interface QuizPageState {
   responses?: ReadonlyMap<string, unknown>;
   /** The best attempt's question ids, in order, under `draw` or `shuffle`. */
   questionIds?: readonly string[];
+  /** The drawn attempt not yet submitted, under `draw` or `shuffle`. */
+  drawn?: readonly string[];
 }
 
 export interface PageContext {

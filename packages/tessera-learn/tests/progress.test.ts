@@ -539,6 +539,22 @@ describe('ProgressState', () => {
       expect(restored.quizQuestionIds(3)).toEqual(['2', '1']);
     });
 
+    it('saves an unsubmitted draw until the attempt is submitted', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizDraw(2, ['c', 'a']);
+
+      const { saved, restored } = roundTrip(progress);
+      expect(saved.g[2]).toEqual({ d: ['c', 'a'] });
+      expect(restored.quizDrawn(2)).toEqual(['c', 'a']);
+      expect(restored.quizAttempts(2)).toBe(0);
+      expect(restored.quizScore(2)).toBeUndefined();
+      expect(roundTrip(progress, 0).saved.g).toBeUndefined();
+
+      progress.quizCompleted(2, 100, [], true, ['c', 'a']);
+      expect(roundTrip(progress).saved.g[2]).toEqual({ s: 100 });
+      expect(progress.quizDrawn(2)).toBeUndefined();
+    });
+
     it('drops the saved answers when a better attempt has none', () => {
       const progress = new ProgressState(createManifest(6), createConfig());
       progress.quizCompleted(2, 50, [['a', ['0']]]);
