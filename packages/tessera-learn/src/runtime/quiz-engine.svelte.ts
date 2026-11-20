@@ -89,6 +89,7 @@ export class QuizEngine implements UseQuizHandle {
   // is in it, in page order (no `draw` or `shuffle`).
   #attemptIds = $state.raw<string[] | null>(null);
   #mounted = false;
+  #redrawQueued = false;
 
   constructor(deps: QuizEngineDeps) {
     this.#deps = deps;
@@ -223,14 +224,35 @@ export class QuizEngine implements UseQuizHandle {
   }
 
   /**
-   * Draws the first attempt once every question on the page has registered.
-   * A restored result keeps its saved questions.
+   * Draws the first attempt once the questions rendered at mount have
+   * registered. A restored result keeps its saved questions.
    */
   mount(): void {
     this.#mounted = true;
-    if (!this.#bank) return;
+    if (this.#bank && !this.#fromSave && this.#internalQuestions.length > 0)
+      this.#drawAttempt();
+  }
+
+  #drawAttempt(): void {
     if (import.meta.env?.DEV) this.#checkPools();
-    if (!this.#fromSave) this.#attemptIds = this.#draw();
+    this.#attemptIds = this.#draw();
+  }
+
+  /**
+   * A shell can render its questions after mount, behind a Start button say.
+   * Until the learner answers one, a late question draws the attempt again,
+   * once the questions registering with it in the same update have too.
+   */
+  #redrawLate(): boolean {
+    if (this.#submitted || this.#answers.size > 0) return false;
+    if (!this.#redrawQueued) {
+      this.#redrawQueued = true;
+      queueMicrotask(() => {
+        this.#redrawQueued = false;
+        if (!this.#submitted && this.#answers.size === 0) this.#drawAttempt();
+      });
+    }
+    return true;
   }
 
   #draw(): string[] {
@@ -319,15 +341,16 @@ export class QuizEngine implements UseQuizHandle {
     this.#indexById.set(id, index);
     const inAttempt = this.#inAttempt(index);
     if (
-      import.meta.env?.DEV &&
       this.#mounted &&
       !this.#fromSave &&
-      !inAttempt
+      !inAttempt &&
+      !this.#redrawLate() &&
+      import.meta.env?.DEV
     ) {
       console.warn(
-        `[tessera] useQuiz: question "${id}" registered after the quiz drew its ` +
-          'questions, so it is left out of this attempt. Render every question ' +
-          'when the quiz mounts, not inside {#await}, a lazy import or an {#if}.',
+        `[tessera] useQuiz: question "${id}" registered after the learner started ` +
+          'the attempt, so it is left out of it. Render every question before the ' +
+          'learner answers one, not inside {#await}, a lazy import or an {#if} they toggle.',
       );
     }
     const answer =

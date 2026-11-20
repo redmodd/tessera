@@ -1611,11 +1611,22 @@ ${questions}`,
       ]);
     });
 
-    it('skips the count when an imported component can add questions', () => {
+    it.each(['./shared.svelte', '@acme/course-bank'])(
+      'skips the count when a component imported from %s can add questions',
+      (from) => {
+        const { errors } = bankPage(
+          '{ draw: { basics: 2 } }',
+          mc('b1', 'basics') + '\n<Shared />',
+          `\n  import Shared from '${from}';`,
+        );
+        expect(errors.filter((e) => e.includes('asks for'))).toEqual([]);
+      },
+    );
+
+    it('skips the count for a question inside a snippet', () => {
       const { errors } = bankPage(
-        '{ draw: { basics: 2 } }',
-        mc('b1', 'basics') + '\n<Shared />',
-        "\n  import Shared from './shared.svelte';",
+        '{ draw: 2 }',
+        `{#snippet q()}${mc('a')}{/snippet}\n{@render q()}{@render q()}`,
       );
       expect(errors.filter((e) => e.includes('asks for'))).toEqual([]);
     });

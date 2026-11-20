@@ -29,7 +29,7 @@ export interface ComponentMatch {
   name: string;
   props: Map<string, PropValue>;
   hasSpread: boolean;
-  /** The branch it sits in of each enclosing `{#if}`, `{#each}` or `{#await}`, keyed by that block's offset. */
+  /** The branch it sits in of each enclosing `{#if}`, `{#each}`, `{#await}` or `{#snippet}`, keyed by that block's offset. */
   branches: ReadonlyMap<number, string>;
 }
 
@@ -37,6 +37,7 @@ const BRANCH_KEYS: Record<string, ReadonlySet<string>> = {
   IfBlock: new Set(['consequent', 'alternate']),
   EachBlock: new Set(['body', 'fallback']),
   AwaitBlock: new Set(['pending', 'then', 'catch']),
+  SnippetBlock: new Set(['body']),
 };
 
 type NamedObjectLiteral =

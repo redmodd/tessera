@@ -216,7 +216,7 @@ Orchestration hook for any `quiz.svelte` (and the built-in `<Quiz>`). Throws on 
 
 - **A custom shell must render `children`**, visibly or hidden. Questions register only when they mount, so a shell that drops `children` has nothing to score.
 - **A question stays registered once it mounts.** To show one question at a time, hide the others rather than unmounting them.
-- **`questions` lists only the current attempt, in its order.** Under `draw` or `shuffle` it is empty until the quiz mounts and draws. Every per-question rule (`canSubmit`, the score, LMS reporting, the save, review) covers only the attempt. An inline-layout widget renders nothing when `q.inAttempt` is false.
+- **`questions` lists only the current attempt, in its order.** Under `draw` or `shuffle` it is empty until the quiz draws: when it mounts, or when its questions register, if the shell renders them later. Every per-question rule (`canSubmit`, the score, LMS reporting, the save, review) covers only the attempt. An inline-layout widget renders nothing when `q.inAttempt` is false.
 - **Only `submit()` scores the quiz.** It reports every question to the LMS, records the page score and marks the quiz Completed/Passed/Failed.
 - **`tessera-quiz-complete` is a notification, not the scoring path.** A shell that passes `element` gets it dispatched there after `submit()`, with `detail: { score, scored }` from that attempt. Dispatching it yourself is a build error.
 - **Widgets call `setAnswer()` only; the shell decides when an answer is final.** Call `q.commit()` to report one question before the end (the built-in `<Quiz>` does when `feedbackMode: 'immediate'` reveals it), and still call `submit()` at the end.

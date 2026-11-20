@@ -1292,17 +1292,42 @@ describe('QuizEngine quiz bank', () => {
     });
   });
 
-  it('leaves out a question that registers after the draw, with a warning', () => {
+  it('draws once questions a shell renders after mount register', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true, draw: 2 });
+    engine.mount();
+    register(engine, pooled('a'), pooled('b'), pooled('c'));
+    expect(engine.questions).toEqual([]);
+
+    await Promise.resolve();
+    expect(engine.questions).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('draws again for a late question until the learner answers one', async () => {
     const { engine } = makeEngine({ graded: true, shuffle: true });
     register(engine, pooled('a'));
     engine.mount();
     const [late] = register(engine, pooled('late'));
 
+    await Promise.resolve();
+    expect([...ids(engine)].sort()).toEqual(['a', 'late']);
+    expect(late.inAttempt).toBe(true);
+  });
+
+  it('leaves out a question that registers after the learner answers, with a warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true, shuffle: true });
+    const [a] = register(engine, pooled('a'));
+    engine.mount();
+    a.setAnswer(true);
+    const [late] = register(engine, pooled('late'));
+
+    await Promise.resolve();
     expect(ids(engine)).toEqual(['a']);
     expect(late.inAttempt).toBe(false);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringMatching(/"late" registered after the quiz drew/),
+      expect.stringMatching(/"late" registered after the learner started/),
     );
   });
 
@@ -1318,7 +1343,7 @@ describe('QuizEngine quiz bank', () => {
 
     expect(late.inAttempt).toBe(false);
     expect(warn).not.toHaveBeenCalledWith(
-      expect.stringMatching(/registered after the quiz drew/),
+      expect.stringMatching(/registered after the learner started/),
     );
   });
 

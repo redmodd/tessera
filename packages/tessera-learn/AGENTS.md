@@ -428,7 +428,7 @@ Write every question on the page with a literal `id`; the quiz picks which of th
 
 - **`draw: 5` draws from every question**, and `pool` is then an error. A quiz that needs always-included questions uses named pools.
 - **Every `pool` must be named in `draw`, and each count must be no larger than its pool.** The build checks questions written on the page; a dev warning covers questions it can't see.
-- **Render every question when the page mounts.** A question that mounts later (inside `{#await}`, an `{#if}`, a lazy import) is left out of the attempt.
+- **Render every question before the learner answers one.** The quiz draws again when questions mount late (a shell's Start button), but one that mounts after an answer (inside `{#await}`, an `{#if}` the learner toggles, a lazy import) is left out of the attempt.
 - **Share a pool across pages** by putting its questions in a component both pages import. See [Recipe 5](docs/recipes.md#recipe-5-question-bank-shared-across-pages).
 
 ### Per-question weighting

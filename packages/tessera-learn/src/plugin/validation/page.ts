@@ -170,7 +170,8 @@ function validatePageFile(
   validateQuestionComponents(questionComponents, d, profile);
   if (isQuiz && isValidDraw(quiz.draw)) {
     validateQuestionPools(quiz.draw, questionComponents, d, {
-      seesEveryQuestion: !hasCustomWidget && useQuestions === 'absent',
+      seesEveryQuestion:
+        !importsOutsideTessera(content) && useQuestions === 'absent',
     });
   }
   validateMediaComponents(content, d);
@@ -395,11 +396,23 @@ const KNOWN_PAGE_FIELDS = new Set(
 // A local import may wrap useQuestion, so its presence suppresses the "no
 // questions" warning: false negatives are fine for an advisory heuristic.
 function hasLocalModuleImport(content: string): boolean {
-  return scriptImports(content).some(({ from }) => {
-    if (!/^(?:\.{1,2}\/|\$)/.test(from)) return false;
-    const file = from.slice(from.lastIndexOf('/') + 1);
-    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
-  });
+  return codeImports(content).some((from) => /^(?:\.{1,2}\/|\$)/.test(from));
+}
+
+/** A component from a local file or a package may render questions the build can't see. */
+function importsOutsideTessera(content: string): boolean {
+  return codeImports(content).some(
+    (from) => !/^(?:tessera-learn|svelte)(?:\/|$)/.test(from),
+  );
+}
+
+function codeImports(content: string): string[] {
+  return scriptImports(content)
+    .map(({ from }) => from)
+    .filter((from) => {
+      const file = from.slice(from.lastIndexOf('/') + 1);
+      return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+    });
 }
 
 function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
