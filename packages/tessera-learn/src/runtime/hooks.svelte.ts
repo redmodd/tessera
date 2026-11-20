@@ -542,7 +542,6 @@ export function useQuiz(
   });
 
   onMount(() => {
-    engine.mount();
     if (!import.meta.env?.DEV) return;
     void tick().then(() => warnEmptyQuiz(engine.stats.registeredCount));
   });

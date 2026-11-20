@@ -1093,8 +1093,6 @@ describe('QuizEngine', () => {
   });
 });
 
-// ---- Wrapper-only tests: context wiring + lifecycle, where mounting is the point ----
-
 describe('QuizEngine quiz bank', () => {
   /** A true/false question answered right, in pool `pool` when given. */
   function pooled(id: string, pool?: string, restore = true) {
@@ -1118,19 +1116,21 @@ describe('QuizEngine quiz bank', () => {
     for (const q of engine.questions) q.setAnswer(true);
   }
 
-  it('draws the attempt when the quiz mounts, in page order', () => {
+  it('draws the attempt once its questions register, in page order', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine({ graded: true, draw: 2 });
     register(engine, pooled('a'), pooled('b'), pooled('c'), pooled('d'));
     expect(engine.questions).toEqual([]);
 
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    engine.mount();
+    await Promise.resolve();
 
     expect(ids(engine)).toHaveLength(2);
     expect(ids(engine)).toEqual([...ids(engine)].sort());
+    expect(warn).not.toHaveBeenCalled();
   });
 
-  it('includes every question with no pool and draws the count from each named pool', () => {
+  it('includes every question with no pool and draws the count from each named pool', async () => {
     const { engine } = makeEngine({
       graded: true,
       draw: { basics: 2, advanced: 1 },
@@ -1144,7 +1144,7 @@ describe('QuizEngine quiz bank', () => {
       pooled('a1', 'advanced'),
       pooled('a2', 'advanced'),
     );
-    engine.mount();
+    await Promise.resolve();
 
     const drawn = ids(engine);
     expect(drawn[0]).toBe('intro');
@@ -1152,16 +1152,16 @@ describe('QuizEngine quiz bank', () => {
     expect(drawn.filter((id) => id.startsWith('a'))).toHaveLength(1);
   });
 
-  it('shuffles every question when shuffle is set without draw', () => {
+  it('shuffles every question when shuffle is set without draw', async () => {
     const { engine } = makeEngine({ graded: true, shuffle: true });
     register(engine, pooled('a'), pooled('b'), pooled('c'));
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    engine.mount();
+    await Promise.resolve();
 
     expect(ids(engine)).toEqual(['b', 'c', 'a']);
   });
 
-  it('submits, scores, reports and saves only the attempt', () => {
+  it('submits, scores, reports and saves only the attempt', async () => {
     const { engine, reports, responses, questionIds, completed } = makeEngine({
       graded: true,
       draw: 1,
@@ -1171,7 +1171,7 @@ describe('QuizEngine quiz bank', () => {
       checkAnswer: () => false,
     });
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    engine.mount();
+    await Promise.resolve();
     expect(ids(engine)).toEqual(['b']);
     expect(a.inAttempt).toBe(false);
     expect(b.inAttempt).toBe(true);
@@ -1189,17 +1189,17 @@ describe('QuizEngine quiz bank', () => {
     expect(questionIds).toEqual([['b']]);
   });
 
-  it('saves no question ids when the quiz neither draws nor shuffles', () => {
+  it('saves no question ids when the quiz neither draws nor shuffles', async () => {
     const { engine, questionIds } = makeEngine({ graded: true });
     register(engine, pooled('a'));
-    engine.mount();
+    await Promise.resolve();
     answerAll(engine);
     engine.submit();
 
     expect(questionIds).toEqual([undefined]);
   });
 
-  it("draws again on a full retry and keeps the attempt's order on an incorrect-only one", () => {
+  it("draws again on a full retry and keeps the attempt's order on an incorrect-only one", async () => {
     const random = vi.spyOn(Math, 'random');
     for (const [retryMode, expected] of [
       ['full', ['b', 'c']],
@@ -1208,7 +1208,7 @@ describe('QuizEngine quiz bank', () => {
       const { engine } = makeEngine({ graded: true, draw: 2, retryMode });
       register(engine, pooled('a'), pooled('b'), pooled('c'));
       random.mockReturnValue(0.99);
-      engine.mount();
+      await Promise.resolve();
       expect(ids(engine)).toEqual(['a', 'b']);
       answerAll(engine);
       engine.submit();
@@ -1233,7 +1233,6 @@ describe('QuizEngine quiz bank', () => {
         { restore: saved },
       );
       const [a] = register(engine, pooled('a'), pooled('b'), pooled('c'));
-      engine.mount();
 
       expect(ids(engine)).toEqual(['c', 'b']);
       expect(a.inAttempt).toBe(false);
@@ -1249,7 +1248,6 @@ describe('QuizEngine quiz bank', () => {
         { restore: saved },
       );
       register(engine, pooled('a'), pooled('b'));
-      engine.mount();
 
       expect(ids(engine)).toEqual(['b']);
       expect(engine.restored).toBe(true);
@@ -1270,7 +1268,6 @@ describe('QuizEngine quiz bank', () => {
         pooled('b', undefined, false),
         pooled('c'),
       );
-      engine.mount();
       expect(engine.restored).toBe(true);
 
       vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -1286,7 +1283,6 @@ describe('QuizEngine quiz bank', () => {
         { restore: { attempts: 1, score: 80 } },
       );
       register(engine, pooled('a'), pooled('b'));
-      engine.mount();
 
       expect(engine.questions).toEqual([]);
       expect(engine.restored).toBe(true);
@@ -1297,22 +1293,10 @@ describe('QuizEngine quiz bank', () => {
     });
   });
 
-  it('draws once questions a shell renders after mount register', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { engine } = makeEngine({ graded: true, draw: 2 });
-    engine.mount();
-    register(engine, pooled('a'), pooled('b'), pooled('c'));
-    expect(engine.questions).toEqual([]);
-
-    await Promise.resolve();
-    expect(engine.questions).toHaveLength(2);
-    expect(warn).not.toHaveBeenCalled();
-  });
-
   it('draws again for a late question until the learner answers one', async () => {
     const { engine } = makeEngine({ graded: true, shuffle: true });
     register(engine, pooled('a'));
-    engine.mount();
+    await Promise.resolve();
     const [late] = register(engine, pooled('late'));
 
     await Promise.resolve();
@@ -1324,7 +1308,7 @@ describe('QuizEngine quiz bank', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine({ graded: true, shuffle: true });
     const [a] = register(engine, pooled('a'));
-    engine.mount();
+    await Promise.resolve();
     a.setAnswer(true);
     const [late] = register(engine, pooled('late'));
 
@@ -1343,7 +1327,6 @@ describe('QuizEngine quiz bank', () => {
       { restore: { attempts: 1, score: 100, questionIds: ['a'] } },
     );
     register(engine, pooled('a'));
-    engine.mount();
     const [late] = register(engine, pooled('late'));
 
     expect(late.inAttempt).toBe(false);
@@ -1353,46 +1336,33 @@ describe('QuizEngine quiz bank', () => {
   });
 
   describe('an unsubmitted draw', () => {
-    it('keeps a fresh draw until it is submitted', () => {
+    it('keeps a fresh draw until it is submitted', async () => {
       const { engine, draws } = makeEngine({ graded: true, draw: 2 });
       register(engine, pooled('a'), pooled('b'), pooled('c'));
-      engine.mount();
+      await Promise.resolve();
 
       expect(draws).toEqual([ids(engine)]);
     });
 
-    it('asks a saved draw again, in its order, without drawing', () => {
+    it('asks a saved draw again, in its order, without drawing', async () => {
       const { engine, draws } = makeEngine(
         { graded: true, draw: 2 },
         { restore: { attempts: 0, score: 0, drawn: ['c', 'a'] } },
       );
       register(engine, pooled('a'), pooled('b'), pooled('c'));
-      engine.mount();
-
-      expect(ids(engine)).toEqual(['c', 'a']);
-      expect(draws).toEqual([]);
-    });
-
-    it('asks a saved draw again behind a shell that renders questions late', async () => {
-      const { engine, draws } = makeEngine(
-        { graded: true, draw: 2 },
-        { restore: { attempts: 0, score: 0, drawn: ['c', 'a'] } },
-      );
-      engine.mount();
-      register(engine, pooled('a'), pooled('b'), pooled('c'));
-
       await Promise.resolve();
+
       expect(ids(engine)).toEqual(['c', 'a']);
       expect(draws).toEqual([]);
     });
 
-    it('draws again when a saved question no longer registers', () => {
+    it('draws again when a saved question no longer registers', async () => {
       const { engine, draws } = makeEngine(
         { graded: true, draw: 2 },
         { restore: { attempts: 0, score: 0, drawn: ['gone', 'a'] } },
       );
       register(engine, pooled('a'), pooled('b'), pooled('c'));
-      engine.mount();
+      await Promise.resolve();
 
       expect(ids(engine)).not.toContain('gone');
       expect(draws).toEqual([ids(engine)]);
@@ -1413,7 +1383,6 @@ describe('QuizEngine quiz bank', () => {
         },
       );
       register(engine, pooled('a'), pooled('b'), pooled('c'));
-      engine.mount();
       expect(ids(engine)).toEqual(['a', 'b']);
 
       engine.retry();
@@ -1428,11 +1397,11 @@ describe('QuizEngine quiz bank', () => {
     });
   });
 
-  it('warns about pools that cannot be drawn as configured', () => {
+  it('warns about pools that cannot be drawn as configured', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine({ graded: true, draw: { basics: 3 } });
     register(engine, pooled('b1', 'basics'), pooled('x', 'typo'));
-    engine.mount();
+    await Promise.resolve();
 
     expect(ids(engine)).toEqual(['b1']);
     expect(warn).toHaveBeenCalledWith(
@@ -1447,12 +1416,13 @@ describe('QuizEngine quiz bank', () => {
     const { engine } = makeEngine({ graded: true });
     const [a] = register(engine, pooled('a'));
     expect(a.inAttempt).toBe(true);
-    engine.mount();
     const [late] = register(engine, pooled('late'));
     expect(late.inAttempt).toBe(true);
     expect(ids(engine)).toEqual(['a', 'late']);
   });
 });
+
+// ---- Wrapper-only tests: context wiring + lifecycle, where mounting is the point ----
 
 describe('useQuiz (Svelte wrapper)', () => {
   it('throws when called on a page with no quiz config', () => {

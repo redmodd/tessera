@@ -30,8 +30,10 @@ import type { StandardProfile } from '../../runtime/standards.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
+  drawShortfalls,
   isRecord,
   isRequiredGradedPage,
+  poolProblem,
   type QuizConfig,
 } from '../../runtime/types.js';
 import { A11Y_IDS, tag } from './a11y.js';
@@ -507,7 +509,7 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
   }
 }
 
-function isValidDraw(draw: unknown): boolean {
+function isValidDraw(draw: unknown): draw is QuizConfig['draw'] {
   const isCount = (n: unknown) => Number.isInteger(n) && (n as number) > 0;
   return (
     draw === undefined ||
@@ -523,13 +525,12 @@ function isValidDraw(draw: unknown): boolean {
  * are checked only when the build sees every question the page renders.
  */
 function validateQuestionPools(
-  draw: unknown,
+  draw: QuizConfig['draw'],
   questions: ComponentMatch[],
   d: Diagnostics,
   { seesEveryQuestion }: { seesEveryQuestion: boolean },
 ): void {
-  const pools = isRecord(draw) ? draw : null;
-  const sizes = new Map<string | undefined, number>();
+  const pools: (string | undefined)[] = [];
   let counted = seesEveryQuestion;
   for (const match of questions) {
     const id = staticQuestionId(match);
@@ -538,39 +539,19 @@ function validateQuestionPools(
     const literal = literalValue(prop);
     if (match.hasSpread || match.branches.size > 0 || (prop && !literal))
       counted = false;
-    const value = literal?.value;
-    if (value !== undefined && typeof value !== 'string') {
-      d.error(`${subject} pool must be a string, got ${formatValue(value)}`);
+    const pool = literal?.value;
+    if (pool !== undefined && typeof pool !== 'string') {
+      d.error(`${subject} pool must be a string, got ${formatValue(pool)}`);
       counted = false;
       continue;
     }
-    const pool = value;
-    if (pool !== undefined && !pools) {
-      d.error(
-        `${subject} names pool "${pool}", but quiz.draw is not { pool: count }, ` +
-          'so the pool is ignored. Name the pool in quiz.draw, or drop pool.',
-      );
-    } else if (pool !== undefined && pools && !Object.hasOwn(pools, pool)) {
-      d.error(
-        `${subject} names pool "${pool}", which quiz.draw does not list, ` +
-          'so it is never drawn. Add the pool to quiz.draw, or fix the name.',
-      );
-    }
-    const key = pools ? pool : undefined;
-    sizes.set(key, (sizes.get(key) ?? 0) + 1);
+    const problem = poolProblem(draw, pool);
+    if (problem) d.error(`${subject} ${problem}`);
+    pools.push(pool);
   }
   if (!counted) return;
-  const wanted: [string | undefined, unknown][] = pools
-    ? Object.entries(pools)
-    : [[undefined, draw]];
-  for (const [pool, count] of wanted) {
-    const size = sizes.get(pool) ?? 0;
-    if (typeof count === 'number' && count > size) {
-      d.error(
-        `quiz.draw asks for ${count} ${pool === undefined ? 'questions' : `from pool "${pool}"`}, ` +
-          `but the page has ${size}`,
-      );
-    }
+  for (const { count, size, from } of drawShortfalls(draw, pools)) {
+    d.error(`quiz.draw asks for ${count} ${from}, but the page has ${size}`);
   }
 }
 

@@ -195,7 +195,9 @@ test.describe.serial('quiz reporting timing — review and never', () => {
       await active.locator('.tessera-mc-option').nth(0).click();
       await primary.click();
     }
-    await page.waitForSelector('.tessera-quiz-results', { timeout: 5000 });
+    await expect(page.locator('.tessera-quiz-results')).toBeVisible({
+      timeout: 5000,
+    });
     expect(asked).toContain('Intro question');
     expect(new Set(asked).size).toBe(3);
 
@@ -205,7 +207,6 @@ test.describe.serial('quiz reporting timing — review and never', () => {
       .toEqual(ids);
 
     await page.reload();
-    await waitForTesseraContent(page);
     await expect(page.locator('.tessera-content h1')).toHaveText('Bank Quiz');
     await page.getByRole('button', { name: 'Review Answers' }).click();
     const reviewed: string[] = [];

@@ -95,6 +95,44 @@ export interface QuizConfig {
   shuffle?: boolean;
 }
 
+/** Why `draw` never draws a question that names `pool`, else undefined. */
+export function poolProblem(
+  draw: QuizConfig['draw'],
+  pool: string | undefined,
+): string | undefined {
+  if (pool === undefined) return undefined;
+  if (typeof draw !== 'object') {
+    return (
+      `names pool "${pool}", but quiz.draw is not { pool: count }, so the ` +
+      'pool is ignored. Name the pool in quiz.draw, or drop pool.'
+    );
+  }
+  if (!Object.hasOwn(draw, pool)) {
+    return (
+      `names pool "${pool}", which quiz.draw does not list, so it is never ` +
+      'drawn. Add the pool to quiz.draw, or fix the name.'
+    );
+  }
+  return undefined;
+}
+
+/** Each `draw` count larger than the questions, given by `pools`, it draws from. */
+export function drawShortfalls(
+  draw: QuizConfig['draw'],
+  pools: readonly (string | undefined)[],
+): { count: number; size: number; from: string }[] {
+  const wanted: [string | undefined, number][] =
+    typeof draw === 'number' ? [[undefined, draw]] : Object.entries(draw ?? {});
+  return wanted.flatMap(([pool, count]) => {
+    const size =
+      pool === undefined
+        ? pools.length
+        : pools.filter((p) => p === pool).length;
+    const from = pool === undefined ? 'questions' : `from pool "${pool}"`;
+    return count > size ? [{ count, size, from }] : [];
+  });
+}
+
 /**
  * Whether a page's score joins the course rollup. Shared so the criterion a
  * package declares and the rollup that feeds it count the same pages.

@@ -1,7 +1,7 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { normalizeWeight, scoredMean } from './progress.svelte.js';
 import { restoreResponse, type Interaction } from './interaction.js';
-import type { QuizConfig } from './types.js';
+import { drawShortfalls, poolProblem, type QuizConfig } from './types.js';
 import type { QuizPageState } from './contexts.js';
 import { shuffle } from '../components/util.js';
 import type {
@@ -84,14 +84,12 @@ export class QuizEngine implements UseQuizHandle {
   #lockedCorrect = new SvelteSet<number>();
   // Each handle carries its index under this symbol, so a proxied copy resolves too.
   #indexKey = Symbol('tessera.questionIndex');
-  #seenIds = new Set<string>();
   #rewrittenIds = new Set<string>();
   #indexById = new Map<string, number>();
   // The attempt's question ids in order; null when every registered question
   // is in it, in page order (no `draw` or `shuffle`).
-  #attemptIds = $state.raw<string[] | null>(null);
-  #mounted = false;
-  #redrawQueued = false;
+  #attemptIds = $state.raw<readonly string[] | null>(null);
+  #drawQueued = false;
   #savedDraw: readonly string[] | null = null;
 
   constructor(deps: QuizEngineDeps) {
@@ -107,18 +105,11 @@ export class QuizEngine implements UseQuizHandle {
       this.#fromSave = true;
       this.#submitCalled = true;
     }
-    if (this.#bank) {
+    if (deps.quizConfig.draw !== undefined || deps.quizConfig.shuffle) {
       this.#savedDraw = deps.restore?.drawn?.length ? deps.restore.drawn : null;
-      this.#attemptIds = [
-        ...((this.#fromSave ? deps.restore?.questionIds : this.#savedDraw) ??
-          []),
-      ];
+      this.#attemptIds =
+        (this.#fromSave ? deps.restore?.questionIds : this.#savedDraw) ?? [];
     }
-  }
-
-  get #bank(): boolean {
-    const { draw, shuffle } = this.#deps.quizConfig;
-    return draw !== undefined || !!shuffle;
   }
 
   // Derived values are plain getters over $state, not $derived. Getters
@@ -228,46 +219,42 @@ export class QuizEngine implements UseQuizHandle {
     };
   }
 
-  /**
-   * Draws the first attempt once the questions rendered at mount have
-   * registered, or asks a saved unsubmitted draw again. A restored result
-   * keeps its saved questions.
-   */
-  mount(): void {
-    this.#mounted = true;
-    if (!this.#bank || this.#internalQuestions.length === 0) return;
-    if (import.meta.env?.DEV) this.#checkPools();
-    if (!this.#fromSave) this.#drawAttempt();
-  }
-
   /** The saved draw while every question in it has registered, else a new one. */
   #drawAttempt(): void {
     const saved = this.#savedDraw;
     if (saved?.every((id) => this.#indexById.has(id))) {
-      this.#attemptIds = [...saved];
+      this.#attemptIds = saved;
       return;
     }
-    this.#attemptIds = this.#draw();
-    this.#deps.onDraw?.(this.#attemptIds);
+    const drawn = this.#draw();
+    this.#attemptIds = drawn;
+    this.#deps.onDraw?.(drawn);
   }
 
   /**
-   * A shell can render its questions after mount, behind a Start button say.
-   * Until the learner answers one, a late question draws the attempt again,
-   * once the questions registering with it in the same update have too.
+   * Draws once every question registering in this update has, whether the
+   * page renders them at mount or a shell renders them later (behind a Start
+   * button, say). After the learner answers one, a late question stays out.
    */
-  #redrawLate(): boolean {
-    if (this.#submitted || this.#answers.size > 0) return false;
-    if (!this.#redrawQueued) {
-      this.#redrawQueued = true;
-      queueMicrotask(() => {
-        this.#redrawQueued = false;
-        if (this.#submitted || this.#answers.size > 0) return;
-        if (import.meta.env?.DEV) this.#checkPools();
-        this.#drawAttempt();
-      });
+  #queueDraw(id: string): void {
+    if (this.#submitted || this.#answers.size > 0) {
+      if (import.meta.env?.DEV) {
+        console.warn(
+          `[tessera] useQuiz: question "${id}" registered after the learner started ` +
+            'the attempt, so it is left out of it. Render every question before the ' +
+            'learner answers one, not inside {#await}, a lazy import or an {#if} they toggle.',
+        );
+      }
+      return;
     }
-    return true;
+    if (this.#drawQueued) return;
+    this.#drawQueued = true;
+    queueMicrotask(() => {
+      this.#drawQueued = false;
+      if (this.#submitted || this.#answers.size > 0) return;
+      if (import.meta.env?.DEV) this.#checkPools();
+      this.#drawAttempt();
+    });
   }
 
   #draw(): string[] {
@@ -296,41 +283,25 @@ export class QuizEngine implements UseQuizHandle {
   #checkPools(): void {
     const { draw } = this.#deps.quizConfig;
     const questions = this.#internalQuestions;
-    const tooFew = (count: number, size: number, from: string) => {
-      if (count <= size) return;
+    const pools = questions.map((q) => q.pool);
+    for (const { count, size, from } of drawShortfalls(draw, pools)) {
       console.warn(
         `[tessera] useQuiz: quiz.draw asks for ${count} ${from}, but only ` +
           `${size} registered, so each attempt gets ${size}.`,
       );
-    };
-    if (typeof draw === 'number') tooFew(draw, questions.length, 'questions');
-    if (typeof draw === 'object') {
-      for (const [pool, count] of Object.entries(draw)) {
-        const size = questions.filter((q) => q.pool === pool).length;
-        tooFew(count, size, `from pool "${pool}"`);
-      }
     }
     for (const q of questions) {
-      if (q.pool === undefined) continue;
-      if (typeof draw !== 'object') {
-        console.warn(
-          `[tessera] useQuiz: question "${q.id}" names pool "${q.pool}", but quiz.draw ` +
-            'is not { pool: count }, so the pool is ignored. Name the pool in draw, or drop pool.',
-        );
-      } else if (!Object.hasOwn(draw, q.pool)) {
-        console.warn(
-          `[tessera] useQuiz: question "${q.id}" names pool "${q.pool}", which quiz.draw ` +
-            'does not list, so it is never drawn. Add the pool to draw, or fix the name.',
-        );
-      }
+      const problem = poolProblem(draw, q.pool);
+      if (problem)
+        console.warn(`[tessera] useQuiz: question "${q.id}" ${problem}`);
     }
   }
 
   registerQuestion(api: UseQuizQuestionApi): UseQuestionHandle {
     let id = api.id;
-    if (this.#seenIds.has(id)) {
+    if (this.#indexById.has(id)) {
       let n = 2;
-      while (this.#seenIds.has(`${api.id}-${n}`)) n++;
+      while (this.#indexById.has(`${api.id}-${n}`)) n++;
       id = `${api.id}-${n}`;
       console.warn(
         this.#rewrittenIds.has(api.id)
@@ -344,7 +315,6 @@ export class QuizEngine implements UseQuizHandle {
       );
       this.#rewrittenIds.add(id);
     }
-    this.#seenIds.add(id);
     const internal: InternalQuestion = {
       ...api,
       id,
@@ -355,19 +325,7 @@ export class QuizEngine implements UseQuizHandle {
     const index = this.#internalQuestions.length - 1;
     this.#indexById.set(id, index);
     const inAttempt = this.#inAttempt(index);
-    if (
-      this.#mounted &&
-      !this.#fromSave &&
-      !inAttempt &&
-      !this.#redrawLate() &&
-      import.meta.env?.DEV
-    ) {
-      console.warn(
-        `[tessera] useQuiz: question "${id}" registered after the learner started ` +
-          'the attempt, so it is left out of it. Render every question before the ' +
-          'learner answers one, not inside {#await}, a lazy import or an {#if} they toggle.',
-      );
-    }
+    if (!this.#fromSave && !inAttempt) this.#queueDraw(id);
     const answer =
       this.#fromSave && inAttempt
         ? restoreResponse(internal, this.#deps.restore?.responses?.get(id))
@@ -508,7 +466,8 @@ export class QuizEngine implements UseQuizHandle {
     this.#lockedCorrect.clear();
     const incorrectOnly = this.#deps.quizConfig.retryMode === 'incorrect-only';
     // A restored attempt missing a question can't be asked again as it was.
-    const redraw = this.#bank && (!incorrectOnly || this.#questionMissing);
+    const redraw =
+      this.#attemptIds !== null && (!incorrectOnly || this.#questionMissing);
     if (incorrectOnly && !redraw) {
       for (const i of this.#attempt) {
         // A question restored without its answer can read as correct, and
