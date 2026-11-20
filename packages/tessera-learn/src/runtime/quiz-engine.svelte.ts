@@ -90,7 +90,7 @@ export class QuizEngine implements UseQuizHandle {
   // Each handle carries its index under this symbol, so a proxied copy resolves too.
   #indexKey = Symbol('tessera.questionIndex');
   #rewrittenIds = new Set<string>();
-  #indexById = new Map<string, number>();
+  #indexById = new SvelteMap<string, number>();
   // The attempt's question ids in order; null when every registered question
   // is in it, in page order (no `draw` or `shuffle`).
   #attemptIds = $state.raw<readonly string[] | null>(null);
@@ -112,7 +112,7 @@ export class QuizEngine implements UseQuizHandle {
       this.#fromSave = true;
       this.#submitCalled = true;
     }
-    if (deps.quizConfig.draw !== undefined || deps.quizConfig.shuffle) {
+    if (deps.quizConfig.draw != null || deps.quizConfig.shuffle) {
       this.#savedDraw = deps.restore?.drawn?.length ? deps.restore.drawn : null;
       this.#persistedDraw = this.#savedDraw;
       this.#attemptIds =

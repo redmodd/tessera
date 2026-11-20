@@ -1482,6 +1482,22 @@ describe('QuizEngine quiz bank', () => {
     );
   });
 
+  it('asks every question when draw is null, and flags its pools', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({
+      graded: true,
+      draw: null as unknown as QuizConfig['draw'],
+    });
+    register(engine, pooled('a'), pooled('x', 'basics'));
+
+    answerAll(engine);
+    expect(ids(engine)).toEqual(['a', 'x']);
+    expect(engine.canSubmit).toBe(true);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/"x" names pool "basics", but quiz.draw is not/),
+    );
+  });
+
   it('draws late questions in after an answer to a question outside the attempt', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine, draws } = makeEngine({ graded: true, draw: 2 });

@@ -101,7 +101,7 @@ export function poolProblem(
   pool: string | undefined,
 ): string | undefined {
   if (pool === undefined) return undefined;
-  if (typeof draw !== 'object') {
+  if (!isRecord(draw)) {
     return (
       `names pool "${pool}", but quiz.draw is not { pool: count }, so the ` +
       'pool is ignored. Name the pool in quiz.draw, or drop pool.'
@@ -131,7 +131,7 @@ export function drawGroups<T>(
     count,
     members,
   });
-  if (typeof draw !== 'object') return [group([...items], draw)];
+  if (!isRecord(draw)) return [group([...items], draw)];
   return [
     group(items.filter((item) => poolOf(item) === undefined)),
     ...Object.entries(draw).map(([pool, count]) =>
