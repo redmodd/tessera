@@ -342,7 +342,7 @@ Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the h
 
 ## Recipe 5: Question bank shared across pages
 
-Put the pool's questions in a component and import it on each quiz page. The ids stay the same on every page, so LMS reports group each question's answers together. The build can't see ids or pools inside an imported component: keep each `id` a unique literal by hand, and watch the dev console for pool warnings.
+Put the pool's questions in a component and import it on each quiz page. The ids stay the same on every page, so LMS reports group each question's answers together. The build can't see ids or pools inside an imported component: keep each `id` a unique literal by hand, and watch the dev console for pool warnings, which show once you answer a question.
 
 ```svelte
 <!-- components/SafetyBank.svelte -->

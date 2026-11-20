@@ -22,7 +22,7 @@ interface EngineProbe {
   /** The attempt's question ids handed to progress with each score, in order. */
   questionIds: Array<string[] | undefined>;
   /** Every fresh draw handed to progress, in order. */
-  draws: string[][];
+  draws: (readonly string[])[];
   /** Every interaction reported to the (injected) adapter, in order. */
   reports: Array<{
     id: string;
@@ -52,7 +52,7 @@ function makeEngine(
   const completed: number[] = [];
   const responses: EngineProbe['responses'] = [];
   const questionIds: EngineProbe['questionIds'] = [];
-  const draws: string[][] = [];
+  const draws: (readonly string[])[] = [];
   const engine = new QuizEngine({
     quizConfig: quizConfig as QuizConfig,
     passingScore: () => opts.passingScore ?? 70,
@@ -1395,14 +1395,52 @@ describe('QuizEngine quiz bank', () => {
       engine.retry();
       expect(draws).toEqual([ids(engine)]);
     });
+
+    it('saves the saved draw again once its last question registers late', async () => {
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: 2 },
+        { restore: { attempts: 0, score: 0, drawn: ['c', 'a'] } },
+      );
+      register(engine, pooled('a'), pooled('b'));
+      await Promise.resolve();
+      expect(ids(engine)).not.toEqual(['c', 'a']);
+
+      register(engine, pooled('c'));
+      await Promise.resolve();
+      expect(ids(engine)).toEqual(['c', 'a']);
+      expect(draws.at(-1)).toEqual(['c', 'a']);
+    });
+
+    it('waits for the questions of a Retry pressed before any register', async () => {
+      const { engine, draws } = makeEngine(
+        { graded: true, draw: 2 },
+        {
+          restore: {
+            attempts: 1,
+            score: 50,
+            questionIds: ['a', 'b'],
+            drawn: ['c', 'a'],
+          },
+        },
+      );
+      engine.retry();
+      expect(draws).toEqual([]);
+
+      register(engine, pooled('a'), pooled('b'), pooled('c'));
+      await Promise.resolve();
+      expect(ids(engine)).toEqual(['c', 'a']);
+      expect(draws).toEqual([]);
+    });
   });
 
-  it('warns about pools that cannot be drawn as configured', async () => {
+  it('warns about pools that cannot be drawn as configured once the learner answers', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { engine } = makeEngine({ graded: true, draw: { basics: 3 } });
     register(engine, pooled('b1', 'basics'), pooled('x', 'typo'));
     await Promise.resolve();
+    expect(warn).not.toHaveBeenCalled();
 
+    answerAll(engine);
     expect(ids(engine)).toEqual(['b1']);
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/asks for 3 from pool "basics", but only 1/),
@@ -1410,6 +1448,18 @@ describe('QuizEngine quiz bank', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/pool "typo", which quiz.draw does not list/),
     );
+  });
+
+  it('does not warn about a pool that fills up in a later update', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true, draw: 2 });
+    register(engine, pooled('a'));
+    await Promise.resolve();
+    register(engine, pooled('b'), pooled('c'));
+    await Promise.resolve();
+
+    answerAll(engine);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('puts every question in the attempt of a quiz that neither draws nor shuffles', () => {
