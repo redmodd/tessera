@@ -199,12 +199,7 @@
         if (gen !== loadGeneration || session.exitPhase) return; // stale
         pageError = renderError = null;
         pageContext.quiz = page.quiz;
-        pageContext.quizState = {
-          attempts: progress.quizAttempts(index),
-          score: progress.quizScore(index) ?? 0,
-          unscored: progress.quizUnscored(index),
-          responses: progress.quizResponses(index),
-        };
+        pageContext.quizState = progress.quizState(index);
         mounting = { index, focusBefore, gen };
         PageComponent = mod.default;
         showPage(index);

@@ -14,15 +14,12 @@
    * }}
    */
   let {
-    id,
     question,
     answers,
     caseSensitive = false,
     correctFeedback = '',
     incorrectFeedback = '',
-    graded,
-    maxRetries,
-    weight,
+    ...rest
   } = $props();
 
   const answerList = $derived(fillInAnswers(answers));
@@ -32,7 +29,7 @@
   const inputId = `fitb-${componentId}`;
 
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+    questionOptions(() => ({ question, ...rest }), {
       complete: () => inputValue.trim() !== '',
       response: () => ({
         type: 'fill-in',

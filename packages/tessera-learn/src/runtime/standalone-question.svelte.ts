@@ -52,6 +52,8 @@ export class StandaloneQuestion implements UseQuestionHandle {
     return this.#submitted;
   }
 
+  readonly inAttempt = true;
+
   get correct(): boolean | null {
     return this.#correct;
   }

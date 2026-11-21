@@ -1529,6 +1529,146 @@ export const pageConfig = { title: "Quiz", quiz: { retryMode: "partial" } };
     );
   });
 
+  describe('quiz bank', () => {
+    function bankPage(quiz: string, questions: string, script = '') {
+      createValidProject(testRoot);
+      writeFile(
+        testRoot,
+        'pages/01-section/01-lesson/page.svelte',
+        `<script module>
+export const pageConfig = { title: "Quiz", quiz: ${quiz} };
+</script>
+<script>
+  import { MultipleChoice } from 'tessera-learn';${script}
+</script>
+<h1>Quiz</h1>
+${questions}`,
+      );
+      return validateProject(testRoot);
+    }
+
+    const mc = (id: string, pool?: string) =>
+      `<MultipleChoice id="${id}"${pool ? ` pool="${pool}"` : ''} question="Q?" options={['x', 'y']} correct={0} />`;
+
+    it('accepts draw, pools and shuffle that the page can fill', () => {
+      const { errors, warnings } = bankPage(
+        '{ graded: true, draw: { basics: 1, advanced: 1 }, shuffle: true }',
+        [mc('intro'), mc('b1', 'basics'), mc('a1', 'advanced')].join('\n'),
+      );
+      expect(errors).toEqual([]);
+      expect(warnings.filter((w) => /pool|draw|shuffle/.test(w))).toEqual([]);
+    });
+
+    it.each(['0', '1.5', '"3"', '{}', '{ basics: 0 }'])(
+      'errors on quiz.draw %s',
+      (draw) => {
+        const { errors } = bankPage(`{ draw: ${draw} }`, mc('a'));
+        expect(errors).toContainEqual(
+          expect.stringContaining('quiz.draw must be a positive whole number'),
+        );
+      },
+    );
+
+    it('errors on a non-boolean quiz.shuffle', () => {
+      const { errors } = bankPage('{ shuffle: "yes" }', mc('a'));
+      expect(errors).toContainEqual(expect.stringContaining('quiz.shuffle'));
+    });
+
+    it('errors when a draw count is larger than its pool', () => {
+      const { errors } = bankPage(
+        '{ draw: { basics: 2 } }',
+        mc('b1', 'basics'),
+      );
+      expect(errors).toContainEqual(
+        expect.stringContaining(
+          'quiz.draw asks for 2 from pool "basics", but the page has 1',
+        ),
+      );
+      const { errors: whole } = bankPage('{ draw: 3 }', mc('a') + mc('b'));
+      expect(whole).toContainEqual(
+        expect.stringContaining(
+          'quiz.draw asks for 3 questions, but the page has 2',
+        ),
+      );
+    });
+
+    it('reports one error for a bad draw or a bad pool, not a cascade', () => {
+      const badDraw = bankPage(
+        '{ draw: "3" }',
+        mc('a', 'basics') + mc('b', 'basics'),
+      );
+      expect(badDraw.errors.filter((e) => /quiz\.draw|pool/.test(e))).toEqual([
+        expect.stringContaining('quiz.draw must be a positive whole number'),
+      ]);
+
+      const badPool = bankPage(
+        '{ draw: 2 }',
+        mc('a') +
+          `<MultipleChoice id="b" pool={1} question="Q?" options={['x', 'y']} correct={0} />`,
+      );
+      expect(badPool.errors.filter((e) => /quiz\.draw|pool/.test(e))).toEqual([
+        expect.stringMatching(/pool must be a string, got number\.$/),
+      ]);
+    });
+
+    it.each(['./shared.svelte', './shared.mjs', '@acme/course-bank'])(
+      'skips the count when a component imported from %s can add questions',
+      (from) => {
+        const { errors } = bankPage(
+          '{ draw: { basics: 2 } }',
+          mc('b1', 'basics') + '\n<Shared />',
+          `\n  import Shared from '${from}';`,
+        );
+        expect(errors.filter((e) => e.includes('asks for'))).toEqual([]);
+      },
+    );
+
+    it.each([
+      [
+        "import { MultipleChoice as MC } from 'tessera-learn';",
+        '<MC id="a" question="Q?" options={[\'x\', \'y\']} correct={0} />',
+      ],
+      [
+        "import * as T from 'tessera-learn';",
+        '<T.MultipleChoice id="a" question="Q?" options={[\'x\', \'y\']} correct={0} />',
+      ],
+    ])(
+      'skips the count when a question is rendered under another name: %s',
+      (imp, q) => {
+        const { errors } = bankPage('{ draw: 1 }', q, `\n  ${imp}`);
+        expect(errors.filter((e) => e.includes('asks for'))).toEqual([]);
+      },
+    );
+
+    it('skips the count for a question inside a snippet', () => {
+      const { errors } = bankPage(
+        '{ draw: 2 }',
+        `{#snippet q()}${mc('a')}{/snippet}\n{@render q()}{@render q()}`,
+      );
+      expect(errors.filter((e) => e.includes('asks for'))).toEqual([]);
+    });
+
+    it('errors on a pool that draw does not name, and on any pool without draw: { … }', () => {
+      const named = bankPage(
+        '{ draw: { basics: 1 } }',
+        mc('b1', 'basics') + mc('x', 'typo'),
+      );
+      expect(named.errors).toContainEqual(
+        expect.stringContaining(
+          '<MultipleChoice> "x" names pool "typo", which quiz.draw does not list',
+        ),
+      );
+      for (const quiz of ['{ draw: 1 }', '{ shuffle: true }']) {
+        const { errors } = bankPage(quiz, mc('a') + mc('b', 'basics'));
+        expect(errors).toContainEqual(
+          expect.stringContaining(
+            '<MultipleChoice> "b" names pool "basics", but quiz.draw is not { pool: count }',
+          ),
+        );
+      }
+    });
+  });
+
   it('accepts valid quiz.feedbackMode and retryMode', () => {
     createValidProject(testRoot);
     writeFile(

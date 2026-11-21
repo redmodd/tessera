@@ -8,6 +8,8 @@ import {
   walkPages,
   isLiterallyGradedQuestion,
   listedGradedQuestions,
+  literalValue,
+  staticQuestionId,
   QUESTION_COMPONENT_NAMES,
   READ_FAILURE_MESSAGES,
   STATIC_LITERAL_RULE,
@@ -28,8 +30,10 @@ import type { StandardProfile } from '../../runtime/standards.js';
 import {
   FEEDBACK_MODES,
   RETRY_MODES,
+  drawShortfalls,
   isRecord,
   isRequiredGradedPage,
+  poolProblem,
   type QuizConfig,
 } from '../../runtime/types.js';
 import { A11Y_IDS, tag } from './a11y.js';
@@ -166,6 +170,11 @@ function validatePageFile(
 
   validateAssetRefs(content, assetsDir, d, { existsCache: assetExistsCache });
   validateQuestionComponents(questionComponents, d, profile);
+  if (isQuiz && isValidDraw(quiz.draw)) {
+    validateQuestionPools(quiz.draw, questionComponents, d, {
+      seesEveryQuestion: !hidesQuestions(content) && useQuestions === 'absent',
+    });
+  }
   validateMediaComponents(content, d);
   validateHeadingOrder(content, d);
   validateContractBypass(content, d);
@@ -388,10 +397,27 @@ const KNOWN_PAGE_FIELDS = new Set(
 // A local import may wrap useQuestion, so its presence suppresses the "no
 // questions" warning: false negatives are fine for an advisory heuristic.
 function hasLocalModuleImport(content: string): boolean {
-  return scriptImports(content).some(({ from }) => {
-    if (!/^(?:\.{1,2}\/|\$)/.test(from)) return false;
+  return codeImports(content).some(({ from }) =>
+    /^(?:\.{1,2}\/|\$)/.test(from),
+  );
+}
+
+/**
+ * A component from a local file or a package, or one from tessera-learn
+ * under another name, may render questions the build can't see.
+ */
+function hidesQuestions(content: string): boolean {
+  return codeImports(content).some(({ from, renames }) =>
+    /^tessera-learn(?:\/|$)/.test(from)
+      ? renames
+      : !/^svelte(?:\/|$)/.test(from),
+  );
+}
+
+function codeImports(content: string) {
+  return scriptImports(content).filter(({ from }) => {
     const file = from.slice(from.lastIndexOf('/') + 1);
-    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+    return !file.includes('.') || /\.(?:svelte|[cm]?[jt]sx?)$/.test(file);
   });
 }
 
@@ -437,6 +463,8 @@ const KNOWN_QUIZ_FIELDS = new Set(
     maxAttempts: true,
     feedbackMode: true,
     retryMode: true,
+    draw: true,
+    shuffle: true,
   } satisfies Record<keyof QuizConfig, true>),
 );
 const PAGE_LEVEL_FIELDS = new Set<string>([
@@ -461,7 +489,7 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
     }
   }
 
-  for (const field of ['graded', 'gatesProgress']) {
+  for (const field of ['graded', 'gatesProgress', 'shuffle']) {
     validateBoolean(quiz[field], `quiz.${field}`, d);
   }
 
@@ -476,6 +504,60 @@ function validateQuizConfig(quiz: unknown, d: Diagnostics): void {
 
   checkOneOf('quiz.feedbackMode', FEEDBACK_MODES, quiz.feedbackMode, d);
   checkOneOf('quiz.retryMode', RETRY_MODES, quiz.retryMode, d);
+
+  if (!isValidDraw(quiz.draw)) {
+    d.error(
+      'quiz.draw must be a positive whole number, or { pool: count } with a ' +
+        `positive whole number per pool, got ${formatValue(quiz.draw)}`,
+    );
+  }
+}
+
+function isValidDraw(draw: unknown): draw is QuizConfig['draw'] {
+  const isCount = (n: unknown) => Number.isInteger(n) && (n as number) > 0;
+  return (
+    draw === undefined ||
+    isCount(draw) ||
+    (isRecord(draw) &&
+      Object.keys(draw).length > 0 &&
+      Object.values(draw).every(isCount))
+  );
+}
+
+/**
+ * Pools named on the page's built-in questions against `quiz.draw`. Counts
+ * are checked only when the build sees every question the page renders.
+ */
+function validateQuestionPools(
+  draw: QuizConfig['draw'],
+  questions: ComponentMatch[],
+  d: Diagnostics,
+  { seesEveryQuestion }: { seesEveryQuestion: boolean },
+): void {
+  const pools: (string | undefined)[] = [];
+  let counted = seesEveryQuestion;
+  for (const match of questions) {
+    const prop = match.props.get('pool');
+    const literal = literalValue(prop);
+    const pool = literal?.value;
+    const problem = poolProblem(draw, pool);
+    if (problem) {
+      const id = staticQuestionId(match);
+      d.error(`<${match.name}>${id === null ? '' : ` "${id}"`} ${problem}`);
+    }
+    if (
+      match.hasSpread ||
+      match.branches.size > 0 ||
+      (prop && !literal) ||
+      (pool !== undefined && typeof pool !== 'string')
+    )
+      counted = false;
+    else pools.push(pool);
+  }
+  if (!counted) return;
+  for (const { count, size, from } of drawShortfalls(draw, pools)) {
+    d.error(`quiz.draw asks for ${count} ${from}, but the page has ${size}`);
+  }
 }
 
 /**

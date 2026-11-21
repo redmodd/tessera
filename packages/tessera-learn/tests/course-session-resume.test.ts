@@ -214,6 +214,25 @@ describe('CourseSession restore gate honours config.resume', () => {
       expect(saved.g).toEqual({ '1': { q: { q1: 100 } } });
     });
 
+    it('warn about a quiz draw only when one is left out', async () => {
+      const draw = (warn: unknown) =>
+        typeof warn === 'string' && warn.includes('quiz draw');
+      await answer(180);
+      expect(vi.mocked(console.warn).mock.calls.flat().some(draw)).toBe(false);
+
+      const { saveState, progress } = await start('auto', { stateLimit: 180 });
+      progress.markStandaloneQuestion(1, 'q1', 100, true, 1, {
+        response: essay,
+      });
+      progress.quizDraw(1, ['a'.repeat(200)]);
+      await flush();
+
+      expect(saveState.mock.lastCall![0].g['1'].d).toBeUndefined();
+      expect(vi.mocked(console.warn).mock.calls.flat().filter(draw)).toEqual([
+        expect.stringContaining('180-byte limit'),
+      ]);
+    });
+
     it('raise no warning when a save over the limit holds none', async () => {
       const { saveState, progress } = await start('auto', { stateLimit: 20 });
       progress.markStandaloneQuestion(1, 'q1', 100, true);

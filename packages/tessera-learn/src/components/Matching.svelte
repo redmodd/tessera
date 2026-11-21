@@ -20,14 +20,11 @@
    * }}
    */
   let {
-    id,
     question,
     pairs,
     correctFeedback = '',
     incorrectFeedback = '',
-    graded,
-    maxRetries,
-    weight,
+    ...rest
   } = $props();
 
   let shuffledRight = $state(shuffledPairs());
@@ -55,7 +52,7 @@
   }
 
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+    questionOptions(() => ({ question, ...rest }), {
       complete: () => matches.size === pairs.length,
       response: () => {
         const left = indexOptions(pairs.map((p) => p.left));

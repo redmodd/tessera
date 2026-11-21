@@ -17,16 +17,13 @@
    * }}
    */
   let {
-    id,
     question,
     items,
     targets,
     correct,
     correctFeedback = '',
     incorrectFeedback = '',
-    graded,
-    maxRetries,
-    weight,
+    ...rest
   } = $props();
 
   let queue = $state([]); // item indices not yet placed; queue[0] is current
@@ -55,7 +52,7 @@
   // cleanly to SCORM 2004's `matching` interaction. We emit [itemIdx, targetIdx]
   // pairs as stringified ids.
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+    questionOptions(() => ({ question, ...rest }), {
       complete: () => placements.size === items.length,
       response: () => {
         const left = indexOptions(items);

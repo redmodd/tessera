@@ -90,6 +90,77 @@ export interface QuizConfig {
   maxAttempts?: number;
   feedbackMode?: (typeof FEEDBACK_MODES)[number];
   retryMode?: (typeof RETRY_MODES)[number];
+  /** Questions per attempt: a count from every question, or a count per named pool. */
+  draw?: number | Record<string, number>;
+  shuffle?: boolean;
+}
+
+/** Why `draw` never draws a question that names `pool`, else undefined. */
+export function poolProblem(
+  draw: QuizConfig['draw'],
+  pool: unknown,
+): string | undefined {
+  if (pool === undefined) return undefined;
+  if (typeof pool !== 'string') {
+    return (
+      `pool must be a string, got ${typeof pool}` +
+      (isRecord(draw) ? ', so it is never drawn.' : '.')
+    );
+  }
+  if (!isRecord(draw)) {
+    return (
+      `names pool "${pool}", but quiz.draw is not { pool: count }, so the ` +
+      'pool is ignored. Name the pool in quiz.draw, or drop pool.'
+    );
+  }
+  if (!Object.hasOwn(draw, pool)) {
+    return (
+      `names pool "${pool}", which quiz.draw does not list, so it is never ` +
+      'drawn. Add the pool to quiz.draw, or fix the name.'
+    );
+  }
+  return undefined;
+}
+
+/**
+ * The questions each `draw` count draws from. Without a count (no `draw`, or
+ * the questions with no `pool` under `{ pool: count }`), every one is drawn;
+ * a question in a pool `draw` does not name is in no group.
+ */
+export function drawGroups<T>(
+  draw: QuizConfig['draw'],
+  items: readonly T[],
+  poolOf: (item: T) => string | undefined,
+): { pool?: string; count: number; members: readonly T[] }[] {
+  if (!isRecord(draw)) return [{ count: draw ?? items.length, members: items }];
+  const unpooled = items.filter((item) => poolOf(item) === undefined);
+  return [
+    { count: unpooled.length, members: unpooled },
+    ...Object.entries(draw).map(([pool, count]) => ({
+      pool,
+      count,
+      members: items.filter((item) => poolOf(item) === pool),
+    })),
+  ];
+}
+
+/** Each `draw` count larger than the questions, given by `pools`, it draws from. */
+export function drawShortfalls(
+  draw: QuizConfig['draw'],
+  pools: readonly (string | undefined)[],
+): { count: number; size: number; from: string }[] {
+  return drawGroups(draw, pools, (pool) => pool).flatMap(
+    ({ pool, count, members }) =>
+      count > members.length
+        ? [
+            {
+              count,
+              size: members.length,
+              from: pool === undefined ? 'questions' : `from pool "${pool}"`,
+            },
+          ]
+        : [],
+  );
 }
 
 /**

@@ -15,16 +15,13 @@
    * }}
    */
   let {
-    id,
     question,
     options,
     correct,
     correctFeedback = '',
     incorrectFeedback = '',
     optionFeedback = [],
-    graded,
-    maxRetries,
-    weight,
+    ...rest
   } = $props();
 
   let selectedOption = $state(null);
@@ -34,7 +31,7 @@
   const groupId = `mc-${componentId}`;
 
   const q = useQuestion(
-    questionOptions(() => ({ id, question, graded, weight, maxRetries }), {
+    questionOptions(() => ({ question, ...rest }), {
       response: () => ({
         type: 'choice',
         response: selectedOption !== null ? [String(selectedOption)] : [],

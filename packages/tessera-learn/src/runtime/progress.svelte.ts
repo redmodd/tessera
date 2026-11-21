@@ -6,6 +6,7 @@ import {
   isPageIndex,
   isRecord,
   isRequiredGradedPage,
+  isStringArray,
   resolveSuccess,
   type CourseConfig,
   type SuccessConfig,
@@ -18,6 +19,7 @@ import {
   type SavedState,
   type SuccessStatus,
 } from './persistence.js';
+import type { QuizPageState } from './contexts.js';
 
 type SavedProgress = Pick<SavedState, 'v' | 'g' | 'c' | 'm' | 's' | 'k' | 'p'>;
 
@@ -190,6 +192,10 @@ export interface GradedUnit {
   questions?: Map<string, StandaloneResult>;
   /** The best quiz attempt's responses, questionId → encoded response. */
   responses?: ReadonlyMap<string, string>;
+  /** The best quiz attempt's question ids in order, kept only with its responses. */
+  questionIds?: readonly string[];
+  /** The drawn quiz attempt not yet submitted, so a return visit asks it again. */
+  drawn?: readonly string[];
 }
 
 export class ProgressState {
@@ -283,18 +289,25 @@ export class ProgressState {
     return !!this.gradedUnits.get(pageIndex)?.unscored;
   }
 
-  quizAttempts(pageIndex: number): number {
-    return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
+  quizState(pageIndex: number): QuizPageState {
+    const unit = this.gradedUnits.get(pageIndex);
+    return {
+      attempts: unit?.attempts ?? 0,
+      score: unit?.quizScore ?? 0,
+      unscored: !!unit?.unscored,
+      responses: new Map(
+        [...(unit?.responses ?? [])].map(([questionId, response]) => [
+          questionId,
+          JSON.parse(response),
+        ]),
+      ),
+      questionIds: unit?.questionIds,
+      drawn: unit?.drawn,
+    };
   }
 
-  quizResponses(pageIndex: number): Map<string, unknown> {
-    const responses = this.gradedUnits.get(pageIndex)?.responses ?? [];
-    return new Map(
-      [...responses].map(([questionId, response]) => [
-        questionId,
-        JSON.parse(response),
-      ]),
-    );
+  quizDraw(pageIndex: number, questionIds: readonly string[]) {
+    this.#write(pageIndex, { drawn: questionIds });
   }
 
   /**
@@ -306,19 +319,23 @@ export class ProgressState {
     score: number,
     responses: Iterable<[string, unknown]> = [],
     scored = true,
+    questionIds?: readonly string[],
   ) {
     const unit = this.gradedUnits.get(pageIndex);
+    const encoded = encodeResponses(responses);
     // An unscored attempt's 100 is a placeholder, so any scored attempt beats it.
     const best =
       unit?.quizScore === undefined ||
       (scored === !unit.unscored ? score >= unit.quizScore : scored);
     this.#write(pageIndex, {
       attempts: (unit?.attempts ?? 0) + 1,
+      drawn: undefined,
       ...(best
         ? {
             quizScore: score,
             unscored: !scored,
-            responses: encodeResponses(responses),
+            responses: encoded,
+            questionIds: encoded && questionIds,
           }
         : {}),
     });
@@ -638,6 +655,7 @@ export class ProgressState {
       return true;
     };
     const g: Record<string, GradedUnitState> = {};
+    const draws: [number, GradedUnitState, readonly string[]][] = [];
     for (const [pageIndex, unit] of this.gradedUnits) {
       const entry: GradedUnitState = {};
       if (unit.quizScore !== undefined) entry.s = unit.quizScore;
@@ -678,12 +696,33 @@ export class ProgressState {
             savedResponse(response),
           ]),
         );
-        if (afford(() => jsonSize({ ...entry, r }) - jsonSize(entry)))
+        // `r`'s keys stand in for the attempt when they list it in order.
+        const keys = Object.keys(r);
+        const ids = unit.questionIds;
+        const o =
+          ids &&
+          !(ids.length === keys.length && ids.every((id, i) => id === keys[i]))
+            ? ids
+            : undefined;
+        if (afford(() => jsonSize({ ...entry, r, o }) - jsonSize(entry))) {
           entry.r = r;
+          if (o) entry.o = o;
+        }
       }
+      if (unit.drawn) draws.push([pageIndex, entry, unit.drawn]);
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[pageIndex] = entry;
+    }
+    // A draw not yet submitted gets only what every page's answers leave. Its
+    // page may have no entry yet, and `g` no key, so both are measured.
+    const gSize = (graded: typeof g) =>
+      jsonSize(Object.keys(graded).length > 0 ? { v: 0, g: graded } : { v: 0 });
+    for (const [pageIndex, entry, d] of draws) {
+      const withDraw = { ...g, [pageIndex]: { ...entry, d } };
+      if (!afford(() => gSize(withDraw) - gSize(g))) continue;
+      entry.d = d;
+      g[pageIndex] = entry;
     }
     return {
       v: [...this.visitedPages],
@@ -736,8 +775,14 @@ export class ProgressState {
                 ([qid, response]) => [qid, swapIds(response)],
               ),
             ),
+            questionIds: isStringArray(unit.o)
+              ? unit.o
+              : isRecord(unit.r)
+                ? Object.keys(unit.r)
+                : undefined,
           });
         }
+        if (isStringArray(unit.d)) this.#write(pageIndex, { drawn: unit.d });
         const unanswered = (Array.isArray(unit.w) ? unit.w : []).filter(
           (id): id is string => typeof id === 'string',
         );

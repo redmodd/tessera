@@ -405,6 +405,31 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 | `maxAttempts`   | `number`                             | `Infinity` | Submissions allowed before Retry stops being offered. Counted in suspend data, so it holds across sessions until the LMS attempt ends ([export](docs/export.md#lms-behaviour)); the recorded score is the best attempt                                                                          |
 | `feedbackMode`  | `"review" \| "immediate" \| "never"` | `"review"` | `immediate`: each question's Submit locks, reports and shows feedback for that answer, then the button reads "Next Question" ("See Results" on the last). `review`: post-submit only. `never`: off                                                                                              |
 | `retryMode`     | `"full" \| "incorrect-only"`         | `"full"`   | `full` resets every answer on retry; `incorrect-only` resets only wrong answers: correct ones stay locked, and answers to questions with no `correct` stay editable. On a return visit, a question whose answer did not come back (see [`restored`](docs/hooks.md#usequiz)) is reset either way |
+| `draw`          | `number \| { [pool]: number }`       | all        | Questions per attempt, drawn at random: a count from every question, or a count from each named `pool` plus every question with no `pool`. See [Question banks](#question-banks)                                                                                                                |
+| `shuffle`       | `boolean`                            | `false`    | Show the attempt's questions in random order                                                                                                                                                                                                                                                    |
+
+### Question banks
+
+Write every question on the page with a literal `id`; the quiz picks which of them make up each attempt. `retryMode: "full"` draws a new set (and order) on Retry; `"incorrect-only"` keeps the attempt's questions and order. The draw is saved, so leaving the page or reloading before Submit asks the same questions again (unless the save is over the LMS size limit), and a return visit after Submit gets them back with review. When the save could not keep the answers (see [`restored`](docs/hooks.md#usequiz)), it keeps no questions either, and Retry draws a new set in both modes.
+
+```svelte
+<script module>
+  export const pageConfig = {
+    title: 'Safety check',
+    quiz: { graded: true, draw: { basics: 3, advanced: 2 }, shuffle: true },
+  };
+</script>
+
+<MultipleChoice id="safety_intro" ... />
+<!-- no pool: in every attempt -->
+<MultipleChoice id="b_units" pool="basics" ... />
+<MultipleChoice id="a_torque" pool="advanced" ... />
+```
+
+- **`draw: 5` draws from every question**, and `pool` is then an error. A quiz that needs always-included questions uses named pools.
+- **Every `pool` must be named in `draw`, and each count must be no larger than its pool.** The build checks questions written on the page; a dev warning covers questions it can't see.
+- **Render every question before the learner answers one.** The quiz draws again when questions mount late (a shell's Start button), but one that mounts after an answer (inside `{#await}`, an `{#if}` the learner toggles, a lazy import) is left out of the attempt.
+- **Share a pool across pages** by putting its questions in a component both pages import. See [Recipe 5](docs/recipes.md#recipe-5-question-bank-shared-across-pages).
 
 ### Per-question weighting
 
@@ -414,7 +439,7 @@ Per-page weighting, optional pages, pass/fail and manual completion are in [`nod
 
 ### Question types
 
-Props listed before "Optional" are required. Every type also requires `id` and accepts `weight` (default 1) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
+Props listed before "Optional" are required. Every type also requires `id` and accepts `weight` (default 1), `pool` (`string`, see [Question banks](#question-banks)) and `correctFeedback` / `incorrectFeedback` (`string`). Syntax is shown in [Setup](#setup); the complex shapes get an example below.
 
 **MultipleChoice**: `question` `string`, `options` `string[]`, `correct` `number` (the 0-based index into `options`, not the answer text: `correct={1}` is the second option). Optional: `optionFeedback` `string[]`, shown next to each option after submitting; the chosen option's entry replaces `correctFeedback` / `incorrectFeedback`.
 

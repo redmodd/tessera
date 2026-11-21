@@ -258,6 +258,8 @@ Render `children` visibly, never call `q.render()`, and let widgets render their
 
 Mixing is fine in one shell: render `children` visibly **and** `{#if q.render}` the snippet list, and each widget lands in whichever branch it registered for.
 
+Under `quiz.draw`, wrap the widget's markup in `{#if q.inAttempt}` so a question the draw left out renders nothing. Inline layout keeps page order, so `quiz.shuffle` needs a snippet-layout shell.
+
 ## Recipe 3: Graded standalone question
 
 A standalone question (no `<Quiz>`) counts toward course success when built with `graded: true` + a `score()` returning 0–100 on a page that declares `pageConfig.graded: true`. With no `correct` and no `score()`, it is left out of the page score, as in a quiz. Course success rolls up across every declared graded page, quiz and standalone pages alike.
@@ -336,4 +338,35 @@ Reveals sections one at a time. `markChunk(pageIndex, chunkIndex)` records the h
 {#if revealed < TOTAL_CHUNKS - 1}
   <button onclick={reveal}>Show next</button>
 {/if}
+```
+
+## Recipe 5: Question bank shared across pages
+
+Put the pool's questions in a component and import it on each quiz page. The ids stay the same on every page, so LMS reports group each question's answers together. The build can't see ids or pools inside an imported component: keep each `id` a unique literal by hand, and watch the dev console for pool warnings, which show once you answer a question.
+
+```svelte
+<!-- components/SafetyBank.svelte -->
+<script>
+  import { MultipleChoice } from 'tessera-learn';
+</script>
+
+<MultipleChoice id="b_units" pool="basics" question="..." options={[...]} correct={0} />
+<MultipleChoice id="b_signs" pool="basics" question="..." options={[...]} correct={2} />
+<MultipleChoice id="a_torque" pool="advanced" question="..." options={[...]} correct={1} />
+```
+
+```svelte
+<!-- pages/02-practice/01-check/check.svelte -->
+<script module>
+  export const pageConfig = {
+    title: 'Safety check',
+    quiz: { draw: { basics: 1, advanced: 1 }, shuffle: true },
+  };
+</script>
+
+<script>
+  import SafetyBank from '../../../components/SafetyBank.svelte';
+</script>
+
+<SafetyBank />
 ```

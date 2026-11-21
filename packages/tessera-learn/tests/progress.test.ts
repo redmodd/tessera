@@ -89,7 +89,7 @@ describe('ProgressState', () => {
       expect(progress.quizUnscored(2)).toBe(false);
       expect(progress.toSaved().g).toMatchObject({ 2: { s: 100, a: 2 } });
       progress.quizCompleted(2, 100, [['q1', 'b']]);
-      expect(progress.quizResponses(2)?.get('q1')).toBe('b');
+      expect(progress.quizState(2).responses?.get('q1')).toBe('b');
     });
 
     it('keeps a lower scored attempt over a later unscored one', () => {
@@ -113,8 +113,8 @@ describe('ProgressState', () => {
       progress.quizCompleted(2, 50);
       progress.quizCompleted(2, 90);
       progress.quizCompleted(3, 70);
-      expect(progress.quizAttempts(2)).toBe(2);
-      expect(progress.quizAttempts(3)).toBe(1);
+      expect(progress.quizState(2).attempts).toBe(2);
+      expect(progress.quizState(3).attempts).toBe(1);
     });
   });
 
@@ -123,14 +123,14 @@ describe('ProgressState', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({ g: { 2: { s: 90, a: 2 } } });
       progress.quizCompleted(2, 40);
-      expect(progress.quizAttempts(2)).toBe(3);
+      expect(progress.quizState(2).attempts).toBe(3);
       expect(progress.quizScore(2)).toBe(90);
     });
 
     it('assumes one attempt when the save omits the count', () => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({ g: { 2: { s: 90 } } });
-      expect(progress.quizAttempts(2)).toBe(1);
+      expect(progress.quizState(2).attempts).toBe(1);
     });
 
     it.each([
@@ -141,7 +141,7 @@ describe('ProgressState', () => {
     ])('restores a saved attempt count of %s as %s', (a, expected) => {
       const progress = new ProgressState(createManifest(3), createConfig());
       progress.restoreFrom({ g: { 2: { s: 90, a } } });
-      expect(progress.quizAttempts(2)).toBe(expected);
+      expect(progress.quizState(2).attempts).toBe(expected);
     });
 
     it('drops saved progress for pages the course does not have', () => {
@@ -280,7 +280,7 @@ describe('ProgressState', () => {
       expect([...restored.visitedPages]).toEqual([0, 1]);
       expect(restored.getChunk(0)).toBe(2);
       expect(restored.quizScore(1)).toBe(80);
-      expect(restored.quizAttempts(1)).toBe(2);
+      expect(restored.quizState(1).attempts).toBe(2);
       expect(restored.toSaved()).toEqual(saved);
     });
 
@@ -486,11 +486,75 @@ describe('ProgressState', () => {
       const { saved, restored } = roundTrip(progress);
 
       expect(saved.g[2]).toEqual({ s: 100, a: 3, r: { a: [1], b: 'best' } });
-      expect(Object.fromEntries(restored.quizResponses(2))).toEqual({
-        a: ['1'],
-        b: 'best',
-      });
-      expect(restored.quizResponses(3).size).toBe(0);
+      expect(Object.fromEntries(restored.quizState(2).responses ?? [])).toEqual(
+        {
+          a: ['1'],
+          b: 'best',
+        },
+      );
+      expect(restored.quizState(3).responses?.size).toBe(0);
+    });
+
+    it("saves the best attempt's question ids beside its answers, and drops them with the answers", () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizCompleted(2, 100, [['b', 'x']], true, ['b', 'a']);
+      progress.quizCompleted(3, 100, [], true, ['c']);
+
+      const { saved, restored } = roundTrip(progress);
+      expect(saved.g[2]).toEqual({ s: 100, r: { b: 'x' }, o: ['b', 'a'] });
+      expect(saved.g[3]).toEqual({ s: 100 });
+      expect(restored.quizState(2).questionIds).toEqual(['b', 'a']);
+      expect(restored.quizState(3).questionIds).toBeUndefined();
+
+      const { saved: tight, restored: cut } = roundTrip(progress, 0);
+      expect(tight.g[2]).toEqual({ s: 100 });
+      expect(cut.quizState(2).questionIds).toBeUndefined();
+    });
+
+    it("leaves out the question ids when the answers' keys already list them in order", () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizCompleted(
+        2,
+        100,
+        [
+          ['b', 'x'],
+          ['a', 'y'],
+        ],
+        true,
+        ['b', 'a'],
+      );
+      progress.quizCompleted(
+        3,
+        100,
+        [
+          ['2', 'x'],
+          ['1', 'y'],
+        ],
+        true,
+        ['2', '1'],
+      );
+
+      const { saved, restored } = roundTrip(progress);
+      expect(saved.g[2]).toEqual({ s: 100, r: { b: 'x', a: 'y' } });
+      expect(restored.quizState(2).questionIds).toEqual(['b', 'a']);
+      expect(saved.g[3].o).toEqual(['2', '1']);
+      expect(restored.quizState(3).questionIds).toEqual(['2', '1']);
+    });
+
+    it('saves an unsubmitted draw until the attempt is submitted', () => {
+      const progress = new ProgressState(createManifest(6), createConfig());
+      progress.quizDraw(2, ['c', 'a']);
+
+      const { saved, restored } = roundTrip(progress);
+      expect(saved.g[2]).toEqual({ d: ['c', 'a'] });
+      expect(restored.quizState(2).drawn).toEqual(['c', 'a']);
+      expect(restored.quizState(2).attempts).toBe(0);
+      expect(restored.quizScore(2)).toBeUndefined();
+      expect(roundTrip(progress, 0).saved.g).toBeUndefined();
+
+      progress.quizCompleted(2, 100, [], true, ['c', 'a']);
+      expect(roundTrip(progress).saved.g[2]).toEqual({ s: 100 });
+      expect(progress.quizState(2).drawn).toBeUndefined();
     });
 
     it('drops the saved answers when a better attempt has none', () => {
@@ -568,8 +632,9 @@ describe('ProgressState', () => {
     });
 
     describe('when the save has no room', () => {
-      function answered() {
+      function answered(drawn?: string[]) {
         const progress = new ProgressState(createManifest(6), createConfig());
+        if (drawn) progress.quizDraw(1, drawn);
         progress.markStandaloneQuestion(0, 'essay', 100, true, 1, {
           retries: 1,
           response: 'x'.repeat(80),
@@ -596,7 +661,7 @@ describe('ProgressState', () => {
           retries: 1,
           correct: true,
         });
-        expect(restored.quizResponses(2).size).toBe(0);
+        expect(restored.quizState(2).responses?.size).toBe(0);
       });
 
       it('saves the answers that still fit, and a quiz only whole', () => {
@@ -617,6 +682,31 @@ describe('ProgressState', () => {
           expect(size - bare).toBeLessThanOrEqual(budget);
         }
         expect(progress.toSaved(200)).toEqual(progress.toSaved());
+      });
+
+      it("saves an unsubmitted draw only in the room every page's answers leave", () => {
+        const answers = answered();
+        const size = (budget?: number) =>
+          JSON.stringify(answers.toSaved(budget)).length;
+        const progress = answered(['c', 'a']);
+
+        expect(roundTrip(progress, size() - size(0)).saved.g).toEqual(
+          answers.toSaved().g,
+        );
+      });
+
+      it('never spends more than the budget on a page saved only for its draw', () => {
+        const empty = new ProgressState(createManifest(6), createConfig());
+        for (const progress of [answered(), empty]) {
+          progress.quizDraw(4, ['c', 'a']);
+          const bare = JSON.stringify(progress.toSaved(0)).length;
+
+          for (let budget = 0; budget <= 250; budget++) {
+            const size = JSON.stringify(progress.toSaved(budget)).length;
+            expect(size - bare).toBeLessThanOrEqual(budget);
+          }
+          expect(progress.toSaved(250)).toEqual(progress.toSaved());
+        }
       });
 
       it('charges an answer only the bytes it adds to the save', () => {
