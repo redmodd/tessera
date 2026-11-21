@@ -102,7 +102,10 @@ export function poolProblem(
 ): string | undefined {
   if (pool === undefined) return undefined;
   if (typeof pool !== 'string') {
-    return `pool must be a string, got ${typeof pool}, so it is never drawn.`;
+    return (
+      `pool must be a string, got ${typeof pool}` +
+      (isRecord(draw) ? ', so it is never drawn.' : '.')
+    );
   }
   if (!isRecord(draw)) {
     return (

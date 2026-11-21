@@ -1607,7 +1607,7 @@ ${questions}`,
           `<MultipleChoice id="b" pool={1} question="Q?" options={['x', 'y']} correct={0} />`,
       );
       expect(badPool.errors.filter((e) => /quiz\.draw|pool/.test(e))).toEqual([
-        expect.stringContaining('pool must be a string'),
+        expect.stringMatching(/pool must be a string, got number\.$/),
       ]);
     });
 

@@ -1518,7 +1518,9 @@ describe('QuizEngine quiz bank', () => {
 
     engine.setAnswer(0, true);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringMatching(/"x" pool must be a string, got number/),
+      expect.stringMatching(
+        /"x" pool must be a string, got number, so it is never drawn/,
+      ),
     );
   });
 

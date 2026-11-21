@@ -515,11 +515,11 @@ export function useQuiz(
   const pageIndex = pageCtx.index;
 
   // A second useQuiz on the same page silently overwrites the first quiz's
-  // pageIndex-keyed score; warn but don't prevent (some pages compose hosts).
+  // pageIndex-keyed save; warn but don't prevent (some pages compose hosts).
   if (getQuizContext()) {
     console.warn(
       '[tessera] useQuiz: a second quiz registered on this page; ' +
-        'quiz scores are keyed by pageIndex and the later submit will overwrite the earlier one.',
+        'quiz scores and draws are keyed by pageIndex, so each quiz overwrites the other.',
     );
   }
 
