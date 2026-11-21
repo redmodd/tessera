@@ -1,5 +1,13 @@
 # tessera-learn
 
+## 0.14.1
+
+### Patch Changes
+
+- 88006bd: - `vite` 8.3.6 → 8.3.8
+- ac3252e: - `jsdom` 30.1.3 → 31.0.0
+  - `playwright` 1.65.0 → 1.65.1
+
 ## 0.14.0
 
 ### Minor Changes
