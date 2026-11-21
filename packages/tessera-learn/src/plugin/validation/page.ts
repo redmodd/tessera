@@ -417,7 +417,7 @@ function hidesQuestions(content: string): boolean {
 function codeImports(content: string) {
   return scriptImports(content).filter(({ from }) => {
     const file = from.slice(from.lastIndexOf('/') + 1);
-    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+    return !file.includes('.') || /\.(?:svelte|[cm]?[jt]sx?)$/.test(file);
   });
 }
 

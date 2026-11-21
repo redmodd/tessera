@@ -1611,7 +1611,7 @@ ${questions}`,
       ]);
     });
 
-    it.each(['./shared.svelte', '@acme/course-bank'])(
+    it.each(['./shared.svelte', './shared.mjs', '@acme/course-bank'])(
       'skips the count when a component imported from %s can add questions',
       (from) => {
         const { errors } = bankPage(

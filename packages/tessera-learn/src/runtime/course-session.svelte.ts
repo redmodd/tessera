@@ -28,6 +28,9 @@ const COMMIT_INTERVAL_MS = 10_000;
 
 type ExitPhase = 'ending' | 'ended';
 
+const drawCount = (state: SavedState): number =>
+  Object.values(state.g ?? {}).filter((unit) => unit.d).length;
+
 interface CourseSessionDeps {
   adapter: BaseAdapter;
   manifest: Manifest;
@@ -62,6 +65,7 @@ export class CourseSession {
   #userState = $state<Record<string, unknown>>({});
   #unsavableKeys = new Set<string>();
   #answersTrimmedWarned = false;
+  #drawTrimmedWarned = false;
 
   #persistScheduled = false;
   #persistPending = false;
@@ -303,13 +307,21 @@ export class CourseSession {
     if (!this.#answersTrimmedWarned) {
       this.#answersTrimmedWarned = true;
       console.warn(
-        `Tessera: the saved state is over the ${limit}-byte limit, so a quiz draw ` +
-          `not yet submitted and question answers are left out of it until it ` +
-          `fits. Those questions come back scored, without the answer shown, and ` +
-          `a quiz left before Submit draws a new set.`,
+        `Tessera: the saved state is over the ${limit}-byte limit, so question ` +
+          `answers are left out of it until it fits. Those questions come back ` +
+          `scored, without the answer shown.`,
       );
     }
-    return withAnswers(limit - bareSize);
+    const trimmed = withAnswers(limit - bareSize);
+    if (!this.#drawTrimmedWarned && drawCount(trimmed) < drawCount(state)) {
+      this.#drawTrimmedWarned = true;
+      console.warn(
+        `Tessera: the saved state is over the ${limit}-byte limit, so a quiz draw ` +
+          `not yet submitted is left out of it, and a quiz left before Submit ` +
+          `draws a new set.`,
+      );
+    }
+    return trimmed;
   }
 
   // Microtask-batched: mutations within one tick collapse to one save.

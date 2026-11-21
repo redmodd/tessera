@@ -36,7 +36,7 @@ export interface QuizPageState {
   score: number;
   unscored?: boolean;
   responses?: ReadonlyMap<string, unknown>;
-  /** The best attempt's question ids, in order, under `draw` or `shuffle`. */
+  /** The best attempt's question ids, in order; the engine reads them only under `draw` or `shuffle`. */
   questionIds?: readonly string[];
   /** The drawn attempt not yet submitted, under `draw` or `shuffle`. */
   drawn?: readonly string[];
