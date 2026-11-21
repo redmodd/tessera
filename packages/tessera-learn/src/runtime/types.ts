@@ -131,22 +131,16 @@ export function drawGroups<T>(
   draw: QuizConfig['draw'],
   items: readonly T[],
   poolOf: (item: T) => string | undefined,
-): { pool?: string; count: number; members: T[] }[] {
-  const group = (members: T[], count = members.length, pool?: string) => ({
-    pool,
-    count,
-    members,
-  });
-  if (!isRecord(draw)) return [group([...items], draw)];
+): { pool?: string; count: number; members: readonly T[] }[] {
+  if (!isRecord(draw)) return [{ count: draw ?? items.length, members: items }];
+  const unpooled = items.filter((item) => poolOf(item) === undefined);
   return [
-    group(items.filter((item) => poolOf(item) === undefined)),
-    ...Object.entries(draw).map(([pool, count]) =>
-      group(
-        items.filter((item) => poolOf(item) === pool),
-        count,
-        pool,
-      ),
-    ),
+    { count: unpooled.length, members: unpooled },
+    ...Object.entries(draw).map(([pool, count]) => ({
+      pool,
+      count,
+      members: items.filter((item) => poolOf(item) === pool),
+    })),
   ];
 }
 
@@ -156,12 +150,12 @@ export function drawShortfalls(
   pools: readonly (string | undefined)[],
 ): { count: number; size: number; from: string }[] {
   return drawGroups(draw, pools, (pool) => pool).flatMap(
-    ({ pool, count, members: { length: size } }) =>
-      count > size
+    ({ pool, count, members }) =>
+      count > members.length
         ? [
             {
               count,
-              size,
+              size: members.length,
               from: pool === undefined ? 'questions' : `from pool "${pool}"`,
             },
           ]

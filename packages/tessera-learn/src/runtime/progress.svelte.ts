@@ -19,6 +19,7 @@ import {
   type SavedState,
   type SuccessStatus,
 } from './persistence.js';
+import type { QuizPageState } from './contexts.js';
 
 type SavedProgress = Pick<SavedState, 'v' | 'g' | 'c' | 'm' | 's' | 'k' | 'p'>;
 
@@ -288,30 +289,25 @@ export class ProgressState {
     return !!this.gradedUnits.get(pageIndex)?.unscored;
   }
 
-  quizAttempts(pageIndex: number): number {
-    return this.gradedUnits.get(pageIndex)?.attempts ?? 0;
-  }
-
-  quizQuestionIds(pageIndex: number): readonly string[] | undefined {
-    return this.gradedUnits.get(pageIndex)?.questionIds;
-  }
-
-  quizDrawn(pageIndex: number): readonly string[] | undefined {
-    return this.gradedUnits.get(pageIndex)?.drawn;
+  quizState(pageIndex: number): QuizPageState {
+    const unit = this.gradedUnits.get(pageIndex);
+    return {
+      attempts: unit?.attempts ?? 0,
+      score: unit?.quizScore ?? 0,
+      unscored: !!unit?.unscored,
+      responses: new Map(
+        [...(unit?.responses ?? [])].map(([questionId, response]) => [
+          questionId,
+          JSON.parse(response),
+        ]),
+      ),
+      questionIds: unit?.questionIds,
+      drawn: unit?.drawn,
+    };
   }
 
   quizDraw(pageIndex: number, questionIds: readonly string[]) {
     this.#write(pageIndex, { drawn: questionIds });
-  }
-
-  quizResponses(pageIndex: number): Map<string, unknown> {
-    const responses = this.gradedUnits.get(pageIndex)?.responses ?? [];
-    return new Map(
-      [...responses].map(([questionId, response]) => [
-        questionId,
-        JSON.parse(response),
-      ]),
-    );
   }
 
   /**
@@ -659,7 +655,7 @@ export class ProgressState {
       return true;
     };
     const g: Record<string, GradedUnitState> = {};
-    const draws: [number, GradedUnitState, string[]][] = [];
+    const draws: [number, GradedUnitState, readonly string[]][] = [];
     for (const [pageIndex, unit] of this.gradedUnits) {
       const entry: GradedUnitState = {};
       if (unit.quizScore !== undefined) entry.s = unit.quizScore;
@@ -706,14 +702,14 @@ export class ProgressState {
         const o =
           ids &&
           !(ids.length === keys.length && ids.every((id, i) => id === keys[i]))
-            ? [...ids]
+            ? ids
             : undefined;
         if (afford(() => jsonSize({ ...entry, r, o }) - jsonSize(entry))) {
           entry.r = r;
           if (o) entry.o = o;
         }
       }
-      if (unit.drawn) draws.push([pageIndex, entry, [...unit.drawn]]);
+      if (unit.drawn) draws.push([pageIndex, entry, unit.drawn]);
       const unanswered = this.#unlistedUnanswered(pageIndex);
       if (unanswered.length > 0) entry.w = unanswered;
       if (Object.keys(entry).length > 0) g[pageIndex] = entry;

@@ -537,20 +537,22 @@ function validateQuestionPools(
   const pools: (string | undefined)[] = [];
   let counted = seesEveryQuestion;
   for (const match of questions) {
-    const id = staticQuestionId(match);
-    const subject = `<${match.name}>${id === null ? '' : ` "${id}"`}`;
     const prop = match.props.get('pool');
     const literal = literalValue(prop);
-    if (match.hasSpread || match.branches.size > 0 || (prop && !literal))
-      counted = false;
     const pool = literal?.value;
     const problem = poolProblem(draw, pool);
-    if (problem) d.error(`${subject} ${problem}`);
-    if (pool !== undefined && typeof pool !== 'string') {
-      counted = false;
-      continue;
+    if (problem) {
+      const id = staticQuestionId(match);
+      d.error(`<${match.name}>${id === null ? '' : ` "${id}"`} ${problem}`);
     }
-    pools.push(pool);
+    if (
+      match.hasSpread ||
+      match.branches.size > 0 ||
+      (prop && !literal) ||
+      (pool !== undefined && typeof pool !== 'string')
+    )
+      counted = false;
+    else pools.push(pool);
   }
   if (!counted) return;
   for (const { count, size, from } of drawShortfalls(draw, pools)) {

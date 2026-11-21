@@ -20,7 +20,7 @@ interface EngineProbe {
   /** The responses handed to progress with each score, in order. */
   responses: Array<Record<string, unknown>>;
   /** The attempt's question ids handed to progress with each score, in order. */
-  questionIds: Array<string[] | undefined>;
+  questionIds: Array<readonly string[] | undefined>;
   /** Every fresh draw handed to progress, in order. */
   draws: (readonly string[])[];
   /** Every interaction reported to the (injected) adapter, in order. */
@@ -1158,7 +1158,7 @@ describe('QuizEngine quiz bank', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     await Promise.resolve();
 
-    expect(ids(engine)).toEqual(['b', 'c', 'a']);
+    expect(ids(engine)).toEqual(['c', 'a', 'b']);
   });
 
   it('submits, scores, reports and saves only the attempt', async () => {

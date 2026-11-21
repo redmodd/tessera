@@ -41,7 +41,7 @@ export interface QuizEngineDeps {
     score: number,
     responses: Map<string, unknown>,
     scored: boolean,
-    questionIds?: string[],
+    questionIds?: readonly string[],
   ) => void;
   /** Keeps a fresh draw until it is submitted, so leaving the page can't redraw it. */
   onDraw?: (questionIds: readonly string[]) => void;
@@ -212,7 +212,7 @@ export class QuizEngine implements UseQuizHandle {
     return this.#maxAttempts;
   }
 
-  /** Dev-warning inputs the wrapper reads in onDestroy. */
+  /** Dev-warning inputs the wrapper reads in onMount and onDestroy. */
   get stats(): {
     registeredCount: number;
     questionsCount: number;
@@ -305,7 +305,7 @@ export class QuizEngine implements UseQuizHandle {
 
   #draw(): string[] {
     let picked = this.#drawGroups().flatMap(({ count, members }) =>
-      count < members.length ? shuffle(members).slice(0, count) : members,
+      shuffle(members).slice(0, count),
     );
     if (this.#deps.quizConfig.shuffle) picked = shuffle(picked);
     else {
