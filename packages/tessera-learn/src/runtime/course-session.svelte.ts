@@ -303,9 +303,10 @@ export class CourseSession {
     if (!this.#answersTrimmedWarned) {
       this.#answersTrimmedWarned = true;
       console.warn(
-        `Tessera: the saved state is over the ${limit}-byte limit, so question ` +
-          `answers are left out of it until it fits. Those questions come back ` +
-          `scored, without the answer shown.`,
+        `Tessera: the saved state is over the ${limit}-byte limit, so a quiz draw ` +
+          `not yet submitted and question answers are left out of it until it ` +
+          `fits. Those questions come back scored, without the answer shown, and ` +
+          `a quiz left before Submit draws a new set.`,
       );
     }
     return withAnswers(limit - bareSize);

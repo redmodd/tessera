@@ -97,6 +97,8 @@ export class QuizEngine implements UseQuizHandle {
   #drawQueued = false;
   #savedDraw: readonly string[] | null = null;
   #persistedDraw: readonly string[] | null = null;
+  // An incorrect-only retry asks the same attempt again, answered or not.
+  #attemptKept = false;
   #poolsChecked = false;
 
   constructor(deps: QuizEngineDeps) {
@@ -269,7 +271,11 @@ export class QuizEngine implements UseQuizHandle {
 
   /** An answer to a question outside the attempt doesn't start it. */
   get #started(): boolean {
-    return this.#submitted || this.#attempt.some((i) => this.#answers.has(i));
+    return (
+      this.#submitted ||
+      this.#attemptKept ||
+      this.#attempt.some((i) => this.#answers.has(i))
+    );
   }
 
   /**
@@ -526,6 +532,7 @@ export class QuizEngine implements UseQuizHandle {
     this.#fromSave = false;
     this.#reviewing = false;
     this.#score = 0;
+    this.#attemptKept = incorrectOnly && !redraw;
     if (redraw) this.#drawAttempt();
   }
 

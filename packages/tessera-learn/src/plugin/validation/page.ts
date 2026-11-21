@@ -172,8 +172,7 @@ function validatePageFile(
   validateQuestionComponents(questionComponents, d, profile);
   if (isQuiz && isValidDraw(quiz.draw)) {
     validateQuestionPools(quiz.draw, questionComponents, d, {
-      seesEveryQuestion:
-        !importsOutsideTessera(content) && useQuestions === 'absent',
+      seesEveryQuestion: !hidesQuestions(content) && useQuestions === 'absent',
     });
   }
   validateMediaComponents(content, d);
@@ -398,23 +397,28 @@ const KNOWN_PAGE_FIELDS = new Set(
 // A local import may wrap useQuestion, so its presence suppresses the "no
 // questions" warning: false negatives are fine for an advisory heuristic.
 function hasLocalModuleImport(content: string): boolean {
-  return codeImports(content).some((from) => /^(?:\.{1,2}\/|\$)/.test(from));
-}
-
-/** A component from a local file or a package may render questions the build can't see. */
-function importsOutsideTessera(content: string): boolean {
-  return codeImports(content).some(
-    (from) => !/^(?:tessera-learn|svelte)(?:\/|$)/.test(from),
+  return codeImports(content).some(({ from }) =>
+    /^(?:\.{1,2}\/|\$)/.test(from),
   );
 }
 
-function codeImports(content: string): string[] {
-  return scriptImports(content)
-    .map(({ from }) => from)
-    .filter((from) => {
-      const file = from.slice(from.lastIndexOf('/') + 1);
-      return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
-    });
+/**
+ * A component from a local file or a package, or one from tessera-learn
+ * under another name, may render questions the build can't see.
+ */
+function hidesQuestions(content: string): boolean {
+  return codeImports(content).some(({ from, renames }) =>
+    /^tessera-learn(?:\/|$)/.test(from)
+      ? renames
+      : !/^svelte(?:\/|$)/.test(from),
+  );
+}
+
+function codeImports(content: string) {
+  return scriptImports(content).filter(({ from }) => {
+    const file = from.slice(from.lastIndexOf('/') + 1);
+    return !file.includes('.') || /\.(?:svelte|js|ts)$/.test(file);
+  });
 }
 
 function splitsAcrossBranches(questions: ComponentMatch[]): boolean {
@@ -540,13 +544,12 @@ function validateQuestionPools(
     if (match.hasSpread || match.branches.size > 0 || (prop && !literal))
       counted = false;
     const pool = literal?.value;
+    const problem = poolProblem(draw, pool);
+    if (problem) d.error(`${subject} ${problem}`);
     if (pool !== undefined && typeof pool !== 'string') {
-      d.error(`${subject} pool must be a string, got ${formatValue(pool)}`);
       counted = false;
       continue;
     }
-    const problem = poolProblem(draw, pool);
-    if (problem) d.error(`${subject} ${problem}`);
     pools.push(pool);
   }
   if (!counted) return;

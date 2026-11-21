@@ -98,9 +98,12 @@ export interface QuizConfig {
 /** Why `draw` never draws a question that names `pool`, else undefined. */
 export function poolProblem(
   draw: QuizConfig['draw'],
-  pool: string | undefined,
+  pool: unknown,
 ): string | undefined {
   if (pool === undefined) return undefined;
+  if (typeof pool !== 'string') {
+    return `pool must be a string, got ${typeof pool}, so it is never drawn.`;
+  }
   if (!isRecord(draw)) {
     return (
       `names pool "${pool}", but quiz.draw is not { pool: count }, so the ` +

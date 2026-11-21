@@ -410,7 +410,7 @@ The built-in `<Quiz>` shows one question at a time (Back / Next / Submit), then 
 
 ### Question banks
 
-Write every question on the page with a literal `id`; the quiz picks which of them make up each attempt. `retryMode: "full"` draws a new set (and order) on Retry; `"incorrect-only"` keeps the attempt's questions and order. The draw is saved, so leaving the page or reloading before Submit asks the same questions again, and a return visit after Submit gets them back with review. When the save could not keep the answers (see [`restored`](docs/hooks.md#usequiz)), it keeps no questions either, and Retry draws a new set in both modes.
+Write every question on the page with a literal `id`; the quiz picks which of them make up each attempt. `retryMode: "full"` draws a new set (and order) on Retry; `"incorrect-only"` keeps the attempt's questions and order. The draw is saved, so leaving the page or reloading before Submit asks the same questions again (unless the save is over the LMS size limit), and a return visit after Submit gets them back with review. When the save could not keep the answers (see [`restored`](docs/hooks.md#usequiz)), it keeps no questions either, and Retry draws a new set in both modes.
 
 ```svelte
 <script module>

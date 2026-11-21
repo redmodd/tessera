@@ -311,6 +311,8 @@ function locallyImportedNames(root: Node): Set<string> {
 interface ScriptImport {
   from: string;
   locals: string[];
+  /** Binds an export under another name: `x as y`, `* as ns` or a default. */
+  renames: boolean;
 }
 
 /** Every `import` in a component's instance and module scripts, or none if it doesn't parse. */
@@ -327,10 +329,17 @@ function importsOf(root: Node): ScriptImport[] {
       const from = (node.source as Node | undefined)?.value;
       if (node.type !== 'ImportDeclaration' || typeof from !== 'string')
         continue;
+      const specifiers = (node.specifiers as Node[]) ?? [];
       imports.push({
         from,
-        locals: ((node.specifiers as Node[]) ?? []).map(
+        locals: specifiers.map(
           (specifier) => (specifier.local as Node).name as string,
+        ),
+        renames: specifiers.some(
+          (specifier) =>
+            specifier.type !== 'ImportSpecifier' ||
+            (specifier.imported as Node).name !==
+              (specifier.local as Node).name,
         ),
       });
     }

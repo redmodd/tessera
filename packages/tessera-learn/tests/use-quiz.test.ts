@@ -1219,6 +1219,35 @@ describe('QuizEngine quiz bank', () => {
     }
   });
 
+  it('leaves a late question out of an incorrect-only retry that kept no answer', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const { engine } = makeEngine({
+      graded: true,
+      draw: 2,
+      retryMode: 'incorrect-only',
+    });
+    const wrong = (id: string) => ({
+      ...pooled(id),
+      ...tfQuestion(id, false, true),
+    });
+    register(engine, wrong('a'), wrong('b'), wrong('c'));
+    await Promise.resolve();
+    answerAll(engine);
+    engine.submit();
+
+    engine.retry();
+    random.mockReturnValue(0);
+    const [late] = register(engine, pooled('late'));
+    await Promise.resolve();
+
+    expect(ids(engine)).toEqual(['a', 'b']);
+    expect(late.inAttempt).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/"late" registered after the learner started/),
+    );
+  });
+
   describe('resumed', () => {
     const saved = {
       attempts: 1,
@@ -1479,6 +1508,17 @@ describe('QuizEngine quiz bank', () => {
     answerAll(engine);
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(/"x" names pool "basics", but quiz.draw is not/),
+    );
+  });
+
+  it('warns about a pool that is not a string, which no draw count matches', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine } = makeEngine({ graded: true, draw: { '1': 1 } });
+    register(engine, pooled('x', 1 as unknown as string));
+
+    engine.setAnswer(0, true);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/"x" pool must be a string, got number/),
     );
   });
 

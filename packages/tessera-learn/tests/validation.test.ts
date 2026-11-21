@@ -1623,6 +1623,23 @@ ${questions}`,
       },
     );
 
+    it.each([
+      [
+        "import { MultipleChoice as MC } from 'tessera-learn';",
+        '<MC id="a" question="Q?" options={[\'x\', \'y\']} correct={0} />',
+      ],
+      [
+        "import * as T from 'tessera-learn';",
+        '<T.MultipleChoice id="a" question="Q?" options={[\'x\', \'y\']} correct={0} />',
+      ],
+    ])(
+      'skips the count when a question is rendered under another name: %s',
+      (imp, q) => {
+        const { errors } = bankPage('{ draw: 1 }', q, `\n  ${imp}`);
+        expect(errors.filter((e) => e.includes('asks for'))).toEqual([]);
+      },
+    );
+
     it('skips the count for a question inside a snippet', () => {
       const { errors } = bankPage(
         '{ draw: 2 }',
