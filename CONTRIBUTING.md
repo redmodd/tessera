@@ -4,7 +4,7 @@ Thanks for your interest in contributing. This document covers how to get the re
 
 ## Prerequisites
 
-- Node.js >= 24 (CI tests Node 24 and 26)
+- Node.js >= 24.15 (CI tests Node 24 and 26)
 - [pnpm](https://pnpm.io/) (the repo is a pnpm workspace; `package.json` pins the version in `packageManager`)
 
 ## Getting set up

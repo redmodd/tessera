@@ -47,7 +47,7 @@ pnpm fix              # autofix: prettier --write + eslint --fix
 pnpm changeset        # record a release note for a user-facing change
 ```
 
-Node >= 24, pnpm (version pinned in `packageManager`). First-time full setup (install + build + Playwright browsers): `./scripts/setup-e2e.sh`.
+Node >= 24.15, pnpm (version pinned in `packageManager`). First-time full setup (install + build + Playwright browsers): `./scripts/setup-e2e.sh`.
 
 Per-package or single-file runs and the e2e variant pre-build are documented in [TESTING.md](./TESTING.md).
 

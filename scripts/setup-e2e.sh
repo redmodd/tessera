@@ -12,9 +12,8 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
-NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
-if [ "$NODE_MAJOR" -lt 24 ]; then
-  echo "error: Node 24+ required (found $(node -v))." >&2
+if ! node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 24 || (a === 24 && b >= 15) ? 0 : 1)'; then
+  echo "error: Node 24.15+ required (found $(node -v))." >&2
   exit 1
 fi
 
