@@ -110,14 +110,14 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^5.1.0",
-    "jsdom": "^31.0.0",
+    "@vitest/coverage-v8": "^5.1.1",
+    "jsdom": "^31.0.1",
     "playwright": "^1.65.1",
     "scorm-again": "3.5.0",
-    "svelte": "^5.57.3",
+    "svelte": "^5.59.1",
     "svelte-check": "^4.7.8",
     "tsdown": "^0.23.7",
     "typescript": "^6.0.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }
